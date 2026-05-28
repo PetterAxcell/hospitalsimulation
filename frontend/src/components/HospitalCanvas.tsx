@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { KIND_COLORS } from '../data/catalog'
-import { clampRoom } from '../engine/geometry'
-import type { EquipmentKind, HospitalPlan, PlacedRoom } from '../types'
+import { KIND_COLORS, DEFAULT_CHANNEL_CONFIGS } from '../data/catalog'
+import { clampRoom, renderChannels } from '../engine/geometry'
+import type { ChannelConfig, EquipmentKind, HospitalPlan, PlacedRoom } from '../types'
 
 interface HospitalCanvasProps {
   plan: HospitalPlan
@@ -9,6 +9,8 @@ interface HospitalCanvasProps {
   selectedRoomId?: string
   onSelectRoom: (roomId: string) => void
   onChangeRoom: (room: PlacedRoom) => void
+  channelConfigs?: ChannelConfig[]
+  showChannels?: boolean
 }
 
 interface DragState {
@@ -20,7 +22,10 @@ interface DragState {
 const WORLD_W = 100
 const WORLD_H = 70
 
-export function HospitalCanvas({ plan, selectedFloor, selectedRoomId, onSelectRoom, onChangeRoom }: HospitalCanvasProps) {
+export function HospitalCanvas({
+  plan, selectedFloor, selectedRoomId, onSelectRoom, onChangeRoom,
+  channelConfigs = DEFAULT_CHANNEL_CONFIGS, showChannels = true,
+}: HospitalCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
   const floorRooms = useMemo(() => plan.rooms.filter((room) => room.floor === selectedFloor), [plan.rooms, selectedFloor])
@@ -35,8 +40,8 @@ export function HospitalCanvas({ plan, selectedFloor, selectedRoomId, onSelectRo
     canvas.width = Math.round(rect.width * ratio)
     canvas.height = Math.round(rect.height * ratio)
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-    drawHospital(ctx, rect.width, rect.height, floorRooms, selectedRoomId)
-  }, [floorRooms, selectedRoomId])
+    drawHospital(ctx, rect.width, rect.height, floorRooms, selectedRoomId, channelConfigs, plan.rooms, selectedFloor, showChannels)
+  }, [floorRooms, selectedRoomId, channelConfigs, plan.rooms, selectedFloor, showChannels])
 
   function worldFromEvent(event: React.PointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current
@@ -90,13 +95,23 @@ export function HospitalCanvas({ plan, selectedFloor, selectedRoomId, onSelectRo
   )
 }
 
-function drawHospital(ctx: CanvasRenderingContext2D, width: number, height: number, rooms: PlacedRoom[], selectedRoomId?: string) {
+function drawHospital(
+  ctx: CanvasRenderingContext2D, width: number, height: number,
+  rooms: PlacedRoom[], selectedRoomId?: string,
+  channelConfigs?: ChannelConfig[], allRooms?: PlacedRoom[], currentFloor?: number, showChannels?: boolean,
+) {
   const scale = Math.min(width / WORLD_W, height / WORLD_H)
   const ox = (width - WORLD_W * scale) / 2
   const oy = (height - WORLD_H * scale) / 2
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = '#eef4ec'
   ctx.fillRect(0, 0, width, height)
+
+  // Draw channels first (behind rooms)
+  if (showChannels && channelConfigs && allRooms && currentFloor !== undefined) {
+    const occupancyMap = new Map<string, number>()
+    renderChannels(ctx, channelConfigs, allRooms, currentFloor, occupancyMap, WORLD_W, WORLD_H, width, height)
+  }
 
   function sx(x: number) {
     return ox + x * scale

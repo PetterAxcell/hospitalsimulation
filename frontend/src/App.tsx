@@ -2,11 +2,19 @@ import { useMemo, useState } from 'react'
 import './App.css'
 import { HospitalCanvas } from './components/HospitalCanvas'
 import { SimulationCanvas } from './components/SimulationCanvas'
-import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
+import {
+  KIND_LABELS, ROOM_TEMPLATES, templateById,
+  DEFAULT_CHANNEL_CONFIGS, DEFAULT_DISRUPTOR_TEMPLATES,
+} from './data/catalog'
 import { PROGRAM_AREA_SCALE, createTertiaryHospitalPlan } from './data/presets'
-import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
+import {
+  evaluateArchitectureRules, evaluateSpecialistCoverage,
+  evaluateChannelDensity, evaluateEmergencyResponse,
+  type ArchitectureRuleResult,
+} from './engine/architectureRules'
 import { clampRoom, distance, overlapScore, roomByNode } from './engine/geometry'
-import { DEFAULT_SIMULATION_SETTINGS, type SimulationSettings } from './engine/simulation'
+import { DEFAULT_SIMULATION_SETTINGS } from './engine/simulation'
+import type { SimulationSettings } from './types'
 import type { HospitalPlan, PlacedRoom, SimulationResult } from './types'
 
 type WorkspaceTab = 'plan' | 'simulation' | 'services' | 'analysis'
@@ -21,6 +29,8 @@ function App() {
   const [templateToAdd, setTemplateToAdd] = useState('edBoxes')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null)
+  const [showChannels] = useState(true)
+  const [manualDisruptor, setManualDisruptor] = useState('')
 
   const selectedRoom = plan.rooms.find((room) => room.id === selectedRoomId)
   const activeFloorRooms = plan.rooms.filter((room) => room.floor === selectedFloor)
@@ -148,6 +158,8 @@ function App() {
               selectedRoomId={selectedRoomId}
               onSelectRoom={setSelectedRoomId}
               onChangeRoom={updateRoom}
+              channelConfigs={simulationSettings.channelConfigs}
+              showChannels={showChannels}
             />
           )}
 
@@ -157,6 +169,7 @@ function App() {
               selectedFloor={selectedFloor}
               settings={simulationSettings}
               onResult={setSimulationResult}
+              channelConfigs={simulationSettings.channelConfigs}
             />
           )}
 
@@ -171,6 +184,9 @@ function App() {
               onChange={setSimulationSettings}
               result={simulationResult}
               rules={rules}
+              manualDisruptor={manualDisruptor}
+              onManualDisruptorChange={setManualDisruptor}
+              selectedRoomName={selectedRoom?.name ?? '(selecciona una sala)'}
             />
           ) : (
             <RoomInspector
@@ -278,11 +294,17 @@ function SimulationControls({
   result,
   rules,
   onChange,
+  manualDisruptor,
+  onManualDisruptorChange,
+  selectedRoomName,
 }: {
   settings: SimulationSettings
   result: SimulationResult | null
   rules: ArchitectureRuleResult[]
   onChange: (settings: SimulationSettings) => void
+  manualDisruptor: string
+  onManualDisruptorChange: (value: string) => void
+  selectedRoomName: string
 }) {
   const failingRules = rules.filter((rule) => rule.status !== 'ok')
 
@@ -291,15 +313,14 @@ function SimulationControls({
       <section className="panel-section">
         <h2>Parametros</h2>
         <label>
-          Llegadas/hora
+          Pacientes totales
           <input
-            type="range"
-            min={3}
-            max={24}
-            value={settings.arrivalsPerHour}
-            onChange={(event) => onChange({ ...settings, arrivalsPerHour: Number(event.target.value) })}
+            type="number"
+            min={10}
+            max={1000}
+            value={settings.totalPatients ?? settings.arrivalsPerHour * settings.durationHours}
+            onChange={(event) => onChange({ ...settings, totalPatients: Number(event.target.value) })}
           />
-          <output>{settings.arrivalsPerHour}</output>
         </label>
         <label>
           Duracion horas
@@ -327,11 +348,119 @@ function SimulationControls({
       </section>
 
       <section className="panel-section">
+        <h2>Staff</h2>
+        <label>
+          Specialists {Math.round(settings.staffProportions.specialist * 100)}%
+          <input
+            type="range" min={5} max={40} step={1}
+            value={Math.round(settings.staffProportions.specialist * 100)}
+            onChange={(event) => onChange({
+              ...settings,
+              staffProportions: { ...settings.staffProportions, specialist: Number(event.target.value) / 100 },
+            })}
+          />
+        </label>
+        <label>
+          Nurses {Math.round(settings.staffProportions.nurse * 100)}%
+          <input
+            type="range" min={20} max={60} step={1}
+            value={Math.round(settings.staffProportions.nurse * 100)}
+            onChange={(event) => onChange({
+              ...settings,
+              staffProportions: { ...settings.staffProportions, nurse: Number(event.target.value) / 100 },
+            })}
+          />
+        </label>
+        <label>
+          Technicians {Math.round(settings.staffProportions.technician * 100)}%
+          <input
+            type="range" min={10} max={50} step={1}
+            value={Math.round(settings.staffProportions.technician * 100)}
+            onChange={(event) => onChange({
+              ...settings,
+              staffProportions: { ...settings.staffProportions, technician: Number(event.target.value) / 100 },
+            })}
+          />
+        </label>
+        <label>
+          Security {Math.round(settings.staffProportions.security * 100)}%
+          <input
+            type="range" min={1} max={15} step={1}
+            value={Math.round(settings.staffProportions.security * 100)}
+            onChange={(event) => onChange({
+              ...settings,
+              staffProportions: { ...settings.staffProportions, security: Number(event.target.value) / 100 },
+            })}
+          />
+        </label>
+        <label>
+          Emergency team ratio (1/{settings.emergencyTeamRatio})
+          <input
+            type="range" min={50} max={500} step={10}
+            value={settings.emergencyTeamRatio}
+            onChange={(event) => onChange({ ...settings, emergencyTeamRatio: Number(event.target.value) })}
+          />
+        </label>
+      </section>
+
+      <section className="panel-section">
+        <h2>Perturbadores</h2>
+        <label>
+          Probabilidad por paciente
+          <input
+            type="range" min={0} max={20} step={1}
+            value={Math.round(settings.disruptorProbability * 100)}
+            onChange={(event) => onChange({ ...settings, disruptorProbability: Number(event.target.value) / 100 })}
+          />
+          <output>{Math.round(settings.disruptorProbability * 100)}%</output>
+        </label>
+        <label>
+          Eventos por hora
+          <input
+            type="range" min={0} max={5} step={0.5}
+            value={settings.disruptorEventsPerHour}
+            onChange={(event) => onChange({ ...settings, disruptorEventsPerHour: Number(event.target.value) })}
+          />
+          <output>{settings.disruptorEventsPerHour}</output>
+        </label>
+      </section>
+
+      <section className="panel-section">
+        <h2>⚠️ Inyectar perturbación</h2>
+        <select value={manualDisruptor} onChange={(e) => {
+          const value = e.target.value
+          onManualDisruptorChange(value)
+          if (value) {
+            onChange({ ...settings, seed: settings.seed + 1 })
+          }
+        }}>
+          <option value="">Seleccionar tipo...</option>
+          {DEFAULT_DISRUPTOR_TEMPLATES.map(t => (
+            <option key={t.id} value={t.id}>{t.icon} {t.name}</option>
+          ))}
+        </select>
+        <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+          Sala: {selectedRoomName}
+        </p>
+      </section>
+
+      <section className="panel-section">
         <h2>Resultado</h2>
         <Metric label="Pacientes" value={String(result?.kpis.completed ?? 0)} />
         <Metric label="ED P90" value={`${result?.kpis.edP90Minutes ?? 0} min`} />
         <Metric label="Traslado medio" value={`${result?.kpis.averageTravelMinutes ?? 0} min`} />
-        <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
+        <Metric label="Staff total" value={String(result?.kpis.totalStaff ?? 0)} />
+        {result && result.kpis.disruptorEvents_total > 0 && (
+          <>
+            <Metric label="Eventos" value={String(result.kpis.disruptorEvents_total)} />
+            <Metric label="Resueltos" value={String(result.kpis.disruptorEvents_resolved)} />
+            <Metric label="Escalados" value={String(result.kpis.disruptorEvents_escalated)} />
+            <Metric label="Tasa escalado" value={`${(result.kpis.disruptorEvents_escalationRate * 100).toFixed(0)}%`} />
+            <Metric label="Tiempo respuesta" value={`${result.kpis.disruptorEvents_avgResponseTime.toFixed(1)} min`} />
+            <Metric label="Salas bloqueadas" value={String(result.kpis.disruptorEvents_roomsBlocked)} />
+          </>
+        )}
+        <Metric label="Canales saturados" value={String(result?.kpis.channelCongestionHotspots ?? 0)} />
       </section>
 
       <section className="panel-section">
@@ -410,11 +539,21 @@ function AnalysisPanel({
     ['Quirofano a UCI', or, icu],
     ['PACU a ward', roomByNode(plan.rooms, 'pacu'), ward],
   ] as const
-  const groupedRules = rules.reduce<Record<string, ArchitectureRuleResult[]>>((acc, rule) => {
-    acc[rule.category] ??= []
-    acc[rule.category].push(rule)
-    return acc
-  }, {})
+
+  // Combine all rules including new ones
+  const allRules = [
+    ...rules,
+    ...evaluateSpecialistCoverage(plan),
+    ...evaluateChannelDensity(plan, DEFAULT_CHANNEL_CONFIGS),
+    ...evaluateEmergencyResponse(plan, DEFAULT_CHANNEL_CONFIGS),
+  ]
+
+  const groupedAllRules =
+    allRules.reduce<Record<string, ArchitectureRuleResult[]>>((acc, rule) => {
+      acc[rule.category] ??= []
+      acc[rule.category].push(rule)
+      return acc
+    }, {})
 
   return (
     <div className="analysis-grid">
@@ -427,7 +566,7 @@ function AnalysisPanel({
       <section className="analysis-block">
         <h2>Seguridad funcional</h2>
         <div className="rule-list">
-          {Object.entries(groupedRules).map(([category, categoryRules]) => (
+          {Object.entries(groupedAllRules).map(([category, categoryRules]) => (
             <div key={category} className="rule-category">
               <h3>{category}</h3>
               {categoryRules.map((rule) => (
@@ -443,7 +582,22 @@ function AnalysisPanel({
       <section className="analysis-block">
         <h2>Simulacion</h2>
         <Metric label="Zona mas cargada" value={result?.kpis.hottestRoomName ?? '-'} />
-        <Metric label="Avisos" value={String(rules.filter((rule) => rule.status !== 'ok').length)} />
+        <Metric label="Staff total" value={String(result?.kpis.totalStaff ?? 0)} />
+        <Metric label="Canales saturados" value={String(result?.kpis.channelCongestionHotspots ?? 0)} />
+        {result && result.kpis.disruptorEvents_total > 0 && (
+          <>
+            <h3>Perturbadores</h3>
+            <Metric label="Eventos" value={String(result.kpis.disruptorEvents_total)} />
+            <Metric label="Resueltos" value={String(result.kpis.disruptorEvents_resolved)} />
+            <Metric label="Escalados" value={String(result.kpis.disruptorEvents_escalated)} />
+            <Metric label="Tiempo respuesta" value={`${result.kpis.disruptorEvents_avgResponseTime.toFixed(1)} min`} />
+            <Metric label="Tiempo resolucion" value={`${result.kpis.disruptorEvents_avgResolutionTime.toFixed(1)} min`} />
+            <Metric label="Propagaciones" value={String(result.kpis.disruptorEvents_propagationCount)} />
+            <Metric label="Salas bloqueadas" value={String(result.kpis.disruptorEvents_roomsBlocked)} />
+            <Metric label="Pacientes afectados" value={String(result.kpis.disruptorEvents_patientsAffected)} />
+          </>
+        )}
+        <Metric label="Avisos" value={String(allRules.filter((rule) => rule.status !== 'ok').length)} />
       </section>
     </div>
   )

@@ -1,24 +1,46 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { KIND_COLORS } from '../data/catalog'
-import { center, roomByNode } from '../engine/geometry'
-import { positionAt, runHospitalSimulation, type SimulationSettings } from '../engine/simulation'
-import type { EquipmentKind, HospitalPlan, PlacedRoom, SimulationResult } from '../types'
+import { KIND_COLORS, DEFAULT_CHANNEL_CONFIGS } from '../data/catalog'
+import { center, roomByNode, renderChannels } from '../engine/geometry'
+import { positionAt, runHospitalSimulation } from '../engine/simulation'
+import type { SimulationSettings } from '../types'
+import type { ChannelConfig, DisruptorEvent, EquipmentKind, HospitalPlan, PlacedRoom, SimulationResult } from '../types'
 
 interface SimulationCanvasProps {
   plan: HospitalPlan
   selectedFloor: number
   settings: SimulationSettings
   onResult: (result: SimulationResult) => void
+  channelConfigs?: ChannelConfig[]
 }
 
 const WORLD_W = 100
 const WORLD_H = 70
 
-export function SimulationCanvas({ plan, selectedFloor, settings, onResult }: SimulationCanvasProps) {
+const DISRUPTOR_ICONS: Record<string, string> = {
+  suicidal_patient: '⚠️',
+  criminal_theft: '🚔',
+  terrorist_threat: '🚨',
+  cardiac_arrest: '❤️‍🔥',
+  violent_relative: '💢',
+  fire_outbreak: '🔥',
+  biohazard_spill: '☣️',
+  power_outage: '⚡',
+  elevator_failure: '🛗',
+  massive_hemorrhage: '🩸',
+  anaphylactic_shock: '💉',
+  patient_escape: '🏃',
+  gas_leak: '💨',
+  cyber_attack: '💻',
+  maternity_emergency: '👶',
+}
+
+export function SimulationCanvas({
+  plan, selectedFloor, settings, onResult, channelConfigs = DEFAULT_CHANNEL_CONFIGS,
+}: SimulationCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [minute, setMinute] = useState(0)
   const [playing, setPlaying] = useState(true)
-  const [viewMode, setViewMode] = useState<'rpg' | 'flows' | 'rules'>('rpg')
+  const [viewMode, setViewMode] = useState<'rpg' | 'flows' | 'rules' | 'disruptors'>('rpg')
   const result = useMemo(() => runHospitalSimulation(plan, settings), [plan, settings])
 
   useEffect(() => {
@@ -50,8 +72,8 @@ export function SimulationCanvas({ plan, selectedFloor, settings, onResult }: Si
     canvas.width = Math.round(rect.width * ratio)
     canvas.height = Math.round(rect.height * ratio)
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-    drawSimulation(ctx, rect.width, rect.height, plan, selectedFloor, result, minute, viewMode)
-  }, [minute, plan, result, selectedFloor, viewMode])
+    drawSimulation(ctx, rect.width, rect.height, plan, selectedFloor, result, minute, viewMode, channelConfigs)
+  }, [minute, plan, result, selectedFloor, viewMode, channelConfigs])
 
   return (
     <div className="simulation-stage">
@@ -68,11 +90,17 @@ export function SimulationCanvas({ plan, selectedFloor, settings, onResult }: Si
           }}
         />
         <span>{formatTime(minute)}</span>
-        <select value={viewMode} onChange={(event) => setViewMode(event.target.value as 'rpg' | 'flows' | 'rules')} aria-label="Capa visual">
+        <select value={viewMode} onChange={(event) => setViewMode(event.target.value as 'rpg' | 'flows' | 'rules' | 'disruptors')} aria-label="Capa visual">
           <option value="rpg">RPG</option>
           <option value="flows">Flujos</option>
           <option value="rules">Reglas</option>
+          <option value="disruptors">Perturbadores</option>
         </select>
+        <span className="sim-kpi-badge">
+          {result.kpis.disruptorEvents_total > 0
+            ? `🚨 ${result.kpis.disruptorEvents_resolved}/${result.kpis.disruptorEvents_total}`
+            : `👤 ${result.kpis.completed}`}
+        </span>
       </div>
       <canvas ref={canvasRef} className="hospital-canvas simulation-canvas" aria-label="Simulacion visual del hospital" />
     </div>
@@ -81,13 +109,11 @@ export function SimulationCanvas({ plan, selectedFloor, settings, onResult }: Si
 
 function drawSimulation(
   ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  plan: HospitalPlan,
-  selectedFloor: number,
-  result: SimulationResult,
-  minute: number,
-  viewMode: 'rpg' | 'flows' | 'rules',
+  width: number, height: number,
+  plan: HospitalPlan, selectedFloor: number,
+  result: SimulationResult, minute: number,
+  viewMode: 'rpg' | 'flows' | 'rules' | 'disruptors',
+  channelConfigs: ChannelConfig[],
 ) {
   const scale = Math.min(width / WORLD_W, height / WORLD_H)
   const ox = (width - WORLD_W * scale) / 2
@@ -97,6 +123,14 @@ function drawSimulation(
   const rooms = plan.rooms.filter((room) => room.floor === selectedFloor)
   ctx.clearRect(0, 0, width, height)
   drawGameBackground(ctx, sx, sy, scale, selectedFloor)
+
+  // Draw channels
+  const occupancyMap = new Map<string, number>()
+  for (const co of result.channelOccupancy) {
+    occupancyMap.set(co.channelId, co.activeMovements)
+  }
+  renderChannels(ctx, channelConfigs, plan.rooms, selectedFloor, occupancyMap, WORLD_W, WORLD_H, width, height)
+
   drawCampusRoutes(ctx, sx, sy, scale, selectedFloor)
 
   rooms.forEach((room) => {
@@ -108,7 +142,34 @@ function drawSimulation(
       ctx.fillRect(sx(room.x), sy(room.y), room.w * scale, room.h * scale)
     }
     drawRoomLabel(ctx, room, sx, sy, scale, `${result.roomPressure[room.id] ?? 0}/${room.capacity}`)
+
+    // Heatmap: occupancy percentage overlay
+    const occRatio = (result.roomPressure[room.id] ?? 0) / Math.max(1, room.capacity)
+    if (occRatio > 0.15) {
+      const intensity = Math.min(0.5, (occRatio - 0.15) * 0.7)
+      ctx.fillStyle = `rgba(231, 76, 60, ${intensity})`
+      ctx.fillRect(sx(room.x), sy(room.y), room.w * scale, room.h * scale)
+      ctx.fillStyle = '#fff'
+      ctx.font = '700 11px Inter, sans-serif'
+      ctx.textAlign = 'right'
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'
+      ctx.shadowBlur = 3
+      ctx.fillText(`${Math.round(occRatio * 100)}%`, sx(room.x + room.w - 0.5), sy(room.y + 1.5))
+      ctx.shadowBlur = 0
+    }
   })
+
+  // Draw disruptor events
+  if (viewMode === 'disruptors' || viewMode === 'rpg') {
+    const activeEvents = result.disruptorEvents.filter(
+      (e) => e.state === 'active' || e.state === 'in_progress' || e.state === 'escalated',
+    )
+    for (const event of activeEvents) {
+      const eventRoom = plan.rooms.find((r) => r.id === event.roomId)
+      if (!eventRoom || eventRoom.floor !== selectedFloor) continue
+      drawDisruptorEvent(ctx, event, eventRoom, sx, sy, scale, minute)
+    }
+  }
 
   if (viewMode === 'flows' || viewMode === 'rules') {
     drawFlowOverlay(ctx, plan, selectedFloor, sx, sy, scale, viewMode)
@@ -515,4 +576,46 @@ function formatTime(minutes: number) {
   const hour = Math.floor(minutes / 60)
   const minute = Math.floor(minutes % 60)
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+function drawDisruptorEvent(
+  ctx: CanvasRenderingContext2D,
+  event: DisruptorEvent,
+  room: PlacedRoom,
+  sx: (x: number) => number,
+  sy: (y: number) => number,
+  scale: number,
+  minute: number,
+) {
+  const cx = sx(room.x + room.w / 2)
+  const cy = sy(room.y + room.h / 2)
+  const icon = DISRUPTOR_ICONS[event.templateId] ?? '🚨'
+  const pulse = Math.sin(minute * 0.15) * 0.15 + 0.85
+  const isEscalated = event.state === 'escalated'
+  const size = (isEscalated ? 28 : 22) * pulse
+
+  // Glow effect
+  ctx.save()
+  ctx.shadowColor = isEscalated ? '#e74c3c' : '#f39c12'
+  ctx.shadowBlur = isEscalated ? 20 : 12
+  ctx.font = `${size}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(icon, cx, cy - 10)
+  ctx.restore()
+
+  // State indicator
+  ctx.fillStyle = isEscalated ? '#e74c3c' : '#f39c12'
+  ctx.font = '700 10px Inter, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(event.state === 'in_progress' ? '⌛' : event.state, cx, cy + 16)
+
+  // Red border on room if escalated
+  if (isEscalated) {
+    ctx.strokeStyle = '#e74c3c'
+    ctx.lineWidth = 3
+    ctx.setLineDash([5, 3])
+    ctx.strokeRect(sx(room.x) - 2, sy(room.y) - 2, room.w * scale + 4, room.h * scale + 4)
+    ctx.setLineDash([])
+  }
 }

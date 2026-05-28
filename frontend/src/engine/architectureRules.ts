@@ -1,5 +1,6 @@
-import { distance, roomByNode } from './geometry'
-import type { HospitalPlan, PlacedRoom, SimulationNode } from '../types'
+import { distance, roomByNode, ChannelGraph } from './geometry'
+import type { HospitalPlan, PlacedRoom, SimulationNode, ChannelConfig, ResourceConfig } from '../types'
+import { DEFAULT_RESOURCE_CONFIGS, DEFAULT_CHANNEL_CONFIGS, DEFAULT_SPECIALIST_CONFIGS } from '../data/catalog'
 
 export type RuleStatus = 'ok' | 'warn' | 'fail'
 
@@ -223,4 +224,123 @@ function evaluateEvacuation(rooms: PlacedRoom[]): ArchitectureRuleResult[] {
 function nearestCoreDistance(room: PlacedRoom, cores: PlacedRoom[]): number {
   const sameFloorCores = cores.filter((core) => core.floor === room.floor)
   return Math.min(...sameFloorCores.map((core) => distance(room, core)))
+}
+
+/* ─── New Rules: Specialists, Channels, Response Times ─── */
+
+export function evaluateSpecialistCoverage(plan: HospitalPlan, resourceConfigs: ResourceConfig[] = DEFAULT_RESOURCE_CONFIGS): ArchitectureRuleResult[] {
+  const results: ArchitectureRuleResult[] = []
+  const missing: string[] = []
+
+  for (const rc of resourceConfigs) {
+    if (rc.requiredSpecialistTypes.length === 0) continue
+    const room = plan.rooms.find((r) => r.simulationNode === rc.id)
+    if (!room) {
+      missing.push(`${rc.name} (sin sala en el plan)`)
+      continue
+    }
+  }
+
+  results.push({
+    id: 'specialist-coverage',
+    label: 'Cobertura de especialistas por recurso',
+    status: missing.length === 0 ? 'ok' : missing.length > 3 ? 'fail' : 'warn',
+    evidence: missing.length === 0
+      ? 'Todos los recursos tienen especialistas asignados'
+      : `Faltan: ${missing.join(', ')}`,
+    category: 'clinico',
+  })
+
+  const orRoom = roomByNode(plan.rooms, 'or')
+  if (orRoom) {
+    const surgicalSpecs = DEFAULT_SPECIALIST_CONFIGS.filter((s) => s.isSurgical)
+    results.push({
+      id: 'surgical-specialists-available',
+      label: `Especialistas quirurgicos disponibles (${surgicalSpecs.length} tipos)`,
+      status: surgicalSpecs.length >= 5 ? 'ok' : 'warn',
+      evidence: `${surgicalSpecs.length} tipos quirurgicos configurados`,
+      category: 'clinico',
+    })
+  }
+
+  return results
+}
+
+export function evaluateChannelDensity(
+  plan: HospitalPlan,
+  channelConfigs: ChannelConfig[] = DEFAULT_CHANNEL_CONFIGS,
+): ArchitectureRuleResult[] {
+  const results: ArchitectureRuleResult[] = []
+  const floors = new Set(plan.rooms.map((r) => r.floor))
+
+  for (const floor of floors) {
+    const floorRooms = plan.rooms.filter((r) => r.floor === floor && r.simulationNode)
+    const floorChannels = channelConfigs.filter((ch) => {
+      const from = plan.rooms.find((r) => r.id === ch.fromRoomId)
+      const to = plan.rooms.find((r) => r.id === ch.toRoomId)
+      return from && to && from.floor === floor && to.floor === floor
+    })
+
+    const ratio = floorRooms.length > 0 ? floorChannels.length / floorRooms.length : 0
+    results.push({
+      id: `channel-density-floor-${floor}`,
+      label: `Densidad de canales en planta ${floor}`,
+      status: ratio >= 0.5 ? 'ok' : ratio >= 0.3 ? 'warn' : 'fail',
+      evidence: `${floorChannels.length} canales para ${floorRooms.length} salas (ratio ${ratio.toFixed(2)})`,
+      category: 'flujos',
+    })
+  }
+
+  return results
+}
+
+export function evaluateEmergencyResponse(
+  plan: HospitalPlan,
+  channelConfigs: ChannelConfig[] = DEFAULT_CHANNEL_CONFIGS,
+): ArchitectureRuleResult[] {
+  const results: ArchitectureRuleResult[] = []
+  const graph = new ChannelGraph(channelConfigs)
+
+  const ed = roomByNode(plan.rooms, 'ed_bay')
+  const icu = roomByNode(plan.rooms, 'icu')
+  if (ed && icu) {
+    const path = graph.findStaticRoute(ed.id, icu.id)
+    const cost = path?.totalBaseCost ?? distance(ed, icu) * 0.16
+    results.push({
+      id: 'response-ed-icu',
+      label: 'Tiempo de respuesta ED → UCI',
+      status: cost <= 8 ? 'ok' : cost <= 15 ? 'warn' : 'fail',
+      evidence: `~${Math.round(cost)} min por canales`,
+      category: 'emergencia',
+    })
+  }
+
+  const orRoom = roomByNode(plan.rooms, 'or')
+  if (ed && orRoom) {
+    const path = graph.findStaticRoute(ed.id, orRoom.id)
+    const cost = path?.totalBaseCost ?? distance(ed, orRoom) * 0.16
+    results.push({
+      id: 'response-ed-or',
+      label: 'Tiempo de respuesta ED → Quirofano',
+      status: cost <= 10 ? 'ok' : cost <= 18 ? 'warn' : 'fail',
+      evidence: `~${Math.round(cost)} min por canales`,
+      category: 'emergencia',
+    })
+  }
+
+  const amb = roomByNode(plan.rooms, 'arrival_ambulance')
+  const resus = roomByNode(plan.rooms, 'resus')
+  if (amb && resus) {
+    const path = graph.findStaticRoute(amb.id, resus.id)
+    const cost = path?.totalBaseCost ?? distance(amb, resus) * 0.16
+    results.push({
+      id: 'response-ambulance-resus',
+      label: 'Tiempo de ambulancia → shock room',
+      status: cost <= 4 ? 'ok' : cost <= 8 ? 'warn' : 'fail',
+      evidence: `~${Math.round(cost)} min por canales`,
+      category: 'emergencia',
+    })
+  }
+
+  return results
 }
