@@ -712,6 +712,9 @@ function SimulationControls({
   onChange: (settings: SimulationSettings) => void
 }) {
   const failingRules = rules.filter((rule) => rule.status !== 'ok')
+  const caseStats = (result?.caseStats ?? [])
+    .filter((stat) => stat.attempted > 0)
+    .sort((a, b) => b.completed - a.completed)
 
   return (
     <>
@@ -759,7 +762,24 @@ function SimulationControls({
         <Metric label="ED P90" value={`${result?.kpis.edP90Minutes ?? 0} min`} />
         <Metric label="Traslado medio" value={`${result?.kpis.averageTravelMinutes ?? 0} min`} />
         <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
-        <Metric label="Sin puerta" value={String(result?.kpis.blockedPatients ?? 0)} />
+        <Metric label="Bloqueados" value={String(result?.kpis.blockedPatients ?? 0)} />
+      </section>
+
+      <section className="panel-section">
+        <h2>Casos clinicos</h2>
+        {caseStats.length > 0 ? (
+          <div className="case-list">
+            {caseStats.slice(0, 7).map((stat) => (
+              <article key={stat.id} className="case-item" style={{ borderLeftColor: stat.color }}>
+                <strong>{stat.label}</strong>
+                <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
+                <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Ejecutando mezcla clinica.</p>
+        )}
       </section>
 
       <section className="panel-section">

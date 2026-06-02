@@ -1,17 +1,37 @@
 import { buildAccessiblePatientRoute, doorWorldPosition, isPassage } from './circulation'
 import { distance, roomByNode } from './geometry'
-import type { HospitalPlan, PatientStream, PlacedRoom, RouteStop, Severity, SimAgent, SimulationNode, SimulationResult } from '../types'
+import type {
+  HospitalPlan,
+  PatientCaseId,
+  PatientCaseStat,
+  PatientStream,
+  PlacedRoom,
+  RouteStop,
+  Severity,
+  SimAgent,
+  SimulationNode,
+  SimulationResult,
+} from '../types'
 
 interface MovementPoint {
   x: number
   y: number
 }
 
-const STREAM_COLORS: Record<PatientStream, string> = {
-  ed_ambulance: '#d62828',
-  ed_walkin: '#f4a261',
-  outpatient: '#2a9d8f',
-  elective: '#7c6bb0',
+interface PatientCaseStep {
+  node: SimulationNode
+  phase: string
+}
+
+interface PatientCaseDefinition {
+  id: PatientCaseId
+  label: string
+  code: string
+  stream: PatientStream
+  severity: Severity
+  color: string
+  weight: number
+  build: (rng: () => number) => PatientCaseStep[]
 }
 
 const SEVERITY_WEIGHT: Record<Severity, number> = {
@@ -20,6 +40,146 @@ const SEVERITY_WEIGHT: Record<Severity, number> = {
   high: 1.35,
   critical: 1.8,
 }
+
+const PATIENT_CASES: PatientCaseDefinition[] = [
+  {
+    id: 'trauma_major',
+    label: 'Trauma mayor',
+    code: 'TRA',
+    stream: 'ed_ambulance',
+    severity: 'critical',
+    color: '#d62828',
+    weight: 9,
+    build: (rng) => {
+      const surgical = rng() < 0.62
+      const needsIcu = rng() < 0.78
+      return [
+        caseStep('arrival_ambulance', 'Entrada ambulancia'),
+        caseStep('resus', 'ABCDE y estabilizacion'),
+        caseStep('imaging', 'TAC urgente'),
+        ...(surgical ? [caseStep('or', 'Quirofano trauma'), caseStep('pacu', 'Reanimacion postoperatoria')] : []),
+        caseStep(needsIcu ? 'icu' : 'ward', needsIcu ? 'Ingreso UCI' : 'Ingreso planta'),
+      ]
+    },
+  },
+  {
+    id: 'stroke_code',
+    label: 'Codigo ictus',
+    code: 'ICT',
+    stream: 'ed_ambulance',
+    severity: 'high',
+    color: '#7c3aed',
+    weight: 7,
+    build: (rng) => {
+      const needsResus = rng() < 0.34
+      const criticalUnit = rng() < 0.58
+      return [
+        caseStep('arrival_ambulance', 'Preaviso SEM'),
+        caseStep('triage', 'Triaje avanzado'),
+        caseStep('imaging', 'TC craneal'),
+        ...(needsResus ? [caseStep('resus', 'Estabilizacion neuro')] : []),
+        caseStep(criticalUnit ? 'icu' : 'ward', criticalUnit ? 'Unidad critica' : 'Ingreso neurologia'),
+      ]
+    },
+  },
+  {
+    id: 'chest_pain',
+    label: 'Dolor toracico',
+    code: 'DT',
+    stream: 'ed_walkin',
+    severity: 'high',
+    color: '#ef4444',
+    weight: 11,
+    build: (rng) => {
+      const needsImaging = rng() < 0.42
+      const observation = rng() < 0.46
+      return [
+        caseStep('registration', 'Admision rapida'),
+        caseStep('triage', 'Triaje prioridad alta'),
+        caseStep('ed_bay', 'Box monitorizado'),
+        caseStep('lab', 'Troponinas seriadas'),
+        ...(needsImaging ? [caseStep('imaging', 'Prueba cardiologia')] : []),
+        caseStep(observation ? 'observation' : 'pharmacy', observation ? 'Observacion ED' : 'Alta con tratamiento'),
+      ]
+    },
+  },
+  {
+    id: 'minor_ed',
+    label: 'Urgencia leve',
+    code: 'UL',
+    stream: 'ed_walkin',
+    severity: 'low',
+    color: '#f4a261',
+    weight: 24,
+    build: (rng) => [
+      caseStep('registration', 'Admision'),
+      caseStep('triage', 'Triaje'),
+      caseStep('ed_bay', rng() < 0.5 ? 'Cura / analgesia' : 'Valoracion medica'),
+      caseStep('pharmacy', 'Receta y alta'),
+    ],
+  },
+  {
+    id: 'ed_observation',
+    label: 'Urgencia con observacion',
+    code: 'OBS',
+    stream: 'ed_walkin',
+    severity: 'medium',
+    color: '#2a9d8f',
+    weight: 17,
+    build: (rng) => {
+      const needsLab = rng() < 0.64
+      const needsImaging = rng() < 0.38
+      const admission = rng() < 0.32
+      return [
+        caseStep('registration', 'Admision'),
+        caseStep('triage', 'Triaje'),
+        caseStep('ed_bay', 'Box diagnostico'),
+        ...(needsLab ? [caseStep('lab', 'Analitica')] : []),
+        ...(needsImaging ? [caseStep('imaging', 'Imagen')] : []),
+        caseStep('observation', 'Observacion y decision'),
+        caseStep(admission ? 'ward' : 'pharmacy', admission ? 'Ingreso planta' : 'Alta'),
+      ]
+    },
+  },
+  {
+    id: 'outpatient_consult',
+    label: 'Consulta externa',
+    code: 'CEX',
+    stream: 'outpatient',
+    severity: 'medium',
+    color: '#2563eb',
+    weight: 22,
+    build: (rng) => {
+      const needsLab = rng() < 0.36
+      const needsImaging = rng() < 0.24
+      return [
+        caseStep('registration', 'Check-in'),
+        caseStep('consult', 'Consulta / hospital de dia'),
+        ...(needsLab ? [caseStep('lab', 'Extraccion')] : []),
+        ...(needsImaging ? [caseStep('imaging', 'Prueba imagen')] : []),
+        caseStep('pharmacy', 'Farmacia / salida'),
+      ]
+    },
+  },
+  {
+    id: 'scheduled_surgery',
+    label: 'Cirugia programada',
+    code: 'QX',
+    stream: 'elective',
+    severity: 'medium',
+    color: '#7c6bb0',
+    weight: 9,
+    build: (rng) => {
+      const needsIcu = rng() < 0.18
+      return [
+        caseStep('registration', 'Ingreso quirurgico'),
+        caseStep('or', 'Quirofano'),
+        caseStep('pacu', 'PACU'),
+        caseStep(needsIcu ? 'icu' : 'ward', needsIcu ? 'UCI postoperatoria' : 'Planta postoperatoria'),
+      ]
+    },
+  },
+]
 
 export interface SimulationSettings {
   seed: number
@@ -41,39 +201,53 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
   const agents: SimAgent[] = []
   const totalArrivals = Math.max(40, Math.round(settings.arrivalsPerHour * settings.durationHours))
   const roomPressure: Record<string, number> = {}
+  const caseStats = createCaseStats()
   let completed = 0
   let blockedPatients = 0
   let travelSum = 0
   let verticalMoves = 0
 
   for (let i = 0; i < totalArrivals; i += 1) {
-    const stream = weightedStream(rng())
-    const severity = weightedSeverity(rng(), stream)
+    const patientCase = weightedPatientCase(rng)
+    const caseStat = caseStats.get(patientCase.id)
+    if (caseStat) caseStat.attempted += 1
+    const caseSteps = patientCase.build(rng)
     const start = Math.floor((i / totalArrivals) * durationMinutes + rng() * 18)
-    const serviceRooms = routeForPatient(plan.rooms, stream, severity, rng)
+    const serviceStops = resolveCaseStops(plan.rooms, caseSteps)
+    const serviceRooms = serviceStops.map((stop) => stop.room)
     if (serviceRooms.length < 2) {
       blockedPatients += 1
+      if (caseStat) caseStat.blocked += 1
       continue
     }
     const routeRooms = buildAccessiblePatientRoute(plan.rooms, serviceRooms)
     if (!routeRooms) {
       blockedPatients += 1
+      if (caseStat) caseStat.blocked += 1
       continue
     }
-    const route = buildTimedRoute(routeRooms, start, severity, rng)
+    const phaseByRoomId = new Map(serviceStops.map((stop) => [stop.room.id, stop.phase]))
+    const route = buildTimedRoute(routeRooms, start, patientCase.severity, rng, phaseByRoomId)
     for (const room of serviceRooms) {
       roomPressure[room.id] = (roomPressure[room.id] ?? 0) + 1
     }
     completed += 1
+    if (caseStat) {
+      caseStat.completed += 1
+      if (caseStat.samplePath.length === 0) caseStat.samplePath = samplePath(routeRooms, phaseByRoomId)
+    }
     travelSum += routeTravel(routeRooms)
     verticalMoves += countVerticalMoves(routeRooms)
     agents.push({
       id: `p-${i + 1}`,
       role: 'patient',
-      stream,
-      severity,
+      stream: patientCase.stream,
+      severity: patientCase.severity,
+      caseId: patientCase.id,
+      caseName: patientCase.label,
+      caseCode: patientCase.code,
       route,
-      color: STREAM_COLORS[stream],
+      color: patientCase.color,
     })
   }
 
@@ -93,6 +267,7 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
     agents,
     durationMinutes,
     roomPressure,
+    caseStats: [...caseStats.values()],
     kpis: {
       completed,
       edP90Minutes: estimateEdP90(plan.rooms, roomPressure),
@@ -178,41 +353,13 @@ function displayRoomForSegment(currentRoom: PlacedRoom, nextRoom: PlacedRoom, pr
   return progress < 0.5 ? currentRoom : nextRoom
 }
 
-function routeForPatient(rooms: PlacedRoom[], stream: PatientStream, severity: Severity, rng: () => number): PlacedRoom[] {
-  const nodes: SimulationNode[] = []
-  if (stream === 'ed_ambulance') nodes.push('arrival_ambulance')
-  if (stream === 'ed_walkin') nodes.push('registration')
-  if (stream === 'outpatient') nodes.push('registration', 'consult')
-  if (stream === 'elective') nodes.push('registration', 'or', 'pacu')
-
-  if (stream === 'ed_ambulance' || stream === 'ed_walkin') {
-    nodes.push('triage')
-    nodes.push(severity === 'critical' ? 'resus' : 'ed_bay')
-    if (severity !== 'low' || rng() < 0.45) nodes.push('lab')
-    if (severity === 'critical' || severity === 'high' || rng() < 0.35) nodes.push('imaging')
-    if (severity === 'critical' && rng() < 0.45) nodes.push('or', 'pacu')
-    if (severity === 'critical') nodes.push('icu')
-    else if (severity === 'high' || rng() < 0.28) nodes.push('observation', 'ward')
-    else nodes.push('pharmacy')
-  }
-
-  if (stream === 'outpatient') {
-    if (severity === 'high' || rng() < 0.42) nodes.push('lab')
-    if (severity === 'high' || rng() < 0.28) nodes.push('imaging')
-    if (severity === 'high' && rng() < 0.16) nodes.push('ward')
-    else nodes.push('pharmacy')
-  }
-
-  if (stream === 'elective') {
-    if (severity === 'critical' || rng() < 0.18) nodes.push('icu')
-    else nodes.push('ward')
-  }
-
-  nodes.push('discharge')
-  return nodes.map((node) => roomByNode(rooms, node)).filter(Boolean) as PlacedRoom[]
-}
-
-function buildTimedRoute(routeRooms: PlacedRoom[], start: number, severity: Severity, rng: () => number): RouteStop[] {
+function buildTimedRoute(
+  routeRooms: PlacedRoom[],
+  start: number,
+  severity: Severity,
+  rng: () => number,
+  phaseByRoomId: Map<string, string>,
+): RouteStop[] {
   const stops: RouteStop[] = []
   let at = start
   routeRooms.forEach((room, index) => {
@@ -220,13 +367,35 @@ function buildTimedRoute(routeRooms: PlacedRoom[], start: number, severity: Seve
       const previous = routeRooms[index - 1]
       at += 3 + distance(previous, room) * 0.16
     }
-    stops.push({ roomId: room.id, at: Math.round(at) })
+    const phase = phaseByRoomId.get(room.id) ?? (isPassage(room) ? 'Traslado' : room.name)
+    stops.push({ roomId: room.id, at: Math.round(at), phase })
     at += dwellMinutes(room, severity, rng)
   })
   return stops
 }
 
 function dwellMinutes(room: PlacedRoom, severity: Severity, rng: () => number): number {
+  const baseByNode: Partial<Record<SimulationNode, number>> = {
+    arrival_ambulance: 4,
+    registration: 8,
+    triage: 10,
+    resus: 36,
+    ed_bay: 44,
+    observation: 150,
+    imaging: 28,
+    lab: 18,
+    or: 125,
+    hybrid_or: 150,
+    pacu: 72,
+    icu: 230,
+    ward: 360,
+    maternity: 95,
+    neonatal_icu: 210,
+    consult: 32,
+    pharmacy: 10,
+    logistics: 12,
+    research: 36,
+  }
   const baseByKind: Record<string, number> = {
     public: 9,
     waiting: 18,
@@ -249,9 +418,11 @@ function dwellMinutes(room: PlacedRoom, severity: Severity, rng: () => number): 
     green: 12,
     future: 0,
   }
-  const base = baseByKind[room.kind] ?? 30
+  const base = room.simulationNode ? baseByNode[room.simulationNode] ?? baseByKind[room.kind] ?? 30 : baseByKind[room.kind] ?? 30
   if (base === 0) return 0
-  const mean = base * SEVERITY_WEIGHT[severity]
+  const fixedPaceNodes: SimulationNode[] = ['arrival_ambulance', 'registration', 'triage', 'pharmacy']
+  const multiplier = room.simulationNode && fixedPaceNodes.includes(room.simulationNode) ? 1 : SEVERITY_WEIGHT[severity]
+  const mean = base * multiplier
   return Math.max(4, Math.round(mean * (0.72 + rng() * 0.56)))
 }
 
@@ -270,25 +441,58 @@ function addStaffAgents(plan: HospitalPlan, agents: SimAgent[]) {
   })
 }
 
-function weightedStream(value: number): PatientStream {
-  if (value < 0.44) return 'ed_walkin'
-  if (value < 0.62) return 'ed_ambulance'
-  if (value < 0.86) return 'outpatient'
-  return 'elective'
-}
-
-function weightedSeverity(value: number, stream: PatientStream): Severity {
-  const criticalBoost = stream === 'ed_ambulance' ? 0.1 : 0
-  if (value < 0.08 + criticalBoost) return 'critical'
-  if (value < 0.28 + criticalBoost) return 'high'
-  if (value < 0.68) return 'medium'
-  return 'low'
-}
-
 function routeTravel(routeRooms: PlacedRoom[]): number {
   let total = 0
   for (let i = 0; i < routeRooms.length - 1; i += 1) total += distance(routeRooms[i], routeRooms[i + 1]) * 0.16
   return total
+}
+
+function caseStep(node: SimulationNode, phase: string): PatientCaseStep {
+  return { node, phase }
+}
+
+function weightedPatientCase(rng: () => number): PatientCaseDefinition {
+  const total = PATIENT_CASES.reduce((sum, item) => sum + item.weight, 0)
+  let roll = rng() * total
+  for (const patientCase of PATIENT_CASES) {
+    roll -= patientCase.weight
+    if (roll <= 0) return patientCase
+  }
+  return PATIENT_CASES[PATIENT_CASES.length - 1]
+}
+
+function createCaseStats(): Map<PatientCaseId, PatientCaseStat> {
+  return new Map(PATIENT_CASES.map((patientCase) => [
+    patientCase.id,
+    {
+      id: patientCase.id,
+      label: patientCase.label,
+      color: patientCase.color,
+      attempted: 0,
+      completed: 0,
+      blocked: 0,
+      samplePath: [],
+    },
+  ]))
+}
+
+function resolveCaseStops(rooms: PlacedRoom[], steps: PatientCaseStep[]): Array<{ room: PlacedRoom; phase: string }> {
+  const stops: Array<{ room: PlacedRoom; phase: string }> = []
+  steps.forEach((step) => {
+    const room = roomByNode(rooms, step.node)
+    if (!room) return
+    if (stops[stops.length - 1]?.room.id === room.id) return
+    stops.push({ room, phase: step.phase })
+  })
+  return stops
+}
+
+function samplePath(routeRooms: PlacedRoom[], phaseByRoomId: Map<string, string>): string[] {
+  return routeRooms
+    .filter((room) => !isPassage(room))
+    .map((room) => phaseByRoomId.get(room.id) ?? room.name)
+    .filter((phase, index, phases) => phase !== phases[index - 1])
+    .slice(0, 7)
 }
 
 function countVerticalMoves(routeRooms: PlacedRoom[]): number {

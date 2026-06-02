@@ -123,6 +123,14 @@ export interface HospitalPlan {
 export type AgentRole = 'patient' | 'doctor' | 'nurse' | 'porter' | 'technician'
 export type PatientStream = 'ed_ambulance' | 'ed_walkin' | 'outpatient' | 'elective'
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
+export type PatientCaseId =
+  | 'trauma_major'
+  | 'stroke_code'
+  | 'chest_pain'
+  | 'minor_ed'
+  | 'ed_observation'
+  | 'outpatient_consult'
+  | 'scheduled_surgery'
 
 export type DoorSide = 'top' | 'right' | 'bottom' | 'left'
 
@@ -135,6 +143,7 @@ export interface RoomDoor {
 export interface RouteStop {
   roomId: string
   at: number
+  phase?: string
 }
 
 export interface SimAgent {
@@ -142,14 +151,28 @@ export interface SimAgent {
   role: AgentRole
   stream?: PatientStream
   severity?: Severity
+  caseId?: PatientCaseId
+  caseName?: string
+  caseCode?: string
   route: RouteStop[]
   color: string
+}
+
+export interface PatientCaseStat {
+  id: PatientCaseId
+  label: string
+  color: string
+  attempted: number
+  completed: number
+  blocked: number
+  samplePath: string[]
 }
 
 export interface SimulationResult {
   agents: SimAgent[]
   durationMinutes: number
   roomPressure: Record<string, number>
+  caseStats: PatientCaseStat[]
   kpis: {
     completed: number
     edP90Minutes: number

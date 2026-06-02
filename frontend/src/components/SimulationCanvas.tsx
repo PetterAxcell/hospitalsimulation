@@ -757,7 +757,7 @@ function staffColor(role: AgentRole) {
 }
 
 function shortAgentLabel(agent: SimAgent) {
-  if (agent.role === 'patient') return agent.severity?.slice(0, 1).toUpperCase() ?? 'P'
+  if (agent.role === 'patient') return agent.caseCode ?? agent.severity?.slice(0, 1).toUpperCase() ?? 'P'
   if (agent.role === 'doctor') return 'DR'
   if (agent.role === 'nurse') return 'ENF'
   if (agent.role === 'porter') return 'CEL'

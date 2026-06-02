@@ -678,6 +678,37 @@ th {
   margin-top: 10px;
 }
 
+.case-list {
+  display: grid;
+  gap: 8px;
+}
+
+.case-item {
+  display: grid;
+  gap: 4px;
+  padding: 8px 9px;
+  border: 1px solid #d9e2dc;
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.case-item strong {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.case-item span,
+.case-item small {
+  color: #66736e;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.case-item small {
+  overflow-wrap: anywhere;
+}
+
 .rule-category {
   display: grid;
   gap: 6px;
