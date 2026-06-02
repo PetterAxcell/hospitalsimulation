@@ -1042,6 +1042,83 @@ th {
   margin-top: 10px;
 }
 
+.simulation-hub {
+  display: grid;
+  gap: 10px;
+}
+
+.simulation-hub-header {
+  display: grid;
+  gap: 2px;
+}
+
+.simulation-hub-header h2 {
+  margin-bottom: 0;
+}
+
+.simulation-hub-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.simulation-hub-summary .metric {
+  min-height: 46px;
+}
+
+.simulation-hub-summary .metric strong {
+  font-size: 15px;
+}
+
+.simulation-panel-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.simulation-panel-tabs button {
+  min-width: 0;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 8px;
+  border: 1px solid #c5d0ca;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #33413b;
+  cursor: pointer;
+  text-align: left;
+}
+
+.simulation-panel-tabs button span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-panel-tabs button strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.simulation-panel-tabs button.is-active {
+  border-color: #2a9d8f;
+  background: #e4f3ee;
+  color: #174942;
+}
+
+.simulation-hub-list {
+  max-height: min(42vh, 390px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
 .case-list {
   display: grid;
   gap: 8px;
@@ -1052,6 +1129,10 @@ th {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 10px;
+}
+
+.simulation-hub .agent-layer-grid {
+  margin-bottom: 0;
 }
 
 .agent-layer-grid button {
@@ -1075,7 +1156,6 @@ th {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 8px;
 }
 
 .case-yaml-actions button {
@@ -1091,7 +1171,7 @@ th {
 }
 
 .case-yaml-file {
-  margin: 0 0 8px;
+  margin: 0;
   color: #66736e;
   font-size: 11px;
   font-weight: 800;
