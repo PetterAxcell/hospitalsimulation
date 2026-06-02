@@ -78,7 +78,7 @@ const SimulationCanvas = lazy(() =>
 
 function App() {
   const [plan, setPlan] = useState<HospitalPlan>(INITIAL_PLAN)
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('plan')
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('top')
   const [selectedFloor, setSelectedFloor] = useState(0)
   const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(plan.rooms[0]?.id)
   const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
@@ -115,6 +115,8 @@ function App() {
   )
   const currentScore = useMemo(() => scoreArchitecture(plan, simulationResult, rules, totalArea), [plan, rules, simulationResult, totalArea])
   const simulationWorkspace = activeTab === 'simulation' || activeTab === 'saturation'
+  const showLeftPanel = activeTab === 'plan' || simulationWorkspace
+  const showRightPanel = activeTab === 'plan' || simulationWorkspace || activeTab === 'top'
 
   function updateRoom(nextRoom: PlacedRoom) {
     setPlan((current) => ({
@@ -348,75 +350,77 @@ function App() {
       </header>
 
       <nav className="workspace-tabs" aria-label="Modulos">
+        <TabButton id="top" active={activeTab} onClick={setActiveTab}>Top</TabButton>
         <TabButton id="plan" active={activeTab} onClick={setActiveTab}>Planificador</TabButton>
         <TabButton id="simulation" active={activeTab} onClick={setActiveTab}>Simulacion</TabButton>
         <TabButton id="saturation" active={activeTab} onClick={setActiveTab}>Saturacion</TabButton>
-        <TabButton id="top" active={activeTab} onClick={setActiveTab}>Top</TabButton>
         <TabButton id="services" active={activeTab} onClick={setActiveTab}>Servicios</TabButton>
         <TabButton id="analysis" active={activeTab} onClick={setActiveTab}>Analisis</TabButton>
       </nav>
 
-      <section className="workbench">
-        <aside className="left-panel">
-          <section className="panel-section">
-            <h2>Plantas</h2>
-            <div className="floor-grid">
-              {plan.floors.map((floor) => (
-                <button
-                  key={floor}
-                  type="button"
-                  className={floor === selectedFloor ? 'is-active' : ''}
-                  onClick={() => setSelectedFloor(floor)}
-                >
-                  {floorLabel(floor)}
-                </button>
-              ))}
-            </div>
-          </section>
+      <section className={`workbench ${showLeftPanel ? 'has-left-panel' : 'without-left-panel'} ${showRightPanel ? 'has-right-panel' : 'without-right-panel'}`}>
+        {showLeftPanel && (
+          <aside className="left-panel">
+            <section className="panel-section">
+              <h2>Plantas</h2>
+              <div className="floor-grid">
+                {plan.floors.map((floor) => (
+                  <button
+                    key={floor}
+                    type="button"
+                    className={floor === selectedFloor ? 'is-active' : ''}
+                    onClick={() => setSelectedFloor(floor)}
+                  >
+                    {floorLabel(floor)}
+                  </button>
+                ))}
+              </div>
+            </section>
 
-          {simulationWorkspace ? (
-            <SimulationCaseSelector
-              result={simulationResult}
-              selectedCaseId={selectedCaseId}
-              agentLayer={simulationAgentLayer}
-              fileName={clinicalCaseFileName}
-              diagnostics={clinicalCaseResult?.diagnostics ?? []}
-              onEditCases={() => setClinicalCaseModalOpen(true)}
-              onUploadCases={loadClinicalCaseTemplate}
-              onResetCases={resetClinicalCases}
-              onSelectCase={setSelectedCaseId}
-              onChangeAgentLayer={setSimulationAgentLayer}
-            />
-          ) : (
-            <>
-              <section className="panel-section">
-                <h2>Construir</h2>
-                <label>
-                  Elemento
-                  <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
-                    {ROOM_TEMPLATES.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.shortName} · {KIND_LABELS[template.kind]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
-                <button type="button" className="secondary-action" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
-                <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
-              </section>
+            {simulationWorkspace ? (
+              <SimulationCaseSelector
+                result={simulationResult}
+                selectedCaseId={selectedCaseId}
+                agentLayer={simulationAgentLayer}
+                fileName={clinicalCaseFileName}
+                diagnostics={clinicalCaseResult?.diagnostics ?? []}
+                onEditCases={() => setClinicalCaseModalOpen(true)}
+                onUploadCases={loadClinicalCaseTemplate}
+                onResetCases={resetClinicalCases}
+                onSelectCase={setSelectedCaseId}
+                onChangeAgentLayer={setSimulationAgentLayer}
+              />
+            ) : (
+              <>
+                <section className="panel-section">
+                  <h2>Construir</h2>
+                  <label>
+                    Elemento
+                    <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
+                      {ROOM_TEMPLATES.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.shortName} · {KIND_LABELS[template.kind]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
+                  <button type="button" className="secondary-action" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
+                  <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
+                </section>
 
-              <section className="panel-section">
-                <h2>Planta activa</h2>
-                <Metric label="m2 planta" value={formatNumber(floorArea)} />
-                <Metric label="Bloques" value={String(activeFloorRooms.length)} />
-                <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
-              </section>
+                <section className="panel-section">
+                  <h2>Planta activa</h2>
+                  <Metric label="m2 planta" value={formatNumber(floorArea)} />
+                  <Metric label="Bloques" value={String(activeFloorRooms.length)} />
+                  <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
+                </section>
 
-              <AccessAlerts plan={plan} selectedFloor={selectedFloor} />
-            </>
-          )}
-        </aside>
+                <AccessAlerts plan={plan} selectedFloor={selectedFloor} />
+              </>
+            )}
+          </aside>
+        )}
 
         <section className="main-panel">
           {activeTab === 'plan' && (
@@ -453,37 +457,39 @@ function App() {
           {activeTab === 'analysis' && <AnalysisPanel plan={plan} result={simulationResult} rules={rules} />}
         </section>
 
-        <aside className="right-panel">
-          {simulationWorkspace ? (
-            <SimulationControls
-              settings={simulationSettings}
-              onChange={setSimulationSettings}
-              result={simulationResult}
-              rules={rules}
-            />
-          ) : activeTab === 'top' ? (
-            <TopControls
-              owner={proposalOwner}
-              proposals={topProposals}
-              currentScore={currentScore}
-              onChangeOwner={setProposalOwner}
-              onSubmit={submitCurrentArchitecture}
-            />
-          ) : (
-            <RoomInspector
-              room={selectedRoom}
-              allRooms={plan.rooms}
-              floors={plan.floors}
-              onChange={updateRoom}
-              onDuplicate={duplicateSelected}
-              onRemove={removeSelected}
-              doorToolActive={doorToolRoomId === selectedRoom?.id}
-              onStartDoorTool={() => selectedRoom && setDoorToolRoomId(doorToolRoomId === selectedRoom.id ? undefined : selectedRoom.id)}
-              onRemoveDoor={removeDoor}
-              onAutoConnect={autoConnectSelectedToCorridor}
-            />
-          )}
-        </aside>
+        {showRightPanel && (
+          <aside className="right-panel">
+            {simulationWorkspace ? (
+              <SimulationControls
+                settings={simulationSettings}
+                onChange={setSimulationSettings}
+                result={simulationResult}
+                rules={rules}
+              />
+            ) : activeTab === 'top' ? (
+              <TopControls
+                owner={proposalOwner}
+                proposals={topProposals}
+                currentScore={currentScore}
+                onChangeOwner={setProposalOwner}
+                onSubmit={submitCurrentArchitecture}
+              />
+            ) : (
+              <RoomInspector
+                room={selectedRoom}
+                allRooms={plan.rooms}
+                floors={plan.floors}
+                onChange={updateRoom}
+                onDuplicate={duplicateSelected}
+                onRemove={removeSelected}
+                doorToolActive={doorToolRoomId === selectedRoom?.id}
+                onStartDoorTool={() => selectedRoom && setDoorToolRoomId(doorToolRoomId === selectedRoom.id ? undefined : selectedRoom.id)}
+                onRemoveDoor={removeDoor}
+                onAutoConnect={autoConnectSelectedToCorridor}
+              />
+            )}
+          </aside>
+        )}
       </section>
 
       {isScriptModalOpen && (

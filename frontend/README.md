@@ -6,7 +6,7 @@ Aplicacion React/TypeScript para disenar y simular un hospital terciario multi-p
 
 - React para paneles, formularios, KPIs y estado de producto.
 - Phaser 3 para la vista de simulacion top-down tipo RPG/pixel-art.
-- Ranking `Top` para comparar propuestas de arquitectura por usuario usando KPIs de simulacion.
+- Ranking `Top` como primera vista para comparar propuestas de arquitectura por autor usando KPIs de simulacion.
 - Vite para desarrollo y build.
 
 La simulacion se carga con `React.lazy`, de forma que Phaser solo entra en el bundle cuando se abre la pestana `Simulacion`.
@@ -45,3 +45,5 @@ src/engine/architectureRules.ts       Reglas arquitectonicas iniciales
 ```
 
 Los pasillos se crean desde el selector `Elemento`; los accesos rapidos de pasillos se eliminaron para mantener una unica ruta de creacion de bloques.
+
+Los paneles laterales son contextuales: planificacion y simulacion conservan sus controles, mientras que `Top`, `Servicios` y `Analisis` usan el espacio central sin panel izquierdo.

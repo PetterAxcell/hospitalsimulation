@@ -64,6 +64,18 @@
   grid-template-columns: 270px minmax(0, 1fr) 310px;
 }
 
+.workbench.without-left-panel.has-right-panel {
+  grid-template-columns: minmax(0, 1fr) 310px;
+}
+
+.workbench.has-left-panel.without-right-panel {
+  grid-template-columns: 270px minmax(0, 1fr);
+}
+
+.workbench.without-left-panel.without-right-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .left-panel,
 .right-panel {
   overflow: auto;
@@ -1432,6 +1444,16 @@ th {
 
 @media (max-width: 1180px) {
   .workbench {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .workbench.without-left-panel,
+  .workbench.without-left-panel.has-right-panel,
+  .workbench.without-left-panel.without-right-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workbench.has-left-panel.without-right-panel {
     grid-template-columns: 220px minmax(0, 1fr);
   }
 

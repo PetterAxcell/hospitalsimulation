@@ -101,3 +101,5 @@ La representacion multi-planta debe tratar ascensores/montacargas y escaleras co
 La pestana `Top` compara propuestas por autor con un score de 0 a 100 calculado desde la simulacion actual. La formula inicial penaliza pacientes bloqueados, espera P90 de urgencias, traslado medio, cambios de planta, reglas arquitectonicas abiertas y desviacion respecto a los m2 objetivo. Las propuestas demo sirven para probar la experiencia; las propuestas guardadas registran el estado actual del plano en memoria local.
 
 La fase productiva debe mover este ranking al backend para evitar manipulacion de resultados, comparar solo simulaciones con la misma version de parametros y guardar historico por usuario/proyecto.
+
+El `Top` es la vista inicial del producto porque orienta el trabajo hacia comparacion de alternativas antes que edicion de detalle. Los paneles laterales son contextuales: el panel izquierdo aparece en planificacion y simulacion/saturacion, donde sirve para plantas, construccion o casos clinicos; se oculta en `Top`, `Servicios` y `Analisis` para no introducir controles irrelevantes.
