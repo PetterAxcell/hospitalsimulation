@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { KIND_COLORS } from '../data/catalog'
 import { connectedCorridorGroups, disconnectedPassages, doorWorldPosition } from '../engine/circulation'
-import { center, roomByNode } from '../engine/geometry'
 import { positionAt, runHospitalSimulation, type PatientCaseDefinition, type SimulationSettings } from '../engine/simulation'
 import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationAgentLayer, SimulationResult } from '../types'
 
@@ -17,21 +16,17 @@ interface SimulationCanvasProps {
   onChangeAgentLayer: (layer: SimulationAgentLayer) => void
 }
 
-type ViewMode = 'live' | 'flows' | 'rules'
-
 interface SimulationSnapshot {
   plan: HospitalPlan
   selectedFloor: number
   result: SimulationResult
   minute: number
-  viewMode: ViewMode
   selectedCaseId: PatientCaseFilter
   agentLayer: SimulationAgentLayer
 }
 
 interface SceneLayers {
   staticLayer: Phaser.GameObjects.Container
-  overlayLayer: Phaser.GameObjects.Container
   occupancyLayer: Phaser.GameObjects.Container
   agentLayer: Phaser.GameObjects.Container
   careLayer: Phaser.GameObjects.Container
@@ -117,7 +112,6 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   const sceneRef = useRef<HospitalGameScene | null>(null)
   const [minute, setMinute] = useState(0)
   const [playing, setPlaying] = useState(true)
-  const [viewMode, setViewMode] = useState<ViewMode>('live')
   const result = useMemo(() => runHospitalSimulation(plan, settings, patientCases), [patientCases, plan, settings])
 
   useEffect(() => {
@@ -167,8 +161,8 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   }, [])
 
   useEffect(() => {
-    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, viewMode, selectedCaseId, agentLayer })
-  }, [agentLayer, minute, plan, result, selectedCaseId, selectedFloor, viewMode])
+    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, selectedCaseId, agentLayer })
+  }, [agentLayer, minute, plan, result, selectedCaseId, selectedFloor])
 
   return (
     <div className="simulation-stage">
@@ -185,11 +179,6 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
           }}
         />
         <span>{formatTime(minute)}</span>
-        <div className="view-mode-grid" aria-label="Vista de simulacion">
-          <ViewModeButton mode="live" active={viewMode} onClick={setViewMode}>Vista</ViewModeButton>
-          <ViewModeButton mode="flows" active={viewMode} onClick={setViewMode}>Flujos</ViewModeButton>
-          <ViewModeButton mode="rules" active={viewMode} onClick={setViewMode}>Reglas</ViewModeButton>
-        </div>
         <select value={agentLayer} onChange={(event) => onChangeAgentLayer(event.target.value as SimulationAgentLayer)} aria-label="Agentes visibles">
           <option value="all">Pacientes + personal</option>
           <option value="patients">Solo casos</option>
@@ -206,19 +195,6 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
       </div>
       <div ref={hostRef} className="phaser-stage" role="img" aria-label="Simulacion top-down del hospital" />
     </div>
-  )
-}
-
-function ViewModeButton({ mode, active, children, onClick }: {
-  mode: ViewMode
-  active: ViewMode
-  children: string
-  onClick: (mode: ViewMode) => void
-}) {
-  return (
-    <button type="button" className={active === mode ? 'is-active' : ''} onClick={() => onClick(mode)}>
-      {children}
-    </button>
   )
 }
 
@@ -263,7 +239,6 @@ class HospitalGameScene extends Phaser.Scene {
     this.careIndicators.clear()
     this.layers = {
       staticLayer: this.add.container(0, 0).setDepth(0),
-      overlayLayer: this.add.container(0, 0).setDepth(40),
       occupancyLayer: this.add.container(0, 0).setDepth(62),
       agentLayer: this.add.container(0, 0).setDepth(80),
       careLayer: this.add.container(0, 0).setDepth(96),
@@ -280,11 +255,6 @@ class HospitalGameScene extends Phaser.Scene {
     rooms.filter((room) => room.kind !== 'circulation').forEach((room) => {
       this.drawRoom(room, snapshot.result, disconnectedIds.has(room.id))
     })
-
-    if (snapshot.viewMode === 'flows' || snapshot.viewMode === 'rules') {
-      this.drawFlowOverlay(snapshot)
-    }
-    this.drawLegend(snapshot.viewMode)
   }
 
   private drawCorridorGroup(rooms: PlacedRoom[], disconnectedPassage: boolean) {
@@ -454,61 +424,6 @@ class HospitalGameScene extends Phaser.Scene {
     this.layers.staticLayer.add([bg, label])
   }
 
-  private drawFlowOverlay(snapshot: SimulationSnapshot) {
-    if (!this.layers) return
-    const pairs: Array<[string, string, string, string]> = snapshot.viewMode === 'flows'
-      ? [
-          ['registration', 'triage', '#1d4ed8', 'publico'],
-          ['arrival_ambulance', 'resus', '#d62828', 'ambulancia'],
-          ['ed_bay', 'imaging', '#2a9d8f', 'clinico'],
-          ['or', 'pacu', '#2a9d8f', 'quirurgico'],
-          ['logistics', 'or', '#343a40', 'logistica'],
-        ]
-      : [
-          ['arrival_ambulance', 'resus', '#d62828', 'emergencia'],
-          ['resus', 'or', '#d62828', 'trauma'],
-          ['or', 'pacu', '#2a9d8f', 'OR-PACU'],
-          ['pacu', 'icu', '#2a9d8f', 'criticos'],
-          ['logistics', 'or', '#6b7280', 'limpio/sucio'],
-          ['vertical_core', 'ward', '#7c3aed', 'evacuacion'],
-          ['emergency_stair', 'refuge_area', '#dc2626', 'refugio'],
-        ]
-
-    const g = this.add.graphics()
-    this.layers.overlayLayer.add(g)
-    pairs.forEach(([aNode, bNode, color, label]) => {
-      const a = roomByNode(snapshot.plan.rooms, aNode as never)
-      const b = roomByNode(snapshot.plan.rooms, bNode as never)
-      if (!a || !b) return
-      if (a.floor !== snapshot.selectedFloor && b.floor !== snapshot.selectedFloor) return
-      const aPoint = a.floor === snapshot.selectedFloor ? center(a) : { x: 51.5, y: 24 }
-      const bPoint = b.floor === snapshot.selectedFloor ? center(b) : { x: 51.5, y: 24 }
-      drawArrow(g, aPoint.x, aPoint.y, bPoint.x, bPoint.y, color)
-      this.addPixelText(label, (aPoint.x + bPoint.x) / 2, (aPoint.y + bPoint.y) / 2 - 1, color, '#ffffff', this.layers?.overlayLayer, 11)
-    })
-  }
-
-  private drawLegend(viewMode: ViewMode) {
-    if (!this.layers) return
-    const items = viewMode === 'rules'
-      ? [['#d62828', 'emergencia'], ['#2a9d8f', 'clinico'], ['#6b7280', 'limpio/sucio'], ['#7c3aed', 'evacuacion']]
-      : [['#d62828', 'critico'], ['#f4a261', 'urgente'], ['#2a9d8f', 'leve'], ['#f8f9fa', 'staff']]
-    const group = this.add.container(WORLD_PX_W - 420, WORLD_PX_H - 42)
-    const bg = this.add.rectangle(0, 0, 400, 28, 0xffffff, 0.92).setOrigin(0, 0).setStrokeStyle(1, 0xc9d4ce)
-    group.add(bg)
-    items.forEach(([color, label], index) => {
-      const x = 10 + index * 96
-      group.add(this.add.rectangle(x, 8, 12, 12, toColor(color)).setOrigin(0, 0).setStrokeStyle(1, 0x33413b))
-      group.add(this.add.text(x + 18, 7, label, {
-        color: '#17201c',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '11px',
-        fontStyle: 'bold',
-      }).setResolution(2))
-    })
-    this.layers.overlayLayer.add(group)
-  }
-
   private updateAgents(snapshot: SimulationSnapshot) {
     if (!this.layers) return
     const visibleAgents = visibleAgentsForSnapshot(snapshot)
@@ -525,7 +440,7 @@ class HospitalGameScene extends Phaser.Scene {
       sprite.setVisible(true)
       sprite.setDepth(pos.y * TILE)
       const roleLabel = sprite.getData('roleLabel') as Phaser.GameObjects.Text | undefined
-      if (roleLabel) roleLabel.setVisible(snapshot.viewMode !== 'live')
+      if (roleLabel) roleLabel.setVisible(false)
     })
 
     this.agentSprites.forEach((sprite, id) => {
@@ -761,7 +676,7 @@ function staticSceneKey(snapshot: SimulationSnapshot) {
       return `${room.id}:${room.x}:${room.y}:${room.w}:${room.h}:${room.kind}:${doors}:${connections}:${snapshot.result.roomPressure[room.id] ?? 0}`
     })
     .join('|')
-  return `${snapshot.selectedFloor}:${snapshot.viewMode}:${snapshot.result.kpis.completed}:${rooms}`
+  return `${snapshot.selectedFloor}:${snapshot.result.kpis.completed}:${rooms}`
 }
 
 function visibleAgentsForSnapshot(snapshot: SimulationSnapshot): SimAgent[] {
@@ -1013,25 +928,6 @@ function pixelRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: numb
   g.fillRect(x, y, w, h)
   g.lineStyle(1, toColor(stroke), 1)
   g.strokeRect(x, y, w, h)
-}
-
-function drawArrow(g: Phaser.GameObjects.Graphics, x1: number, y1: number, x2: number, y2: number, color: string) {
-  const px1 = tileX(x1)
-  const py1 = tileY(y1)
-  const px2 = tileX(x2)
-  const py2 = tileY(y2)
-  const angle = Math.atan2(py2 - py1, px2 - px1)
-  g.lineStyle(6, toColor(color), 0.78)
-  g.lineBetween(px1, py1, px2, py2)
-  g.fillStyle(toColor(color), 0.9)
-  g.fillTriangle(
-    px2,
-    py2,
-    px2 - Math.cos(angle - 0.48) * 18,
-    py2 - Math.sin(angle - 0.48) * 18,
-    px2 - Math.cos(angle + 0.48) * 18,
-    py2 - Math.sin(angle + 0.48) * 18,
-  )
 }
 
 function roomLabelLayout(room: PlacedRoom): { width: number; height: number; fontSize: number; titleChars: number } | null {
