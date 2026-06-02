@@ -865,7 +865,7 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
   }
 }
 
-export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number): { room: PlacedRoom; x: number; y: number; moving: boolean } | null {
+export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number): { room: PlacedRoom; x: number; y: number; moving: boolean; phase?: string } | null {
   if (agent.route.length === 0 || minute < agent.route[0].at || minute > agent.route[agent.route.length - 1].at + 60) {
     return null
   }
@@ -876,7 +876,7 @@ export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number)
       const currentRoom = rooms.find((room) => room.id === current.roomId)
       const nextRoom = rooms.find((room) => room.id === next.roomId)
       if (!currentRoom || !nextRoom) return null
-      if (current.roomId === next.roomId) return jitterInRoom(currentRoom, agent.id, false)
+      if (current.roomId === next.roomId) return { ...jitterInRoom(currentRoom, agent.id, false), phase: current.phase }
       const followingRoom = rooms.find((room) => room.id === agent.route[i + 2]?.roomId)
       const segmentDuration = Math.max(1, next.at - current.at)
       const currentIsPassage = isPassage(currentRoom)
@@ -885,7 +885,7 @@ export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number)
         : Math.min(segmentDuration, Math.min(22, Math.max(7, segmentDuration * 0.22)))
       const stayUntil = currentIsPassage ? current.at : next.at - travelWindow
       if (!currentIsPassage && minute <= stayUntil) {
-        return jitterInRoom(currentRoom, agent.id, false)
+        return { ...jitterInRoom(currentRoom, agent.id, false), phase: current.phase }
       }
       const progress = Math.max(0, Math.min(1, (minute - stayUntil) / Math.max(1, next.at - stayUntil)))
       const point = movementPointForSegment(currentRoom, nextRoom, followingRoom, agent.id, progress)
@@ -894,12 +894,13 @@ export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number)
         x: point.x,
         y: point.y,
         moving: true,
+        phase: current.phase,
       }
     }
   }
   const last = agent.route[agent.route.length - 1]
   const room = rooms.find((item) => item.id === last.roomId)
-  return room ? jitterInRoom(room, agent.id, false) : null
+  return room ? { ...jitterInRoom(room, agent.id, false), phase: last.phase } : null
 }
 
 function movementPointForSegment(

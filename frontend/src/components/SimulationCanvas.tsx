@@ -34,6 +34,7 @@ interface SceneLayers {
   overlayLayer: Phaser.GameObjects.Container
   occupancyLayer: Phaser.GameObjects.Container
   agentLayer: Phaser.GameObjects.Container
+  careLayer: Phaser.GameObjects.Container
 }
 
 interface RoomOccupancy {
@@ -44,12 +45,25 @@ interface RoomOccupancy {
 
 type AgentPosition = NonNullable<ReturnType<typeof positionAt>>
 type ActiveAgent = { agent: SimAgent; pos: AgentPosition }
+type CarePair = { id: string; patient: ActiveAgent; professional: ActiveAgent }
 
 const WORLD_W = 100
 const WORLD_H = 70
 const TILE = 16
 const WORLD_PX_W = WORLD_W * TILE
 const WORLD_PX_H = WORLD_H * TILE
+
+const CARE_ROOM_KINDS = new Set<RoomKind>([
+  'emergency',
+  'diagnostic',
+  'surgery',
+  'critical',
+  'inpatient',
+  'ambulatory',
+  'maternalChild',
+  'oncology',
+  'laboratory',
+])
 
 const ROOM_FLOOR_COLORS: Record<RoomKind, string> = {
   public: '#b9e3ef',
@@ -201,6 +215,7 @@ class HospitalGameScene extends Phaser.Scene {
   private layers: SceneLayers | null = null
   private agentSprites = new Map<string, Phaser.GameObjects.Container>()
   private occupancyBadges = new Map<string, Phaser.GameObjects.Container>()
+  private careIndicators = new Map<string, Phaser.GameObjects.Container>()
 
   constructor() {
     super('hospital-game-scene')
@@ -232,11 +247,13 @@ class HospitalGameScene extends Phaser.Scene {
     this.children.removeAll(true)
     this.agentSprites.clear()
     this.occupancyBadges.clear()
+    this.careIndicators.clear()
     this.layers = {
       staticLayer: this.add.container(0, 0).setDepth(0),
       overlayLayer: this.add.container(0, 0).setDepth(40),
       occupancyLayer: this.add.container(0, 0).setDepth(62),
       agentLayer: this.add.container(0, 0).setDepth(80),
+      careLayer: this.add.container(0, 0).setDepth(96),
     }
 
     this.drawBackground(snapshot)
@@ -502,7 +519,76 @@ class HospitalGameScene extends Phaser.Scene {
       if (!activeIds.has(id)) sprite.setVisible(false)
     })
 
+    this.updateCareIndicators(active, snapshot.minute)
     this.updateOccupancy(snapshot, active)
+  }
+
+  private updateCareIndicators(active: ActiveAgent[], minute: number) {
+    if (!this.layers) return
+    const pairs = carePairsForActiveAgents(active)
+    const visibleIds = new Set<string>()
+
+    pairs.forEach((pair, index) => {
+      visibleIds.add(pair.id)
+      const indicator = this.careIndicators.get(pair.id) ?? this.createCareIndicator(pair.id)
+      this.updateCareIndicator(indicator, pair, minute, index)
+    })
+
+    this.careIndicators.forEach((indicator, id) => {
+      if (!visibleIds.has(id)) indicator.setVisible(false)
+    })
+  }
+
+  private createCareIndicator(id: string) {
+    const container = this.add.container(0, 0)
+    const graphics = this.add.graphics()
+    container.add(graphics)
+    container.setData('graphics', graphics)
+    this.layers?.careLayer.add(container)
+    this.careIndicators.set(id, container)
+    return container
+  }
+
+  private updateCareIndicator(container: Phaser.GameObjects.Container, pair: CarePair, minute: number, index: number) {
+    const graphics = container.getData('graphics') as Phaser.GameObjects.Graphics
+    const patientX = tileX(pair.patient.pos.x)
+    const patientY = tileY(pair.patient.pos.y)
+    const professionalX = tileX(pair.professional.pos.x)
+    const professionalY = tileY(pair.professional.pos.y)
+    const midX = (patientX + professionalX) / 2
+    const midY = (patientY + professionalY) / 2 - 7
+    const pulse = 1 + Math.sin(minute * 0.5 + index) * 0.09
+    const radius = 9 * pulse
+    const handAngle = minute * 0.34 + index * 0.6
+    const hourAngle = minute * 0.08 + index * 0.35
+
+    container.setPosition(midX, midY)
+    container.setDepth(midY + 18)
+    container.setVisible(true)
+    graphics.clear()
+
+    graphics.lineStyle(2, 0x0f766e, 0.3)
+    graphics.lineBetween(patientX - midX, patientY - midY, professionalX - midX, professionalY - midY)
+
+    graphics.fillStyle(0xffffff, 0.96)
+    graphics.fillCircle(0, 0, radius + 2)
+    graphics.lineStyle(2, 0x0f766e, 0.95)
+    graphics.strokeCircle(0, 0, radius + 2)
+    graphics.fillStyle(0xe4f3ee, 1)
+    graphics.fillCircle(0, 0, radius)
+
+    graphics.fillStyle(0x17201c, 1)
+    graphics.fillCircle(0, -radius + 3, 1.3)
+    graphics.fillCircle(radius - 3, 0, 1.3)
+    graphics.fillCircle(0, radius - 3, 1.3)
+    graphics.fillCircle(-radius + 3, 0, 1.3)
+
+    graphics.lineStyle(2, 0xd65f50, 1)
+    graphics.lineBetween(0, 0, Math.cos(handAngle) * radius * 0.62, Math.sin(handAngle) * radius * 0.62)
+    graphics.lineStyle(2, 0x17201c, 0.9)
+    graphics.lineBetween(0, 0, Math.cos(hourAngle) * radius * 0.45, Math.sin(hourAngle) * radius * 0.45)
+    graphics.fillStyle(0x17201c, 1)
+    graphics.fillCircle(0, 0, 2)
   }
 
   private updateOccupancy(snapshot: SimulationSnapshot, active: ActiveAgent[]) {
@@ -673,6 +759,84 @@ function visibleAgentsForSnapshot(snapshot: SimulationSnapshot): SimAgent[] {
   if (snapshot.agentLayer === 'patients') return patients
   if (snapshot.agentLayer === 'staff') return staff
   return [...patients, ...staff]
+}
+
+function carePairsForActiveAgents(active: ActiveAgent[]): CarePair[] {
+  const availableStaff = new Map<string, ActiveAgent[]>()
+  active
+    .filter(isCareProfessional)
+    .forEach((item) => {
+      const roomStaff = availableStaff.get(item.pos.room.id) ?? []
+      roomStaff.push(item)
+      availableStaff.set(item.pos.room.id, roomStaff)
+    })
+
+  availableStaff.forEach((items) => {
+    items.sort((a, b) => careProfessionalPriority(a.agent.role) - careProfessionalPriority(b.agent.role))
+  })
+
+  const usedStaff = new Set<string>()
+  const pairs: CarePair[] = []
+  active
+    .filter(isCarePatient)
+    .sort((a, b) => severityPriority(b.agent.severity) - severityPriority(a.agent.severity))
+    .forEach((patient) => {
+      const professionals = availableStaff.get(patient.pos.room.id) ?? []
+      const professional = professionals
+        .filter((item) => !usedStaff.has(item.agent.id))
+        .sort((a, b) => {
+          const roleDelta = careProfessionalPriority(a.agent.role) - careProfessionalPriority(b.agent.role)
+          if (roleDelta !== 0) return roleDelta
+          return distanceBetweenPositions(a.pos, patient.pos) - distanceBetweenPositions(b.pos, patient.pos)
+        })[0]
+      if (!professional) return
+      usedStaff.add(professional.agent.id)
+      pairs.push({
+        id: patient.agent.id,
+        patient,
+        professional,
+      })
+    })
+
+  return pairs.slice(0, 32)
+}
+
+function isCarePatient(item: ActiveAgent): boolean {
+  return item.agent.role === 'patient'
+    && !item.pos.moving
+    && CARE_ROOM_KINDS.has(item.pos.room.kind)
+    && isCarePhase(item.pos.phase)
+}
+
+function isCareProfessional(item: ActiveAgent): boolean {
+  return (item.agent.role === 'doctor' || item.agent.role === 'nurse')
+    && !item.pos.moving
+    && CARE_ROOM_KINDS.has(item.pos.room.kind)
+    && isCarePhase(item.pos.phase)
+}
+
+function isCarePhase(phase: string | undefined): boolean {
+  if (!phase) return true
+  const normalized = phase.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return !/traslado|entrada|check-in|admision|alta|receta|farmacia|salida|turno|base/.test(normalized)
+}
+
+function careProfessionalPriority(role: AgentRole): number {
+  if (role === 'doctor') return 0
+  if (role === 'nurse') return 1
+  return 2
+}
+
+function severityPriority(severity: SimAgent['severity']): number {
+  if (severity === 'critical') return 4
+  if (severity === 'high') return 3
+  if (severity === 'medium') return 2
+  if (severity === 'low') return 1
+  return 0
+}
+
+function distanceBetweenPositions(a: AgentPosition, b: AgentPosition): number {
+  return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
 function corridorCells(rooms: PlacedRoom[]): Set<string> {
