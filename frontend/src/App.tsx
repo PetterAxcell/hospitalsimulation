@@ -917,6 +917,49 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function ToolIconButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: 'edit' | 'upload' | 'reset'
+  label: string
+  onClick?: () => void
+}) {
+  return (
+    <button type="button" className="icon-action" aria-label={label} title={label} onClick={onClick}>
+      <ToolIcon icon={icon} />
+      <span className="visually-hidden">{label}</span>
+    </button>
+  )
+}
+
+function ToolIcon({ icon }: { icon: 'edit' | 'upload' | 'reset' }) {
+  if (icon === 'edit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 20h4l10.5-10.5-4-4L4 16v4Z" />
+        <path d="m13.5 6.5 4 4" />
+      </svg>
+    )
+  }
+  if (icon === 'upload') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 16V4" />
+        <path d="m7 9 5-5 5 5" />
+        <path d="M5 20h14" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 7v5h5" />
+      <path d="M5.5 12A7 7 0 1 0 8 6.7L4 11" />
+    </svg>
+  )
+}
+
 function SimulationCaseSelector({
   result,
   selectedCaseId,
@@ -972,10 +1015,11 @@ function SimulationCaseSelector({
         <Metric label="Personal" value={String(staffOnShift)} />
       </div>
 
-      <div className="case-yaml-actions">
-        <button type="button" onClick={onEditCases}>Editar YAML</button>
-        <label className="file-action">
-          Subir .yaml
+      <div className="case-yaml-actions" aria-label="Herramientas de casos clinicos">
+        <ToolIconButton icon="edit" label="Editar YAML" onClick={onEditCases} />
+        <label className="file-action icon-action" aria-label="Subir YAML" title="Subir YAML">
+          <ToolIcon icon="upload" />
+          <span className="visually-hidden">Subir YAML</span>
           <input
             type="file"
             accept=".yaml"
@@ -985,7 +1029,7 @@ function SimulationCaseSelector({
             }}
           />
         </label>
-        <button type="button" onClick={onResetCases}>Restaurar</button>
+        <ToolIconButton icon="reset" label="Restaurar casos" onClick={onResetCases} />
       </div>
 
       {diagnostics.length > 0 && (

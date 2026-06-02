@@ -288,7 +288,7 @@ output {
 
 .sim-controls {
   display: grid;
-  grid-template-columns: 86px minmax(120px, 1fr) 70px 118px minmax(150px, 190px) minmax(150px, 220px);
+  grid-template-columns: 86px minmax(120px, 1fr) 70px minmax(180px, 230px) minmax(150px, 190px) minmax(150px, 220px);
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -300,6 +300,51 @@ output {
 .sim-controls span {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+.sim-controls select {
+  min-width: 0;
+}
+
+.view-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid #c5d0ca;
+  border-radius: 6px;
+  background: #f7faf7;
+}
+
+.view-mode-grid button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #33413b;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.view-mode-grid button.is-active {
+  background: #e4f3ee;
+  color: #174942;
+  box-shadow: inset 0 0 0 1px rgba(42, 157, 143, 0.35);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .tag-list {
@@ -1094,12 +1139,12 @@ th {
 
 .simulation-panel-tabs button span {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   font-size: 11px;
   font-weight: 900;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .simulation-panel-tabs button strong {
@@ -1155,19 +1200,36 @@ th {
 .case-yaml-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
-.case-yaml-actions button {
+.case-yaml-actions .icon-action {
+  width: 36px;
   min-height: 36px;
-  padding: 0 12px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 1px solid #c5d0ca;
   border-radius: 6px;
   background: #ffffff;
   color: #33413b;
-  font-size: 13px;
-  font-weight: 800;
   cursor: pointer;
+}
+
+.case-yaml-actions .icon-action:hover {
+  border-color: #2a9d8f;
+  color: #174942;
+  background: #e4f3ee;
+}
+
+.case-yaml-actions .icon-action svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .case-yaml-file {
@@ -1387,6 +1449,15 @@ th {
     border-top: 1px solid #c9d4ce;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sim-controls {
+    grid-template-columns: 86px minmax(120px, 1fr) 70px;
+  }
+
+  .view-mode-grid,
+  .sim-controls select {
+    grid-column: 1 / -1;
   }
 }
 

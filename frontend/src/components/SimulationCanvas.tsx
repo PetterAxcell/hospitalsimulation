@@ -17,7 +17,7 @@ interface SimulationCanvasProps {
   onChangeAgentLayer: (layer: SimulationAgentLayer) => void
 }
 
-type ViewMode = 'rpg' | 'flows' | 'rules'
+type ViewMode = 'live' | 'flows' | 'rules'
 
 interface SimulationSnapshot {
   plan: HospitalPlan
@@ -117,7 +117,7 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   const sceneRef = useRef<HospitalGameScene | null>(null)
   const [minute, setMinute] = useState(0)
   const [playing, setPlaying] = useState(true)
-  const [viewMode, setViewMode] = useState<ViewMode>('rpg')
+  const [viewMode, setViewMode] = useState<ViewMode>('live')
   const result = useMemo(() => runHospitalSimulation(plan, settings, patientCases), [patientCases, plan, settings])
 
   useEffect(() => {
@@ -185,11 +185,11 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
           }}
         />
         <span>{formatTime(minute)}</span>
-        <select value={viewMode} onChange={(event) => setViewMode(event.target.value as ViewMode)} aria-label="Capa visual">
-          <option value="rpg">RPG</option>
-          <option value="flows">Flujos</option>
-          <option value="rules">Reglas</option>
-        </select>
+        <div className="view-mode-grid" aria-label="Vista de simulacion">
+          <ViewModeButton mode="live" active={viewMode} onClick={setViewMode}>Vista</ViewModeButton>
+          <ViewModeButton mode="flows" active={viewMode} onClick={setViewMode}>Flujos</ViewModeButton>
+          <ViewModeButton mode="rules" active={viewMode} onClick={setViewMode}>Reglas</ViewModeButton>
+        </div>
         <select value={agentLayer} onChange={(event) => onChangeAgentLayer(event.target.value as SimulationAgentLayer)} aria-label="Agentes visibles">
           <option value="all">Pacientes + personal</option>
           <option value="patients">Solo casos</option>
@@ -206,6 +206,19 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
       </div>
       <div ref={hostRef} className="phaser-stage" role="img" aria-label="Simulacion top-down del hospital" />
     </div>
+  )
+}
+
+function ViewModeButton({ mode, active, children, onClick }: {
+  mode: ViewMode
+  active: ViewMode
+  children: string
+  onClick: (mode: ViewMode) => void
+}) {
+  return (
+    <button type="button" className={active === mode ? 'is-active' : ''} onClick={() => onClick(mode)}>
+      {children}
+    </button>
   )
 }
 
@@ -512,7 +525,7 @@ class HospitalGameScene extends Phaser.Scene {
       sprite.setVisible(true)
       sprite.setDepth(pos.y * TILE)
       const roleLabel = sprite.getData('roleLabel') as Phaser.GameObjects.Text | undefined
-      if (roleLabel) roleLabel.setVisible(snapshot.viewMode !== 'rpg')
+      if (roleLabel) roleLabel.setVisible(snapshot.viewMode !== 'live')
     })
 
     this.agentSprites.forEach((sprite, id) => {
