@@ -123,14 +123,7 @@ export interface HospitalPlan {
 export type AgentRole = 'patient' | 'doctor' | 'nurse' | 'porter' | 'technician'
 export type PatientStream = 'ed_ambulance' | 'ed_walkin' | 'outpatient' | 'elective'
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
-export type PatientCaseId =
-  | 'trauma_major'
-  | 'stroke_code'
-  | 'chest_pain'
-  | 'minor_ed'
-  | 'ed_observation'
-  | 'outpatient_consult'
-  | 'scheduled_surgery'
+export type PatientCaseId = string
 export type PatientCaseFilter = PatientCaseId | 'all'
 
 export type DoorSide = 'top' | 'right' | 'bottom' | 'left'

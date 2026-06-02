@@ -25,7 +25,17 @@ import {
   worldUnitsToMeters,
 } from './engine/geometry'
 import { compilePlanningScript, DEFAULT_PLANNING_SCRIPT, type PlanningLanguageResult } from './engine/planningLanguage'
-import { DEFAULT_SIMULATION_SETTINGS, runHospitalSimulation, type SimulationSettings } from './engine/simulation'
+import {
+  DEFAULT_CLINICAL_CASES_YAML,
+  DEFAULT_PATIENT_CASES,
+  DEFAULT_SIMULATION_SETTINGS,
+  compileClinicalCases,
+  runHospitalSimulation,
+  type ClinicalCaseCompileResult,
+  type ClinicalCaseDiagnostic,
+  type PatientCaseDefinition,
+  type SimulationSettings,
+} from './engine/simulation'
 import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationResult } from './types'
 
 type WorkspaceTab = 'plan' | 'simulation' | 'saturation' | 'services' | 'analysis'
@@ -44,19 +54,25 @@ function App() {
   const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
   const [templateToAdd, setTemplateToAdd] = useState('edBoxes')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
+  const [patientCases, setPatientCases] = useState<PatientCaseDefinition[]>(DEFAULT_PATIENT_CASES)
+  const [clinicalCaseSource, setClinicalCaseSource] = useState(DEFAULT_CLINICAL_CASES_YAML)
+  const [clinicalCaseResult, setClinicalCaseResult] = useState<ClinicalCaseCompileResult | null>(null)
+  const [clinicalCaseFileName, setClinicalCaseFileName] = useState('casos-clinicos.yaml')
   const [selectedCaseId, setSelectedCaseId] = useState<PatientCaseFilter>('all')
   const [scriptSource, setScriptSource] = useState(DEFAULT_PLANNING_SCRIPT)
   const [scriptResult, setScriptResult] = useState<PlanningLanguageResult | null>(null)
   const [scriptFileName, setScriptFileName] = useState('plantilla.yaml')
   const [isScriptModalOpen, setScriptModalOpen] = useState(false)
   const [isScriptHelpOpen, setScriptHelpOpen] = useState(false)
+  const [isClinicalCaseModalOpen, setClinicalCaseModalOpen] = useState(false)
+  const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
 
   const selectedRoom = plan.rooms.find((room) => room.id === selectedRoomId)
   const activeFloorRooms = plan.rooms.filter((room) => room.floor === selectedFloor)
   const floorArea = activeFloorRooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const totalArea = plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
-  const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings), [plan, simulationSettings])
+  const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings, patientCases), [patientCases, plan, simulationSettings])
   const simulationWorkspace = activeTab === 'simulation' || activeTab === 'saturation'
 
   function updateRoom(nextRoom: PlacedRoom) {
@@ -225,6 +241,45 @@ function App() {
     setScriptModalOpen(true)
   }
 
+  async function loadClinicalCaseTemplate(file: File | undefined) {
+    if (!file) return
+    setClinicalCaseFileName(file.name)
+    if (!file.name.toLowerCase().endsWith('.yaml')) {
+      setClinicalCaseResult({
+        cases: patientCases,
+        diagnostics: [{
+          level: 'error',
+          line: 1,
+          message: 'Solo se pueden subir archivos .yaml.',
+        }],
+        appliedCases: 0,
+      })
+      setClinicalCaseModalOpen(true)
+      return
+    }
+    const source = await file.text()
+    setClinicalCaseSource(source)
+    setClinicalCaseResult(null)
+    setClinicalCaseModalOpen(true)
+  }
+
+  function saveClinicalCases() {
+    const result = compileClinicalCases(clinicalCaseSource)
+    setClinicalCaseResult(result)
+    if (result.diagnostics.some((diagnostic) => diagnostic.level === 'error')) return
+    setPatientCases(result.cases)
+    setSelectedCaseId('all')
+    setClinicalCaseModalOpen(false)
+  }
+
+  function resetClinicalCases() {
+    setPatientCases(DEFAULT_PATIENT_CASES)
+    setClinicalCaseSource(DEFAULT_CLINICAL_CASES_YAML)
+    setClinicalCaseFileName('casos-clinicos.yaml')
+    setClinicalCaseResult(null)
+    setSelectedCaseId('all')
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -270,6 +325,11 @@ function App() {
             <SimulationCaseSelector
               result={simulationResult}
               selectedCaseId={selectedCaseId}
+              fileName={clinicalCaseFileName}
+              diagnostics={clinicalCaseResult?.diagnostics ?? []}
+              onEditCases={() => setClinicalCaseModalOpen(true)}
+              onUploadCases={loadClinicalCaseTemplate}
+              onResetCases={resetClinicalCases}
               onSelectCase={setSelectedCaseId}
             />
           ) : (
@@ -326,6 +386,7 @@ function App() {
                 plan={plan}
                 selectedFloor={selectedFloor}
                 settings={simulationSettings}
+                patientCases={patientCases}
                 selectedCaseId={selectedCaseId}
                 onSelectCase={setSelectedCaseId}
               />
@@ -378,6 +439,25 @@ function App() {
           onUpload={loadPlanningTemplate}
           onToggleHelp={() => setScriptHelpOpen((current) => !current)}
           onClose={() => setScriptModalOpen(false)}
+        />
+      )}
+
+      {isClinicalCaseModalOpen && (
+        <ClinicalCasesModal
+          source={clinicalCaseSource}
+          result={clinicalCaseResult}
+          fileName={clinicalCaseFileName}
+          helpOpen={isClinicalCaseHelpOpen}
+          onChange={setClinicalCaseSource}
+          onSave={saveClinicalCases}
+          onReset={() => {
+            setClinicalCaseSource(DEFAULT_CLINICAL_CASES_YAML)
+            setClinicalCaseFileName('casos-clinicos.yaml')
+            setClinicalCaseResult(null)
+          }}
+          onUpload={loadClinicalCaseTemplate}
+          onToggleHelp={() => setClinicalCaseHelpOpen((current) => !current)}
+          onClose={() => setClinicalCaseModalOpen(false)}
         />
       )}
     </main>
@@ -611,6 +691,159 @@ connections:
   )
 }
 
+function ClinicalCasesModal({
+  source,
+  result,
+  fileName,
+  helpOpen,
+  onChange,
+  onSave,
+  onReset,
+  onUpload,
+  onToggleHelp,
+  onClose,
+}: {
+  source: string
+  result: ClinicalCaseCompileResult | null
+  fileName: string
+  helpOpen: boolean
+  onChange: (value: string) => void
+  onSave: () => void
+  onReset: () => void
+  onUpload: (file: File | undefined) => void
+  onToggleHelp: () => void
+  onClose: () => void
+}) {
+  const hasErrors = result?.diagnostics.some((diagnostic) => diagnostic.level === 'error') ?? false
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="script-modal" role="dialog" aria-modal="true" aria-labelledby="clinical-cases-modal-title">
+        <header className="script-modal-header">
+          <div>
+            <h2 id="clinical-cases-modal-title">Programar casos clinicos</h2>
+            <p>{fileName}</p>
+          </div>
+          <div className="script-modal-actions">
+            <button type="button" className="info-action" onClick={onToggleHelp} aria-haspopup="dialog" aria-expanded={helpOpen}>Info</button>
+            <button type="button" onClick={onClose}>Cerrar</button>
+          </div>
+        </header>
+
+        <div className="script-toolbar">
+          <label className="file-action">
+            Subir .yaml
+            <input
+              type="file"
+              accept=".yaml"
+              onChange={(event) => {
+                void onUpload(event.currentTarget.files?.[0])
+                event.currentTarget.value = ''
+              }}
+            />
+          </label>
+          {result && <span>{hasErrors ? 'No aplicado' : `${result.appliedCases} casos aplicados`}</span>}
+        </div>
+
+        <textarea
+          aria-label="Plantilla de casos clinicos"
+          wrap="off"
+          spellCheck={false}
+          value={source}
+          onChange={(event) => onChange(event.target.value)}
+        />
+
+        <footer className="script-diagnostics">
+          {result?.diagnostics.length ? (
+            result.diagnostics.map((diagnostic) => (
+              <p key={`${diagnostic.line}-${diagnostic.message}`} className={diagnostic.level}>
+                Linea {diagnostic.line}: {diagnostic.message}
+              </p>
+            ))
+          ) : (
+            <p className="muted">{result ? `OK · ${result.appliedCases} casos listos` : 'Sin ejecutar.'}</p>
+          )}
+        </footer>
+
+        <div className="script-modal-footer">
+          <button type="button" onClick={onReset}>Restaurar ejemplo</button>
+          <div className="script-footer-actions">
+            <button type="button" onClick={onClose}>Cancelar</button>
+            <button type="button" className="primary-action" onClick={onSave}>Guardar casos</button>
+          </div>
+        </div>
+      </section>
+      {helpOpen && <ClinicalCasesHelpModal onClose={onToggleHelp} />}
+    </div>
+  )
+}
+
+function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="script-info-backdrop" role="presentation">
+      <section className="script-info-modal" role="dialog" aria-modal="true" aria-labelledby="clinical-cases-info-title">
+        <header className="script-info-header">
+          <div>
+            <span>Manual YAML</span>
+            <h2 id="clinical-cases-info-title">Casos para la simulacion</h2>
+            <p>Define perfiles clinicos, su peso de llegada y la secuencia de nodos hospitalarios que recorren los pacientes.</p>
+          </div>
+          <button type="button" onClick={onClose}>Cerrar</button>
+        </header>
+
+        <div className="script-info-body">
+          <section className="script-info-card">
+            <h3>Estructura minima</h3>
+            <pre>{`cases:
+  - id: sepsis_grave
+    label: Sepsis grave
+    code: SEP
+    stream: ed_walkin
+    severity: critical
+    color: "#b45309"
+    weight: 8
+    steps:
+      - node: registration
+        phase: Admision
+      - node: triage
+        phase: Triaje sepsis
+      - node: resus
+        phase: Antibiotico y fluidos
+      - choose:
+          - weight: 0.55
+            node: icu
+            phase: Ingreso UCI
+          - weight: 0.45
+            node: ward
+            phase: Ingreso planta`}</pre>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Campos</h3>
+            <ul>
+              <li><strong>`id`</strong> debe ser unico y no puede ser `all`.</li>
+              <li><strong>`stream`</strong>: `ed_ambulance`, `ed_walkin`, `outpatient` o `elective`.</li>
+              <li><strong>`severity`</strong>: `low`, `medium`, `high` o `critical`.</li>
+              <li><strong>`weight`</strong> aumenta o reduce la frecuencia relativa del caso.</li>
+              <li><strong>`steps`</strong> necesita al menos dos pasos para que haya ruta simulable.</li>
+            </ul>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Ramas y probabilidades</h3>
+            <ul>
+              <li>Usa `chance: 0.35` en un paso para que sea opcional.</li>
+              <li>Usa `choose` para escoger una de varias rutas posibles.</li>
+              <li>Un bloque `choose` puede apuntar a un `node` directo o a una lista `steps`.</li>
+              <li>Nodos utiles: `registration`, `triage`, `ed_bay`, `resus`, `imaging`, `lab`, `or`, `pacu`, `icu`, `ward`, `pharmacy`, `discharge`.</li>
+            </ul>
+          </section>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 interface TabButtonProps {
   id: WorkspaceTab
   active: WorkspaceTab
@@ -638,10 +871,20 @@ function Metric({ label, value }: { label: string; value: string }) {
 function SimulationCaseSelector({
   result,
   selectedCaseId,
+  fileName,
+  diagnostics,
+  onEditCases,
+  onUploadCases,
+  onResetCases,
   onSelectCase,
 }: {
   result: SimulationResult | null
   selectedCaseId: PatientCaseFilter
+  fileName: string
+  diagnostics: ClinicalCaseDiagnostic[]
+  onEditCases: () => void
+  onUploadCases: (file: File | undefined) => void
+  onResetCases: () => void
   onSelectCase: (caseId: PatientCaseFilter) => void
 }) {
   const caseStats = (result?.caseStats ?? [])
@@ -651,6 +894,29 @@ function SimulationCaseSelector({
   return (
     <section className="panel-section">
       <h2>Casos clinicos</h2>
+      <div className="case-yaml-actions">
+        <button type="button" onClick={onEditCases}>Editar YAML</button>
+        <label className="file-action">
+          Subir .yaml
+          <input
+            type="file"
+            accept=".yaml"
+            onChange={(event) => {
+              onUploadCases(event.target.files?.[0])
+              event.currentTarget.value = ''
+            }}
+          />
+        </label>
+        <button type="button" onClick={onResetCases}>Restaurar</button>
+      </div>
+      <p className="case-yaml-file">{fileName}</p>
+      {diagnostics.length > 0 && (
+        <div className="case-yaml-diagnostics">
+          {diagnostics.map((diagnostic, index) => (
+            <p key={`${diagnostic.line}-${index}`} className={diagnostic.level}>{diagnostic.message}</p>
+          ))}
+        </div>
+      )}
       {caseStats.length > 0 ? (
         <div className="case-list">
           <button

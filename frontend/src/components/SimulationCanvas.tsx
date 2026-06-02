@@ -3,13 +3,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { KIND_COLORS } from '../data/catalog'
 import { connectedCorridorGroups, disconnectedPassages, doorWorldPosition } from '../engine/circulation'
 import { center, roomByNode } from '../engine/geometry'
-import { positionAt, runHospitalSimulation, type SimulationSettings } from '../engine/simulation'
+import { positionAt, runHospitalSimulation, type PatientCaseDefinition, type SimulationSettings } from '../engine/simulation'
 import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationResult } from '../types'
 
 interface SimulationCanvasProps {
   plan: HospitalPlan
   selectedFloor: number
   settings: SimulationSettings
+  patientCases: PatientCaseDefinition[]
   selectedCaseId: PatientCaseFilter
   onSelectCase: (caseId: PatientCaseFilter) => void
 }
@@ -93,14 +94,14 @@ const ROOM_WALL_COLORS: Record<RoomKind, string> = {
   future: '#7b7f78',
 }
 
-export function SimulationCanvas({ plan, selectedFloor, settings, selectedCaseId, onSelectCase }: SimulationCanvasProps) {
+export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, onSelectCase }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const sceneRef = useRef<HospitalGameScene | null>(null)
   const [minute, setMinute] = useState(0)
   const [playing, setPlaying] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('rpg')
-  const result = useMemo(() => runHospitalSimulation(plan, settings), [plan, settings])
+  const result = useMemo(() => runHospitalSimulation(plan, settings, patientCases), [patientCases, plan, settings])
 
   useEffect(() => {
     let frame = 0

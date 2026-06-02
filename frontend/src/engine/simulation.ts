@@ -1,3 +1,4 @@
+import { parse as parseYaml } from 'yaml'
 import { buildAccessiblePatientRoute, isPassage } from './circulation'
 import { distance, roomByNode } from './geometry'
 import type {
@@ -18,12 +19,12 @@ interface MovementPoint {
   y: number
 }
 
-interface PatientCaseStep {
+export interface PatientCaseStep {
   node: SimulationNode
   phase: string
 }
 
-interface PatientCaseDefinition {
+export interface PatientCaseDefinition {
   id: PatientCaseId
   label: string
   code: string
@@ -34,6 +35,23 @@ interface PatientCaseDefinition {
   build: (rng: () => number) => PatientCaseStep[]
 }
 
+export interface ClinicalCaseDiagnostic {
+  level: 'error' | 'warning'
+  line: number
+  message: string
+}
+
+export interface ClinicalCaseCompileResult {
+  cases: PatientCaseDefinition[]
+  diagnostics: ClinicalCaseDiagnostic[]
+  appliedCases: number
+}
+
+interface CaseStepSpec {
+  chance: number
+  build: (rng: () => number) => PatientCaseStep[]
+}
+
 const SEVERITY_WEIGHT: Record<Severity, number> = {
   low: 0.7,
   medium: 1,
@@ -41,7 +59,7 @@ const SEVERITY_WEIGHT: Record<Severity, number> = {
   critical: 1.8,
 }
 
-const PATIENT_CASES: PatientCaseDefinition[] = [
+export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
   {
     id: 'trauma_major',
     label: 'Trauma mayor',
@@ -181,6 +199,235 @@ const PATIENT_CASES: PatientCaseDefinition[] = [
   },
 ]
 
+const VALID_STREAMS: PatientStream[] = ['ed_ambulance', 'ed_walkin', 'outpatient', 'elective']
+const VALID_SEVERITIES: Severity[] = ['low', 'medium', 'high', 'critical']
+const VALID_SIMULATION_NODES: SimulationNode[] = [
+  'arrival_public',
+  'arrival_ambulance',
+  'triage',
+  'registration',
+  'ed_bay',
+  'resus',
+  'observation',
+  'consult',
+  'imaging',
+  'lab',
+  'or',
+  'hybrid_or',
+  'pacu',
+  'icu',
+  'ward',
+  'maternity',
+  'neonatal_icu',
+  'pharmacy',
+  'discharge',
+  'logistics',
+  'research',
+  'vertical_core',
+  'emergency_stair',
+  'refuge_area',
+  'fire_sector',
+  'exit',
+]
+
+const NODE_ALIASES: Record<string, SimulationNode> = {
+  admision: 'registration',
+  admission: 'registration',
+  ambulance: 'arrival_ambulance',
+  ambulancia: 'arrival_ambulance',
+  boxes: 'ed_bay',
+  box: 'ed_bay',
+  consulta: 'consult',
+  consultorio: 'consult',
+  diagnostico: 'imaging',
+  emergency: 'ed_bay',
+  farmacia: 'pharmacy',
+  hospitalizacion: 'ward',
+  imagen: 'imaging',
+  laboratorio: 'lab',
+  quirofano: 'or',
+  reanimacion: 'resus',
+  shock: 'resus',
+  urgencias: 'ed_bay',
+  uci: 'icu',
+}
+
+export const DEFAULT_CLINICAL_CASES_YAML = `cases:
+  - id: trauma_major
+    label: Trauma mayor
+    code: TRA
+    stream: ed_ambulance
+    severity: critical
+    color: "#d62828"
+    weight: 9
+    steps:
+      - node: arrival_ambulance
+        phase: Entrada ambulancia
+      - node: resus
+        phase: ABCDE y estabilizacion
+      - node: imaging
+        phase: TAC urgente
+      - chance: 0.62
+        steps:
+          - node: or
+            phase: Quirofano trauma
+          - node: pacu
+            phase: Reanimacion postoperatoria
+      - choose:
+          - weight: 0.78
+            node: icu
+            phase: Ingreso UCI
+          - weight: 0.22
+            node: ward
+            phase: Ingreso planta
+
+  - id: stroke_code
+    label: Codigo ictus
+    code: ICT
+    stream: ed_ambulance
+    severity: high
+    color: "#7c3aed"
+    weight: 7
+    steps:
+      - node: arrival_ambulance
+        phase: Preaviso SEM
+      - node: triage
+        phase: Triaje avanzado
+      - node: imaging
+        phase: TC craneal
+      - chance: 0.34
+        node: resus
+        phase: Estabilizacion neuro
+      - choose:
+          - weight: 0.58
+            node: icu
+            phase: Unidad critica
+          - weight: 0.42
+            node: ward
+            phase: Ingreso neurologia
+
+  - id: chest_pain
+    label: Dolor toracico
+    code: DT
+    stream: ed_walkin
+    severity: high
+    color: "#ef4444"
+    weight: 11
+    steps:
+      - node: registration
+        phase: Admision rapida
+      - node: triage
+        phase: Triaje prioridad alta
+      - node: ed_bay
+        phase: Box monitorizado
+      - node: lab
+        phase: Troponinas seriadas
+      - chance: 0.42
+        node: imaging
+        phase: Prueba cardiologia
+      - choose:
+          - weight: 0.46
+            node: observation
+            phase: Observacion ED
+          - weight: 0.54
+            node: pharmacy
+            phase: Alta con tratamiento
+
+  - id: minor_ed
+    label: Urgencia leve
+    code: UL
+    stream: ed_walkin
+    severity: low
+    color: "#f4a261"
+    weight: 24
+    steps:
+      - node: registration
+        phase: Admision
+      - node: triage
+        phase: Triaje
+      - choose:
+          - weight: 0.5
+            node: ed_bay
+            phase: Cura / analgesia
+          - weight: 0.5
+            node: ed_bay
+            phase: Valoracion medica
+      - node: pharmacy
+        phase: Receta y alta
+
+  - id: ed_observation
+    label: Urgencia con observacion
+    code: OBS
+    stream: ed_walkin
+    severity: medium
+    color: "#2a9d8f"
+    weight: 17
+    steps:
+      - node: registration
+        phase: Admision
+      - node: triage
+        phase: Triaje
+      - node: ed_bay
+        phase: Box diagnostico
+      - chance: 0.64
+        node: lab
+        phase: Analitica
+      - chance: 0.38
+        node: imaging
+        phase: Imagen
+      - node: observation
+        phase: Observacion y decision
+      - choose:
+          - weight: 0.32
+            node: ward
+            phase: Ingreso planta
+          - weight: 0.68
+            node: pharmacy
+            phase: Alta
+
+  - id: outpatient_consult
+    label: Consulta externa
+    code: CEX
+    stream: outpatient
+    severity: medium
+    color: "#2563eb"
+    weight: 22
+    steps:
+      - node: registration
+        phase: Check-in
+      - node: consult
+        phase: Consulta / hospital de dia
+      - chance: 0.36
+        node: lab
+        phase: Extraccion
+      - chance: 0.24
+        node: imaging
+        phase: Prueba imagen
+      - node: pharmacy
+        phase: Farmacia / salida
+
+  - id: scheduled_surgery
+    label: Cirugia programada
+    code: QX
+    stream: elective
+    severity: medium
+    color: "#7c6bb0"
+    weight: 9
+    steps:
+      - node: registration
+        phase: Ingreso quirurgico
+      - node: or
+        phase: Quirofano
+      - node: pacu
+        phase: PACU
+      - choose:
+          - weight: 0.18
+            node: icu
+            phase: UCI postoperatoria
+          - weight: 0.82
+            node: ward
+            phase: Planta postoperatoria`
+
 export interface SimulationSettings {
   seed: number
   arrivalsPerHour: number
@@ -195,20 +442,63 @@ export const DEFAULT_SIMULATION_SETTINGS: SimulationSettings = {
   speed: 90,
 }
 
-export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSettings): SimulationResult {
+export function compileClinicalCases(source: string): ClinicalCaseCompileResult {
+  let document: unknown
+  try {
+    document = parseYaml(source)
+  } catch (error) {
+    return {
+      cases: DEFAULT_PATIENT_CASES,
+      diagnostics: [{
+        level: 'error',
+        line: 1,
+        message: error instanceof Error ? error.message : String(error),
+      }],
+      appliedCases: 0,
+    }
+  }
+
+  try {
+    const root = requireRecord(document, 'El YAML de casos debe ser un objeto con la clave cases.')
+    const cases = listFromValue(root.cases).map(caseFromYamlEntry)
+    if (cases.length === 0) {
+      throw new Error('Define al menos un caso en cases.')
+    }
+    const duplicatedId = firstDuplicate(cases.map((item) => item.id))
+    if (duplicatedId) throw new Error(`El caso "${duplicatedId}" esta duplicado.`)
+    return {
+      cases,
+      diagnostics: [],
+      appliedCases: cases.length,
+    }
+  } catch (error) {
+    return {
+      cases: DEFAULT_PATIENT_CASES,
+      diagnostics: [{
+        level: 'error',
+        line: 1,
+        message: error instanceof Error ? error.message : String(error),
+      }],
+      appliedCases: 0,
+    }
+  }
+}
+
+export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSettings, patientCases: PatientCaseDefinition[] = DEFAULT_PATIENT_CASES): SimulationResult {
+  const activeCases = patientCases.length > 0 ? patientCases : DEFAULT_PATIENT_CASES
   const rng = mulberry32(settings.seed)
   const durationMinutes = settings.durationHours * 60
   const agents: SimAgent[] = []
   const totalArrivals = Math.max(40, Math.round(settings.arrivalsPerHour * settings.durationHours))
   const roomPressure: Record<string, number> = {}
-  const caseStats = createCaseStats()
+  const caseStats = createCaseStats(activeCases)
   let completed = 0
   let blockedPatients = 0
   let travelSum = 0
   let verticalMoves = 0
 
   for (let i = 0; i < totalArrivals; i += 1) {
-    const patientCase = weightedPatientCase(rng)
+    const patientCase = weightedPatientCase(rng, activeCases)
     const caseStat = caseStats.get(patientCase.id)
     if (caseStat) caseStat.attempted += 1
     const caseSteps = patientCase.build(rng)
@@ -468,18 +758,18 @@ function caseStep(node: SimulationNode, phase: string): PatientCaseStep {
   return { node, phase }
 }
 
-function weightedPatientCase(rng: () => number): PatientCaseDefinition {
-  const total = PATIENT_CASES.reduce((sum, item) => sum + item.weight, 0)
+function weightedPatientCase(rng: () => number, patientCases: PatientCaseDefinition[]): PatientCaseDefinition {
+  const total = patientCases.reduce((sum, item) => sum + item.weight, 0)
   let roll = rng() * total
-  for (const patientCase of PATIENT_CASES) {
+  for (const patientCase of patientCases) {
     roll -= patientCase.weight
     if (roll <= 0) return patientCase
   }
-  return PATIENT_CASES[PATIENT_CASES.length - 1]
+  return patientCases[patientCases.length - 1]
 }
 
-function createCaseStats(): Map<PatientCaseId, PatientCaseStat> {
-  return new Map(PATIENT_CASES.map((patientCase) => [
+function createCaseStats(patientCases: PatientCaseDefinition[]): Map<PatientCaseId, PatientCaseStat> {
+  return new Map(patientCases.map((patientCase) => [
     patientCase.id,
     {
       id: patientCase.id,
@@ -491,6 +781,170 @@ function createCaseStats(): Map<PatientCaseId, PatientCaseStat> {
       samplePath: [],
     },
   ]))
+}
+
+function caseFromYamlEntry(value: unknown): PatientCaseDefinition {
+  const item = requireRecord(value, 'Cada caso debe ser un objeto.')
+  const id = requiredString(item.id, 'case.id')
+  if (id === 'all') throw new Error('El id "all" esta reservado.')
+  const label = requiredString(item.label ?? item.name, `case ${id}.label`)
+  const code = optionalString(item.code) ?? id.slice(0, 3).toUpperCase()
+  const stream = streamFromValue(item.stream ?? 'ed_walkin', id)
+  const severity = severityFromValue(item.severity ?? 'medium', id)
+  const color = optionalString(item.color) ?? '#2a9d8f'
+  const weight = optionalNumber(item.weight) ?? 1
+  const specs = specsFromValue(item.steps, `case ${id}.steps`)
+  if (specs.length < 2) throw new Error(`case ${id}.steps necesita al menos 2 pasos.`)
+  return {
+    id,
+    label,
+    code,
+    stream,
+    severity,
+    color,
+    weight: Math.max(0.01, weight),
+    build: (rng) => expandStepSpecs(specs, rng),
+  }
+}
+
+function specsFromValue(value: unknown, path: string): CaseStepSpec[] {
+  return listFromValue(value).flatMap((entry, index) => specFromValue(entry, `${path}[${index}]`))
+}
+
+function specFromValue(value: unknown, path: string): CaseStepSpec[] {
+  if (typeof value === 'string') {
+    const node = simulationNodeFromValue(value, path)
+    return [stepSpec(node, titleFromNode(node), 1)]
+  }
+  const item = requireRecord(value, `${path} debe ser un nodo, un paso o una rama.`)
+
+  if (Array.isArray(item.choose) || Array.isArray(item.oneOf)) {
+    const choices = listFromValue(item.choose ?? item.oneOf).map((choice, index) => choiceFromValue(choice, `${path}.choose[${index}]`))
+    if (choices.length === 0) throw new Error(`${path}.choose necesita opciones.`)
+    const chance = chanceFromValue(item.chance ?? item.probability ?? item.optional)
+    return [{
+      chance,
+      build: (rng) => {
+        const total = choices.reduce((sum, choice) => sum + choice.weight, 0)
+        let roll = rng() * total
+        for (const choice of choices) {
+          roll -= choice.weight
+          if (roll <= 0) return expandStepSpecs(choice.steps, rng)
+        }
+        return expandStepSpecs(choices[choices.length - 1].steps, rng)
+      },
+    }]
+  }
+
+  if (Array.isArray(item.steps)) {
+    const chance = chanceFromValue(item.chance ?? item.probability ?? item.optional)
+    const steps = specsFromValue(item.steps, `${path}.steps`)
+    return [{
+      chance,
+      build: (rng) => expandStepSpecs(steps, rng),
+    }]
+  }
+
+  const node = simulationNodeFromValue(item.node ?? item.to, `${path}.node`)
+  const phase = optionalString(item.phase ?? item.name) ?? titleFromNode(node)
+  const chance = chanceFromValue(item.chance ?? item.probability ?? item.optional)
+  return [stepSpec(node, phase, chance)]
+}
+
+function choiceFromValue(value: unknown, path: string): { weight: number; steps: CaseStepSpec[] } {
+  if (typeof value === 'string') {
+    const node = simulationNodeFromValue(value, path)
+    return { weight: 1, steps: [stepSpec(node, titleFromNode(node), 1)] }
+  }
+  const item = requireRecord(value, `${path} debe ser una opcion de rama.`)
+  const weight = Math.max(0.01, optionalNumber(item.weight ?? item.chance ?? item.probability) ?? 1)
+  if (Array.isArray(item.steps)) return { weight, steps: specsFromValue(item.steps, `${path}.steps`) }
+  const node = simulationNodeFromValue(item.node ?? item.to, `${path}.node`)
+  const phase = optionalString(item.phase ?? item.name) ?? titleFromNode(node)
+  return { weight, steps: [stepSpec(node, phase, 1)] }
+}
+
+function stepSpec(node: SimulationNode, phase: string, chance: number): CaseStepSpec {
+  return {
+    chance,
+    build: () => [caseStep(node, phase)],
+  }
+}
+
+function expandStepSpecs(specs: CaseStepSpec[], rng: () => number): PatientCaseStep[] {
+  const steps = specs.flatMap((spec) => (rng() <= spec.chance ? spec.build(rng) : []))
+  return steps.filter((step, index) => step.node !== steps[index - 1]?.node)
+}
+
+function chanceFromValue(value: unknown): number {
+  if (value === undefined) return 1
+  if (typeof value === 'boolean') return value ? 1 : 0
+  const number = optionalNumber(value)
+  if (number === undefined) return 1
+  return clamp(number, 0, 1)
+}
+
+function streamFromValue(value: unknown, id: string): PatientStream {
+  const stream = requiredString(value, `case ${id}.stream`) as PatientStream
+  if (!VALID_STREAMS.includes(stream)) throw new Error(`case ${id}.stream debe ser ${VALID_STREAMS.join(', ')}.`)
+  return stream
+}
+
+function severityFromValue(value: unknown, id: string): Severity {
+  const severity = requiredString(value, `case ${id}.severity`) as Severity
+  if (!VALID_SEVERITIES.includes(severity)) throw new Error(`case ${id}.severity debe ser ${VALID_SEVERITIES.join(', ')}.`)
+  return severity
+}
+
+function simulationNodeFromValue(value: unknown, path: string): SimulationNode {
+  const raw = requiredString(value, path)
+  const normalized = raw.trim().toLowerCase().replace(/\s+/g, '_')
+  const node = NODE_ALIASES[normalized] ?? normalized
+  if (!VALID_SIMULATION_NODES.includes(node as SimulationNode)) {
+    throw new Error(`${path} usa un nodo desconocido "${raw}".`)
+  }
+  return node as SimulationNode
+}
+
+function titleFromNode(node: SimulationNode): string {
+  return node.split('_').map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(' ')
+}
+
+function requireRecord(value: unknown, message: string): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(message)
+  return value as Record<string, unknown>
+}
+
+function listFromValue(value: unknown): unknown[] {
+  if (value === undefined || value === null) return []
+  return Array.isArray(value) ? value : [value]
+}
+
+function requiredString(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.trim().length === 0) throw new Error(`${label} debe ser texto.`)
+  return value.trim()
+}
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const number = Number(value)
+    return Number.isFinite(number) ? number : undefined
+  }
+  return undefined
+}
+
+function firstDuplicate(values: string[]): string | undefined {
+  const seen = new Set<string>()
+  for (const value of values) {
+    if (seen.has(value)) return value
+    seen.add(value)
+  }
+  return undefined
 }
 
 function resolveCaseStops(rooms: PlacedRoom[], steps: PatientCaseStep[]): Array<{ room: PlacedRoom; phase: string }> {
