@@ -40,6 +40,7 @@ import {
 import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
 
 type WorkspaceTab = 'plan' | 'simulation' | 'saturation' | 'top' | 'services' | 'analysis'
+type SimulationPanelTab = 'cases' | 'staff'
 type ProposalOwner = string
 
 interface ArchitectureScore {
@@ -979,6 +980,49 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function ToolIconButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: 'edit' | 'upload' | 'reset'
+  label: string
+  onClick?: () => void
+}) {
+  return (
+    <button type="button" className="icon-action" aria-label={label} title={label} onClick={onClick}>
+      <ToolIcon icon={icon} />
+      <span className="visually-hidden">{label}</span>
+    </button>
+  )
+}
+
+function ToolIcon({ icon }: { icon: 'edit' | 'upload' | 'reset' }) {
+  if (icon === 'edit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 20h4l10.5-10.5-4-4L4 16v4Z" />
+        <path d="m13.5 6.5 4 4" />
+      </svg>
+    )
+  }
+  if (icon === 'upload') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 16V4" />
+        <path d="m7 9 5-5 5 5" />
+        <path d="M5 20h14" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 7v5h5" />
+      <path d="M5.5 12A7 7 0 1 0 8 6.7L4 11" />
+    </svg>
+  )
+}
+
 function SimulationCaseSelector({
   result,
   selectedCaseId,
@@ -1002,39 +1046,83 @@ function SimulationCaseSelector({
   onSelectCase: (caseId: PatientCaseFilter) => void
   onChangeAgentLayer: (layer: SimulationAgentLayer) => void
 }) {
+  const [activePanel, setActivePanel] = useState<SimulationPanelTab>('cases')
   const caseStats = (result?.caseStats ?? [])
     .filter((stat) => stat.attempted > 0)
     .sort((a, b) => b.completed - a.completed)
+  const staffStats = result?.staffStats ?? []
+  const staffOnShift = result?.kpis.staffOnShift ?? staffStats.reduce((sum, stat) => sum + stat.count, 0)
+  const completedCases = result?.kpis.completed ?? 0
+
+  function selectPanel(panel: SimulationPanelTab) {
+    setActivePanel(panel)
+    if (panel === 'cases' && agentLayer === 'staff') onChangeAgentLayer('patients')
+    if (panel === 'staff' && agentLayer !== 'staff') onChangeAgentLayer('staff')
+  }
+
+  function selectLayer(layer: SimulationAgentLayer) {
+    onChangeAgentLayer(layer)
+    if (layer === 'patients') setActivePanel('cases')
+    if (layer === 'staff') setActivePanel('staff')
+  }
 
   return (
-    <>
-      <section className="panel-section">
-        <h2>Casos clinicos</h2>
-        <div className="case-yaml-actions">
-          <button type="button" onClick={onEditCases}>Editar YAML</button>
-          <label className="file-action">
-            Subir .yaml
-            <input
-              type="file"
-              accept=".yaml"
-              onChange={(event) => {
-                onUploadCases(event.target.files?.[0])
-                event.currentTarget.value = ''
-              }}
-            />
-          </label>
-          <button type="button" onClick={onResetCases}>Restaurar</button>
-        </div>
+    <section className="panel-section simulation-hub">
+      <div className="simulation-hub-header">
+        <h2>Simulacion</h2>
         <p className="case-yaml-file">{fileName}</p>
-        {diagnostics.length > 0 && (
-          <div className="case-yaml-diagnostics">
-            {diagnostics.map((diagnostic, index) => (
-              <p key={`${diagnostic.line}-${index}`} className={diagnostic.level}>{diagnostic.message}</p>
-            ))}
-          </div>
-        )}
-        {caseStats.length > 0 ? (
-          <div className="case-list">
+      </div>
+
+      <div className="simulation-hub-summary">
+        <Metric label="Casos" value={String(caseStats.length)} />
+        <Metric label="Personal" value={String(staffOnShift)} />
+      </div>
+
+      <div className="case-yaml-actions" aria-label="Herramientas de casos clinicos">
+        <ToolIconButton icon="edit" label="Editar YAML" onClick={onEditCases} />
+        <label className="file-action icon-action" aria-label="Subir YAML" title="Subir YAML">
+          <ToolIcon icon="upload" />
+          <span className="visually-hidden">Subir YAML</span>
+          <input
+            type="file"
+            accept=".yaml"
+            onChange={(event) => {
+              onUploadCases(event.target.files?.[0])
+              event.currentTarget.value = ''
+            }}
+          />
+        </label>
+        <ToolIconButton icon="reset" label="Restaurar casos" onClick={onResetCases} />
+      </div>
+
+      {diagnostics.length > 0 && (
+        <div className="case-yaml-diagnostics">
+          {diagnostics.map((diagnostic, index) => (
+            <p key={`${diagnostic.line}-${index}`} className={diagnostic.level}>{diagnostic.message}</p>
+          ))}
+        </div>
+      )}
+
+      <div className="agent-layer-grid" aria-label="Capa visible de simulacion">
+        <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => selectLayer('all')}>Todo</button>
+        <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => selectLayer('patients')}>Casos</button>
+        <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => selectLayer('staff')}>Personal</button>
+      </div>
+
+      <div className="simulation-panel-tabs" aria-label="Grupo de simulacion">
+        <button type="button" className={activePanel === 'cases' ? 'is-active' : ''} onClick={() => selectPanel('cases')}>
+          <span>Casos</span>
+          <strong>{completedCases}</strong>
+        </button>
+        <button type="button" className={activePanel === 'staff' ? 'is-active' : ''} onClick={() => selectPanel('staff')}>
+          <span>Personal</span>
+          <strong>{staffOnShift}</strong>
+        </button>
+      </div>
+
+      {activePanel === 'cases' ? (
+        caseStats.length > 0 ? (
+          <div className="case-list simulation-hub-list">
             <button
               type="button"
               className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
@@ -1061,40 +1149,22 @@ function SimulationCaseSelector({
           </div>
         ) : (
           <p className="muted">Ejecutando mezcla clinica.</p>
-        )}
-      </section>
-      <SimulationStaffPanel result={result} agentLayer={agentLayer} onChangeAgentLayer={onChangeAgentLayer} />
-    </>
-  )
-}
-
-function SimulationStaffPanel({
-  result,
-  agentLayer,
-  onChangeAgentLayer,
-}: {
-  result: SimulationResult | null
-  agentLayer: SimulationAgentLayer
-  onChangeAgentLayer: (layer: SimulationAgentLayer) => void
-}) {
-  const staffStats = result?.staffStats ?? []
-  return (
-    <section className="panel-section">
-      <h2>Personal</h2>
-      <div className="agent-layer-grid" aria-label="Capa visible de simulacion">
-        <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => onChangeAgentLayer('all')}>Todo</button>
-        <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => onChangeAgentLayer('patients')}>Casos</button>
-        <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => onChangeAgentLayer('staff')}>Personal</button>
-      </div>
-      <div className="case-list">
-        {staffStats.map((stat) => (
-          <article key={stat.role} className="case-item staff-item" style={{ borderLeftColor: stat.color }}>
-            <strong>{stat.label}</strong>
-            <span>{stat.count} en turno · {stat.moving} con ruta</span>
-            <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Turno local'}</small>
-          </article>
-        ))}
-      </div>
+        )
+      ) : (
+        <div className="case-list simulation-hub-list">
+          {staffStats.length > 0 ? (
+            staffStats.map((stat) => (
+              <article key={stat.role} className="case-item staff-item" style={{ borderLeftColor: stat.color }}>
+                <strong>{stat.label}</strong>
+                <span>{stat.count} en turno · {stat.moving} con ruta</span>
+                <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Turno local'}</small>
+              </article>
+            ))
+          ) : (
+            <p className="muted">Sin personal asignado a la planta activa.</p>
+          )}
+        </div>
+      )}
     </section>
   )
 }

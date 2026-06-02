@@ -283,7 +283,7 @@ output {
 
 .sim-controls {
   display: grid;
-  grid-template-columns: 86px minmax(120px, 1fr) 70px 118px minmax(150px, 190px) minmax(150px, 220px);
+  grid-template-columns: 86px minmax(120px, 1fr) 70px minmax(150px, 190px) minmax(150px, 220px);
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -295,6 +295,21 @@ output {
 .sim-controls span {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+.sim-controls select {
+  min-width: 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .tag-list {
@@ -1188,6 +1203,83 @@ th {
   margin-top: 10px;
 }
 
+.simulation-hub {
+  display: grid;
+  gap: 10px;
+}
+
+.simulation-hub-header {
+  display: grid;
+  gap: 2px;
+}
+
+.simulation-hub-header h2 {
+  margin-bottom: 0;
+}
+
+.simulation-hub-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.simulation-hub-summary .metric {
+  min-height: 46px;
+}
+
+.simulation-hub-summary .metric strong {
+  font-size: 15px;
+}
+
+.simulation-panel-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.simulation-panel-tabs button {
+  min-width: 0;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 8px;
+  border: 1px solid #c5d0ca;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #33413b;
+  cursor: pointer;
+  text-align: left;
+}
+
+.simulation-panel-tabs button span {
+  min-width: 0;
+  overflow: visible;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.simulation-panel-tabs button strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.simulation-panel-tabs button.is-active {
+  border-color: #2a9d8f;
+  background: #e4f3ee;
+  color: #174942;
+}
+
+.simulation-hub-list {
+  max-height: min(42vh, 390px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
 .case-list {
   display: grid;
   gap: 8px;
@@ -1198,6 +1290,10 @@ th {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 10px;
+}
+
+.simulation-hub .agent-layer-grid {
+  margin-bottom: 0;
 }
 
 .agent-layer-grid button {
@@ -1220,24 +1316,40 @@ th {
 .case-yaml-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 6px;
 }
 
-.case-yaml-actions button {
+.case-yaml-actions .icon-action {
+  width: 36px;
   min-height: 36px;
-  padding: 0 12px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 1px solid #c5d0ca;
   border-radius: 6px;
   background: #ffffff;
   color: #33413b;
-  font-size: 13px;
-  font-weight: 800;
   cursor: pointer;
 }
 
+.case-yaml-actions .icon-action:hover {
+  border-color: #2a9d8f;
+  color: #174942;
+  background: #e4f3ee;
+}
+
+.case-yaml-actions .icon-action svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .case-yaml-file {
-  margin: 0 0 8px;
+  margin: 0;
   color: #66736e;
   font-size: 11px;
   font-weight: 800;
@@ -1463,6 +1575,14 @@ th {
     border-top: 1px solid #c9d4ce;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sim-controls {
+    grid-template-columns: 86px minmax(120px, 1fr) 70px;
+  }
+
+  .sim-controls select {
+    grid-column: 1 / -1;
   }
 }
 
