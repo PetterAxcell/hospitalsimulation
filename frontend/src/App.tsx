@@ -427,6 +427,7 @@ function PlanningScriptModal({
 
         <textarea
           aria-label="Plantilla de planificacion"
+          wrap="off"
           spellCheck={false}
           value={source}
           onChange={(event) => onChange(event.target.value)}
