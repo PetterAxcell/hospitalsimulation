@@ -4,7 +4,7 @@ import { KIND_COLORS } from '../data/catalog'
 import { connectedCorridorGroups, disconnectedPassages, doorWorldPosition } from '../engine/circulation'
 import { center, roomByNode } from '../engine/geometry'
 import { positionAt, runHospitalSimulation, type PatientCaseDefinition, type SimulationSettings } from '../engine/simulation'
-import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationResult } from '../types'
+import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationAgentLayer, SimulationResult } from '../types'
 
 interface SimulationCanvasProps {
   plan: HospitalPlan
@@ -12,7 +12,9 @@ interface SimulationCanvasProps {
   settings: SimulationSettings
   patientCases: PatientCaseDefinition[]
   selectedCaseId: PatientCaseFilter
+  agentLayer: SimulationAgentLayer
   onSelectCase: (caseId: PatientCaseFilter) => void
+  onChangeAgentLayer: (layer: SimulationAgentLayer) => void
 }
 
 type ViewMode = 'rpg' | 'flows' | 'rules'
@@ -24,6 +26,7 @@ interface SimulationSnapshot {
   minute: number
   viewMode: ViewMode
   selectedCaseId: PatientCaseFilter
+  agentLayer: SimulationAgentLayer
 }
 
 interface SceneLayers {
@@ -94,7 +97,7 @@ const ROOM_WALL_COLORS: Record<RoomKind, string> = {
   future: '#7b7f78',
 }
 
-export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, onSelectCase }: SimulationCanvasProps) {
+export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, agentLayer, onSelectCase, onChangeAgentLayer }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const sceneRef = useRef<HospitalGameScene | null>(null)
@@ -150,8 +153,8 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   }, [])
 
   useEffect(() => {
-    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, viewMode, selectedCaseId })
-  }, [minute, plan, result, selectedCaseId, selectedFloor, viewMode])
+    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, viewMode, selectedCaseId, agentLayer })
+  }, [agentLayer, minute, plan, result, selectedCaseId, selectedFloor, viewMode])
 
   return (
     <div className="simulation-stage">
@@ -172,6 +175,11 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
           <option value="rpg">RPG</option>
           <option value="flows">Flujos</option>
           <option value="rules">Reglas</option>
+        </select>
+        <select value={agentLayer} onChange={(event) => onChangeAgentLayer(event.target.value as SimulationAgentLayer)} aria-label="Agentes visibles">
+          <option value="all">Pacientes + personal</option>
+          <option value="patients">Solo casos</option>
+          <option value="staff">Solo personal</option>
         </select>
         <select value={selectedCaseId} onChange={(event) => onSelectCase(event.target.value as PatientCaseFilter)} aria-label="Caso clinico visible">
           <option value="all">Todos los casos</option>
@@ -473,9 +481,7 @@ class HospitalGameScene extends Phaser.Scene {
 
   private updateAgents(snapshot: SimulationSnapshot) {
     if (!this.layers) return
-    const visibleAgents = snapshot.selectedCaseId === 'all'
-      ? snapshot.result.agents
-      : snapshot.result.agents.filter((agent) => agent.role === 'patient' && agent.caseId === snapshot.selectedCaseId)
+    const visibleAgents = visibleAgentsForSnapshot(snapshot)
     const active: ActiveAgent[] = visibleAgents
       .map((agent) => ({ agent, pos: positionAt(agent, snapshot.plan.rooms, snapshot.minute) }))
       .filter((item): item is ActiveAgent => item.pos !== null && item.pos.room.floor === snapshot.selectedFloor)
@@ -657,6 +663,16 @@ function staticSceneKey(snapshot: SimulationSnapshot) {
     })
     .join('|')
   return `${snapshot.selectedFloor}:${snapshot.viewMode}:${snapshot.result.kpis.completed}:${rooms}`
+}
+
+function visibleAgentsForSnapshot(snapshot: SimulationSnapshot): SimAgent[] {
+  const patients = snapshot.selectedCaseId === 'all'
+    ? snapshot.result.agents.filter((agent) => agent.role === 'patient')
+    : snapshot.result.agents.filter((agent) => agent.role === 'patient' && agent.caseId === snapshot.selectedCaseId)
+  const staff = snapshot.result.agents.filter((agent) => agent.role !== 'patient')
+  if (snapshot.agentLayer === 'patients') return patients
+  if (snapshot.agentLayer === 'staff') return staff
+  return [...patients, ...staff]
 }
 
 function corridorCells(rooms: PlacedRoom[]): Set<string> {

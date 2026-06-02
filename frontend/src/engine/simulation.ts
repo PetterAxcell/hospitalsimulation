@@ -2,6 +2,7 @@ import { parse as parseYaml } from 'yaml'
 import { buildAccessiblePatientRoute, isPassage } from './circulation'
 import { distance, roomByNode } from './geometry'
 import type {
+  AgentRole,
   HospitalPlan,
   PatientCaseId,
   PatientCaseStat,
@@ -12,6 +13,7 @@ import type {
   SimAgent,
   SimulationNode,
   SimulationResult,
+  StaffStat,
 } from '../types'
 
 interface MovementPoint {
@@ -196,6 +198,128 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
         caseStep(needsIcu ? 'icu' : 'ward', needsIcu ? 'UCI postoperatoria' : 'Planta postoperatoria'),
       ]
     },
+  },
+  {
+    id: 'sepsis_pathway',
+    label: 'Sepsis grave',
+    code: 'SEP',
+    stream: 'ed_walkin',
+    severity: 'critical',
+    color: '#b45309',
+    weight: 8,
+    build: (rng) => {
+      const directIcu = rng() < 0.62
+      return [
+        caseStep('registration', 'Admision infecciosa'),
+        caseStep('triage', 'Codigo sepsis'),
+        caseStep('resus', 'Fluidoterapia y antibiotico'),
+        caseStep('lab', 'Hemocultivos / lactato'),
+        ...(rng() < 0.35 ? [caseStep('imaging', 'Foco infeccioso')] : []),
+        caseStep(directIcu ? 'icu' : 'ward', directIcu ? 'UCI sepsis' : 'Hospitalizacion infecciosa'),
+      ]
+    },
+  },
+  {
+    id: 'hip_fracture',
+    label: 'Fractura de cadera',
+    code: 'CAD',
+    stream: 'ed_walkin',
+    severity: 'high',
+    color: '#a855f7',
+    weight: 7,
+    build: (rng) => [
+      caseStep(rng() < 0.45 ? 'arrival_ambulance' : 'registration', 'Llegada fragilidad'),
+      caseStep('triage', 'Triaje trauma fragil'),
+      caseStep('imaging', 'Radiologia urgente'),
+      caseStep('lab', 'Preoperatorio'),
+      caseStep('or', 'Cirugia traumatologia'),
+      caseStep('pacu', 'Reanimacion'),
+      caseStep('ward', 'Ingreso traumatologia'),
+    ],
+  },
+  {
+    id: 'maternity_delivery',
+    label: 'Parto y puerperio',
+    code: 'MAT',
+    stream: 'elective',
+    severity: 'medium',
+    color: '#db2777',
+    weight: 6,
+    build: (rng) => {
+      const neonatalSupport = rng() < 0.16
+      return [
+        caseStep('registration', 'Ingreso obstetrico'),
+        caseStep('maternity', rng() < 0.74 ? 'Dilatacion y parto' : 'Cesarea programada'),
+        ...(neonatalSupport ? [caseStep('neonatal_icu', 'Soporte neonatal')] : []),
+        caseStep('ward', 'Puerperio / planta'),
+      ]
+    },
+  },
+  {
+    id: 'neonatal_critical',
+    label: 'Neonato critico',
+    code: 'NEO',
+    stream: 'ed_ambulance',
+    severity: 'critical',
+    color: '#c026d3',
+    weight: 3,
+    build: () => [
+      caseStep('arrival_ambulance', 'Traslado neonatal'),
+      caseStep('resus', 'Estabilizacion neonatal'),
+      caseStep('neonatal_icu', 'Ingreso UCI neonatal'),
+      caseStep('lab', 'Analitica neonatal'),
+    ],
+  },
+  {
+    id: 'psychiatric_crisis',
+    label: 'Crisis psiquiatrica',
+    code: 'PSQ',
+    stream: 'ed_walkin',
+    severity: 'medium',
+    color: '#0f766e',
+    weight: 6,
+    build: (rng) => {
+      const admission = rng() < 0.38
+      return [
+        caseStep('registration', 'Admision discreta'),
+        caseStep('triage', 'Triaje salud mental'),
+        caseStep('ed_bay', 'Box salud mental'),
+        caseStep('observation', 'Observacion protegida'),
+        caseStep(admission ? 'ward' : 'pharmacy', admission ? 'Ingreso psiquiatria' : 'Plan terapeutico y alta'),
+      ]
+    },
+  },
+  {
+    id: 'oncology_infusion',
+    label: 'Oncologia dia',
+    code: 'ONC',
+    stream: 'outpatient',
+    severity: 'medium',
+    color: '#be185d',
+    weight: 9,
+    build: (rng) => [
+      caseStep('registration', 'Check-in oncologia'),
+      caseStep('consult', 'Valoracion oncologica'),
+      ...(rng() < 0.52 ? [caseStep('lab', 'Analitica pretratamiento')] : []),
+      caseStep('pharmacy', 'Preparacion citostatico'),
+      caseStep('research', rng() < 0.2 ? 'Ensayo clinico' : 'Hospital de dia'),
+    ],
+  },
+  {
+    id: 'complex_diagnostic',
+    label: 'Diagnostico complejo',
+    code: 'DXC',
+    stream: 'outpatient',
+    severity: 'medium',
+    color: '#0891b2',
+    weight: 10,
+    build: (rng) => [
+      caseStep('registration', 'Check-in pruebas'),
+      caseStep('consult', 'Consulta especializada'),
+      caseStep('lab', 'Analitica avanzada'),
+      caseStep('imaging', rng() < 0.5 ? 'RM / TAC programado' : 'Intervencionismo diagnostico'),
+      caseStep('consult', 'Decision clinica'),
+    ],
   },
 ]
 
@@ -426,7 +550,175 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
             phase: UCI postoperatoria
           - weight: 0.82
             node: ward
-            phase: Planta postoperatoria`
+            phase: Planta postoperatoria
+
+  - id: sepsis_pathway
+    label: Sepsis grave
+    code: SEP
+    stream: ed_walkin
+    severity: critical
+    color: "#b45309"
+    weight: 8
+    steps:
+      - node: registration
+        phase: Admision infecciosa
+      - node: triage
+        phase: Codigo sepsis
+      - node: resus
+        phase: Fluidoterapia y antibiotico
+      - node: lab
+        phase: Hemocultivos / lactato
+      - chance: 0.35
+        node: imaging
+        phase: Foco infeccioso
+      - choose:
+          - weight: 0.62
+            node: icu
+            phase: UCI sepsis
+          - weight: 0.38
+            node: ward
+            phase: Hospitalizacion infecciosa
+
+  - id: hip_fracture
+    label: Fractura de cadera
+    code: CAD
+    stream: ed_walkin
+    severity: high
+    color: "#a855f7"
+    weight: 7
+    steps:
+      - choose:
+          - weight: 0.45
+            node: arrival_ambulance
+            phase: Llegada ambulancia fragilidad
+          - weight: 0.55
+            node: registration
+            phase: Admision fragilidad
+      - node: triage
+        phase: Triaje trauma fragil
+      - node: imaging
+        phase: Radiologia urgente
+      - node: lab
+        phase: Preoperatorio
+      - node: or
+        phase: Cirugia traumatologia
+      - node: pacu
+        phase: Reanimacion
+      - node: ward
+        phase: Ingreso traumatologia
+
+  - id: maternity_delivery
+    label: Parto y puerperio
+    code: MAT
+    stream: elective
+    severity: medium
+    color: "#db2777"
+    weight: 6
+    steps:
+      - node: registration
+        phase: Ingreso obstetrico
+      - choose:
+          - weight: 0.74
+            node: maternity
+            phase: Dilatacion y parto
+          - weight: 0.26
+            node: maternity
+            phase: Cesarea programada
+      - chance: 0.16
+        node: neonatal_icu
+        phase: Soporte neonatal
+      - node: ward
+        phase: Puerperio / planta
+
+  - id: neonatal_critical
+    label: Neonato critico
+    code: NEO
+    stream: ed_ambulance
+    severity: critical
+    color: "#c026d3"
+    weight: 3
+    steps:
+      - node: arrival_ambulance
+        phase: Traslado neonatal
+      - node: resus
+        phase: Estabilizacion neonatal
+      - node: neonatal_icu
+        phase: Ingreso UCI neonatal
+      - node: lab
+        phase: Analitica neonatal
+
+  - id: psychiatric_crisis
+    label: Crisis psiquiatrica
+    code: PSQ
+    stream: ed_walkin
+    severity: medium
+    color: "#0f766e"
+    weight: 6
+    steps:
+      - node: registration
+        phase: Admision discreta
+      - node: triage
+        phase: Triaje salud mental
+      - node: ed_bay
+        phase: Box salud mental
+      - node: observation
+        phase: Observacion protegida
+      - choose:
+          - weight: 0.38
+            node: ward
+            phase: Ingreso psiquiatria
+          - weight: 0.62
+            node: pharmacy
+            phase: Plan terapeutico y alta
+
+  - id: oncology_infusion
+    label: Oncologia dia
+    code: ONC
+    stream: outpatient
+    severity: medium
+    color: "#be185d"
+    weight: 9
+    steps:
+      - node: registration
+        phase: Check-in oncologia
+      - node: consult
+        phase: Valoracion oncologica
+      - chance: 0.52
+        node: lab
+        phase: Analitica pretratamiento
+      - node: pharmacy
+        phase: Preparacion citostatico
+      - choose:
+          - weight: 0.2
+            node: research
+            phase: Ensayo clinico
+          - weight: 0.8
+            node: research
+            phase: Hospital de dia
+
+  - id: complex_diagnostic
+    label: Diagnostico complejo
+    code: DXC
+    stream: outpatient
+    severity: medium
+    color: "#0891b2"
+    weight: 10
+    steps:
+      - node: registration
+        phase: Check-in pruebas
+      - node: consult
+        phase: Consulta especializada
+      - node: lab
+        phase: Analitica avanzada
+      - choose:
+          - weight: 0.5
+            node: imaging
+            phase: RM / TAC programado
+          - weight: 0.5
+            node: imaging
+            phase: Intervencionismo diagnostico
+      - node: consult
+        phase: Decision clinica`
 
 export interface SimulationSettings {
   seed: number
@@ -516,15 +808,14 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
       if (caseStat) caseStat.blocked += 1
       continue
     }
-    const phaseByRoomId = new Map(serviceStops.map((stop) => [stop.room.id, stop.phase]))
-    const route = buildTimedRoute(routeRooms, start, patientCase.severity, rng, phaseByRoomId)
+    const route = buildTimedRoute(routeRooms, start, patientCase.severity, rng, serviceStops)
     for (const room of serviceRooms) {
       roomPressure[room.id] = (roomPressure[room.id] ?? 0) + 1
     }
     completed += 1
     if (caseStat) {
       caseStat.completed += 1
-      if (caseStat.samplePath.length === 0) caseStat.samplePath = samplePath(routeRooms, phaseByRoomId)
+      if (caseStat.samplePath.length === 0) caseStat.samplePath = samplePath(serviceStops)
     }
     travelSum += routeTravel(routeRooms)
     verticalMoves += countVerticalMoves(routeRooms)
@@ -541,7 +832,8 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
     })
   }
 
-  addStaffAgents(plan, agents)
+  addStaffAgents(plan, agents, durationMinutes, rng)
+  const staffStats = createStaffStats(agents)
 
   const hottest = Object.entries(roomPressure)
     .map(([roomId, count]) => {
@@ -558,8 +850,11 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
     durationMinutes,
     roomPressure,
     caseStats: [...caseStats.values()],
+    staffStats,
     kpis: {
       completed,
+      staffOnShift: agents.filter((agent) => agent.role !== 'patient').length,
+      staffInMotion: staffStats.reduce((sum, stat) => sum + stat.moving, 0),
       edP90Minutes: estimateEdP90(plan.rooms, roomPressure),
       averageTravelMinutes: completed ? Math.round((travelSum / completed) * 10) / 10 : 0,
       verticalMoves,
@@ -666,16 +961,21 @@ function buildTimedRoute(
   start: number,
   severity: Severity,
   rng: () => number,
-  phaseByRoomId: Map<string, string>,
+  serviceStops: Array<{ room: PlacedRoom; phase: string }>,
 ): RouteStop[] {
   const stops: RouteStop[] = []
   let at = start
+  let serviceIndex = 0
   routeRooms.forEach((room, index) => {
     if (index > 0) {
       const previous = routeRooms[index - 1]
       at += 3 + distance(previous, room) * 0.16
     }
-    const phase = phaseByRoomId.get(room.id) ?? (isPassage(room) ? 'Traslado' : room.name)
+    const serviceStop = serviceStops[serviceIndex]
+    const phase = serviceStop?.room.id === room.id
+      ? serviceStop.phase
+      : isPassage(room) ? 'Traslado' : room.name
+    if (serviceStop?.room.id === room.id) serviceIndex += 1
     stops.push({ roomId: room.id, at: Math.round(at), phase })
     at += dwellMinutes(room, severity, rng)
   })
@@ -734,25 +1034,220 @@ function dwellMinutes(room: PlacedRoom, severity: Severity, rng: () => number): 
   return Math.max(4, Math.round(mean * (0.72 + rng() * 0.56)))
 }
 
-function addStaffAgents(plan: HospitalPlan, agents: SimAgent[]) {
+type StaffRole = Exclude<AgentRole, 'patient'>
+
+const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
+  doctor: 'Medicos',
+  nurse: 'Enfermeria',
+  porter: 'Celadores',
+  technician: 'Tecnicos',
+}
+
+const STAFF_ROLE_COLORS: Record<StaffRole, string> = {
+  doctor: '#f8f9fa',
+  nurse: '#4f83cc',
+  porter: '#7c6bb0',
+  technician: '#6c757d',
+}
+
+const STAFF_ROLE_ORDER: StaffRole[] = ['doctor', 'nurse', 'porter', 'technician']
+
+function addStaffAgents(plan: HospitalPlan, agents: SimAgent[], durationMinutes: number, rng: () => number) {
   const staffRooms = plan.rooms.filter((room) =>
     room.staffModel.length > 0
     && !isPassage(room)
-    && room.kind !== 'public'
     && room.kind !== 'green'
     && room.kind !== 'future',
-  )
-  staffRooms.slice(0, 28).forEach((room, index) => {
+  ).sort((a, b) => staffRoomPriority(b) - staffRoomPriority(a) || a.floor - b.floor)
+
+  const staffSlots = staffRooms.flatMap((room) => (
+    Array.from({ length: staffCountForRoom(room) }, (_, index) => ({ room, index }))
+  ))
+
+  staffSlots.slice(0, 64).forEach(({ room, index }, agentIndex) => {
+    const role = staffRoleForRoom(room, index)
+    const route = buildStaffShiftRoute(plan.rooms, room, role, durationMinutes, rng)
     agents.push({
-      id: `s-${index + 1}`,
-      role: index % 3 === 0 ? 'doctor' : index % 3 === 1 ? 'nurse' : 'technician',
-      route: [
-        { roomId: room.id, at: 0 },
-        { roomId: room.id, at: 1440 },
-      ],
-      color: index % 3 === 0 ? '#f8f9fa' : index % 3 === 1 ? '#4f83cc' : '#6c757d',
+      id: `s-${agentIndex + 1}`,
+      role,
+      staffGroup: role,
+      staffLabel: staffLabelForRoom(room, index),
+      route,
+      color: STAFF_ROLE_COLORS[role],
     })
   })
+}
+
+function staffCountForRoom(room: PlacedRoom): number {
+  if (room.kind === 'emergency' || room.kind === 'critical' || room.kind === 'surgery') return Math.min(3, Math.max(1, room.staffModel.length))
+  if (room.kind === 'inpatient' || room.kind === 'maternalChild') return Math.min(2, Math.max(1, room.staffModel.length))
+  if (room.kind === 'diagnostic' || room.kind === 'laboratory' || room.kind === 'pharmacy') return Math.min(2, Math.max(1, room.staffModel.length))
+  return 1
+}
+
+function staffRoomPriority(room: PlacedRoom): number {
+  const priority: Partial<Record<string, number>> = {
+    emergency: 11,
+    critical: 10,
+    surgery: 10,
+    diagnostic: 9,
+    laboratory: 8,
+    inpatient: 7,
+    maternalChild: 7,
+    oncology: 6,
+    ambulatory: 6,
+    pharmacy: 5,
+    logistics: 4,
+    public: 3,
+    research: 3,
+    technical: 2,
+    staff: 2,
+  }
+  return priority[room.kind] ?? 1
+}
+
+function staffRoleForRoom(room: PlacedRoom, index: number): StaffRole {
+  const label = staffLabelForRoom(room, index).toLowerCase()
+  if (/enfermer|matrona|auxiliar|fisioterapia/.test(label)) return 'nurse'
+  if (/celador|transporte|logistica|almacen|residuos/.test(label)) return 'porter'
+  if (/tecnico|mantenimiento|operaciones|data|bms|soc|noc|electromedicina|energia|limpieza|seguridad|administrativo|informacion/.test(label)) return 'technician'
+  return 'doctor'
+}
+
+function staffLabelForRoom(room: PlacedRoom, index: number): string {
+  return room.staffModel[index % room.staffModel.length] ?? STAFF_ROLE_LABELS.technician
+}
+
+function buildStaffShiftRoute(rooms: PlacedRoom[], home: PlacedRoom, role: StaffRole, durationMinutes: number, rng: () => number): RouteStop[] {
+  const targets = staffTargetsForRole(rooms, home, role, rng).slice(0, 3)
+  const route: RouteStop[] = [{ roomId: home.id, at: 0, phase: `Base ${STAFF_ROLE_LABELS[role]}` }]
+  if (targets.length === 0) {
+    route.push({ roomId: home.id, at: durationMinutes, phase: 'Turno local' })
+    return route
+  }
+
+  let current = home
+  let at = Math.round(20 + rng() * 70)
+  let cycle = 0
+  while (at < durationMinutes - 35) {
+    const target = targets[cycle % targets.length]
+    cycle += 1
+    const path = buildAccessiblePatientRoute(rooms, [current, target])
+    if (!path) {
+      at += 45
+      continue
+    }
+
+    path.slice(1).forEach((room) => {
+      at += Math.max(2, Math.round(2 + distance(current, room) * 0.12))
+      if (at < durationMinutes) {
+        route.push({
+          roomId: room.id,
+          at,
+          phase: isPassage(room) ? 'Traslado de personal' : staffPhaseForRoom(role, room),
+        })
+      }
+      current = room
+    })
+
+    at += staffDwellMinutes(role, target, rng)
+  }
+
+  if (route[route.length - 1]?.roomId !== home.id) {
+    const returnPath = buildAccessiblePatientRoute(rooms, [current, home])
+    returnPath?.slice(1).forEach((room) => {
+      at += Math.max(2, Math.round(2 + distance(current, room) * 0.12))
+      if (at < durationMinutes) route.push({ roomId: room.id, at, phase: isPassage(room) ? 'Retorno por pasillo' : 'Cierre de turno' })
+      current = room
+    })
+  }
+
+  route.push({ roomId: route[route.length - 1]?.roomId ?? home.id, at: durationMinutes, phase: 'Fin de turno' })
+  return route
+}
+
+function staffTargetsForRole(rooms: PlacedRoom[], home: PlacedRoom, role: StaffRole, rng: () => number): PlacedRoom[] {
+  return rooms
+    .filter((room) =>
+      room.id !== home.id
+      && room.staffModel.length > 0
+      && !isPassage(room)
+      && room.kind !== 'green'
+      && room.kind !== 'future'
+      && buildAccessiblePatientRoute(rooms, [home, room]) !== null,
+    )
+    .map((room) => ({ room, score: staffTargetScore(home, room, role) + rng() * 0.9 }))
+    .sort((a, b) => b.score - a.score)
+    .map((item) => item.room)
+}
+
+function staffTargetScore(home: PlacedRoom, room: PlacedRoom, role: StaffRole): number {
+  const preferences: Record<StaffRole, string[]> = {
+    doctor: ['emergency', 'surgery', 'critical', 'diagnostic', 'inpatient', 'maternalChild', 'oncology', 'ambulatory'],
+    nurse: ['emergency', 'critical', 'surgery', 'inpatient', 'maternalChild', 'oncology', 'ambulatory'],
+    porter: ['logistics', 'emergency', 'surgery', 'critical', 'inpatient', 'diagnostic', 'laboratory'],
+    technician: ['diagnostic', 'laboratory', 'technical', 'pharmacy', 'logistics', 'surgery', 'critical'],
+  }
+  let score = preferences[role].includes(room.kind) ? 8 : 2
+  if (room.floor === home.floor) score += 5
+  if (room.kind === home.kind) score += 2
+  if (room.simulationNode && home.simulationNode === room.simulationNode) score += 2
+  score -= distance(home, room) * 0.025
+  return score
+}
+
+function staffPhaseForRoom(role: StaffRole, room: PlacedRoom): string {
+  if (role === 'doctor') return `Valoracion en ${room.name}`
+  if (role === 'nurse') return `Cuidados en ${room.name}`
+  if (role === 'porter') return `Traslado / apoyo en ${room.name}`
+  return `Soporte tecnico en ${room.name}`
+}
+
+function staffDwellMinutes(role: StaffRole, room: PlacedRoom, rng: () => number): number {
+  const baseByRole: Record<StaffRole, number> = {
+    doctor: 52,
+    nurse: 44,
+    porter: 26,
+    technician: 38,
+  }
+  const acuity = room.kind === 'critical' || room.kind === 'surgery' || room.kind === 'emergency' ? 1.25 : 1
+  return Math.round(baseByRole[role] * acuity * (0.75 + rng() * 0.5))
+}
+
+function createStaffStats(agents: SimAgent[]): StaffStat[] {
+  const stats = new Map<StaffRole, StaffStat>(STAFF_ROLE_ORDER.map((role) => [
+    role,
+    {
+      role,
+      label: STAFF_ROLE_LABELS[role],
+      color: STAFF_ROLE_COLORS[role],
+      count: 0,
+      moving: 0,
+      samplePath: [],
+    },
+  ]))
+
+  agents.filter((agent) => agent.role !== 'patient').forEach((agent) => {
+    const role = agent.role as StaffRole
+    const stat = stats.get(role)
+    if (!stat) return
+    stat.count += 1
+    const uniqueRooms = agent.route
+      .map((stop) => stop.roomId)
+      .filter((roomId, index, roomIds) => roomId !== roomIds[index - 1])
+    if (new Set(uniqueRooms).size > 1) stat.moving += 1
+    if (stat.samplePath.length === 0) {
+      stat.samplePath = agent.route
+        .map((stop) => stop.phase)
+        .filter((phase): phase is string => Boolean(phase))
+        .filter((phase, index, phases) => phase !== phases[index - 1])
+        .slice(0, 4)
+    }
+  })
+
+  return STAFF_ROLE_ORDER
+    .map((role) => stats.get(role))
+    .filter((stat): stat is StaffStat => Boolean(stat && stat.count > 0))
 }
 
 function routeTravel(routeRooms: PlacedRoom[]): number {
@@ -965,10 +1460,9 @@ function resolveCaseStops(rooms: PlacedRoom[], steps: PatientCaseStep[]): Array<
   return stops
 }
 
-function samplePath(routeRooms: PlacedRoom[], phaseByRoomId: Map<string, string>): string[] {
-  return routeRooms
-    .filter((room) => !isPassage(room))
-    .map((room) => phaseByRoomId.get(room.id) ?? room.name)
+function samplePath(serviceStops: Array<{ room: PlacedRoom; phase: string }>): string[] {
+  return serviceStops
+    .map((stop) => stop.phase)
     .filter((phase, index, phases) => phase !== phases[index - 1])
     .slice(0, 7)
 }

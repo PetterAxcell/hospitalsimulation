@@ -288,7 +288,7 @@ output {
 
 .sim-controls {
   display: grid;
-  grid-template-columns: 86px minmax(140px, 1fr) 70px 118px minmax(160px, 220px);
+  grid-template-columns: 86px minmax(120px, 1fr) 70px 118px minmax(150px, 190px) minmax(150px, 220px);
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -1047,6 +1047,30 @@ th {
   gap: 8px;
 }
 
+.agent-layer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.agent-layer-grid button {
+  min-height: 34px;
+  border: 1px solid #c5d0ca;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #33413b;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.agent-layer-grid button.is-active {
+  border-color: #2a9d8f;
+  background: #e4f3ee;
+  color: #174942;
+}
+
 .case-yaml-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1132,6 +1156,10 @@ th {
 .case-item.is-active {
   background: #e4f3ee;
   box-shadow: inset 0 0 0 1px rgba(42, 157, 143, 0.24);
+}
+
+.staff-item {
+  cursor: default;
 }
 
 .bottleneck-panel {

@@ -125,6 +125,7 @@ export type PatientStream = 'ed_ambulance' | 'ed_walkin' | 'outpatient' | 'elect
 export type Severity = 'low' | 'medium' | 'high' | 'critical'
 export type PatientCaseId = string
 export type PatientCaseFilter = PatientCaseId | 'all'
+export type SimulationAgentLayer = 'all' | 'patients' | 'staff'
 
 export type DoorSide = 'top' | 'right' | 'bottom' | 'left'
 
@@ -148,6 +149,8 @@ export interface SimAgent {
   caseId?: PatientCaseId
   caseName?: string
   caseCode?: string
+  staffGroup?: string
+  staffLabel?: string
   route: RouteStop[]
   color: string
 }
@@ -162,13 +165,25 @@ export interface PatientCaseStat {
   samplePath: string[]
 }
 
+export interface StaffStat {
+  role: Exclude<AgentRole, 'patient'>
+  label: string
+  color: string
+  count: number
+  moving: number
+  samplePath: string[]
+}
+
 export interface SimulationResult {
   agents: SimAgent[]
   durationMinutes: number
   roomPressure: Record<string, number>
   caseStats: PatientCaseStat[]
+  staffStats: StaffStat[]
   kpis: {
     completed: number
+    staffOnShift: number
+    staffInMotion: number
     edP90Minutes: number
     averageTravelMinutes: number
     verticalMoves: number

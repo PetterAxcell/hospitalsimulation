@@ -37,7 +37,7 @@ import {
   type PatientCaseDefinition,
   type SimulationSettings,
 } from './engine/simulation'
-import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationResult } from './types'
+import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
 
 type WorkspaceTab = 'plan' | 'simulation' | 'saturation' | 'services' | 'analysis'
 
@@ -60,6 +60,7 @@ function App() {
   const [clinicalCaseResult, setClinicalCaseResult] = useState<ClinicalCaseCompileResult | null>(null)
   const [clinicalCaseFileName, setClinicalCaseFileName] = useState('casos-clinicos.yaml')
   const [selectedCaseId, setSelectedCaseId] = useState<PatientCaseFilter>('all')
+  const [simulationAgentLayer, setSimulationAgentLayer] = useState<SimulationAgentLayer>('all')
   const [scriptSource, setScriptSource] = useState(DEFAULT_PLANNING_SCRIPT)
   const [scriptResult, setScriptResult] = useState<PlanningLanguageResult | null>(null)
   const [scriptFileName, setScriptFileName] = useState('plantilla.yaml')
@@ -324,12 +325,14 @@ function App() {
             <SimulationCaseSelector
               result={simulationResult}
               selectedCaseId={selectedCaseId}
+              agentLayer={simulationAgentLayer}
               fileName={clinicalCaseFileName}
               diagnostics={clinicalCaseResult?.diagnostics ?? []}
               onEditCases={() => setClinicalCaseModalOpen(true)}
               onUploadCases={loadClinicalCaseTemplate}
               onResetCases={resetClinicalCases}
               onSelectCase={setSelectedCaseId}
+              onChangeAgentLayer={setSimulationAgentLayer}
             />
           ) : (
             <>
@@ -389,7 +392,9 @@ function App() {
                 settings={simulationSettings}
                 patientCases={patientCases}
                 selectedCaseId={selectedCaseId}
+                agentLayer={simulationAgentLayer}
                 onSelectCase={setSelectedCaseId}
+                onChangeAgentLayer={setSimulationAgentLayer}
               />
             </Suspense>
           )}
@@ -878,7 +883,7 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
               <li>Usa `chance: 0.35` en un paso para que sea opcional.</li>
               <li>Usa `choose` para escoger una de varias rutas posibles.</li>
               <li>Un bloque `choose` puede apuntar a un `node` directo o a una lista `steps`.</li>
-              <li>Nodos utiles: `registration`, `triage`, `ed_bay`, `resus`, `imaging`, `lab`, `or`, `pacu`, `icu`, `ward`, `pharmacy`, `discharge`.</li>
+              <li>Nodos utiles: `registration`, `triage`, `ed_bay`, `resus`, `imaging`, `lab`, `or`, `pacu`, `icu`, `ward`, `maternity`, `neonatal_icu`, `consult`, `pharmacy`, `research`.</li>
             </ul>
           </section>
         </div>
@@ -914,81 +919,119 @@ function Metric({ label, value }: { label: string; value: string }) {
 function SimulationCaseSelector({
   result,
   selectedCaseId,
+  agentLayer,
   fileName,
   diagnostics,
   onEditCases,
   onUploadCases,
   onResetCases,
   onSelectCase,
+  onChangeAgentLayer,
 }: {
   result: SimulationResult | null
   selectedCaseId: PatientCaseFilter
+  agentLayer: SimulationAgentLayer
   fileName: string
   diagnostics: ClinicalCaseDiagnostic[]
   onEditCases: () => void
   onUploadCases: (file: File | undefined) => void
   onResetCases: () => void
   onSelectCase: (caseId: PatientCaseFilter) => void
+  onChangeAgentLayer: (layer: SimulationAgentLayer) => void
 }) {
   const caseStats = (result?.caseStats ?? [])
     .filter((stat) => stat.attempted > 0)
     .sort((a, b) => b.completed - a.completed)
 
   return (
-    <section className="panel-section">
-      <h2>Casos clinicos</h2>
-      <div className="case-yaml-actions">
-        <button type="button" onClick={onEditCases}>Editar YAML</button>
-        <label className="file-action">
-          Subir .yaml
-          <input
-            type="file"
-            accept=".yaml"
-            onChange={(event) => {
-              onUploadCases(event.target.files?.[0])
-              event.currentTarget.value = ''
-            }}
-          />
-        </label>
-        <button type="button" onClick={onResetCases}>Restaurar</button>
-      </div>
-      <p className="case-yaml-file">{fileName}</p>
-      {diagnostics.length > 0 && (
-        <div className="case-yaml-diagnostics">
-          {diagnostics.map((diagnostic, index) => (
-            <p key={`${diagnostic.line}-${index}`} className={diagnostic.level}>{diagnostic.message}</p>
-          ))}
+    <>
+      <section className="panel-section">
+        <h2>Casos clinicos</h2>
+        <div className="case-yaml-actions">
+          <button type="button" onClick={onEditCases}>Editar YAML</button>
+          <label className="file-action">
+            Subir .yaml
+            <input
+              type="file"
+              accept=".yaml"
+              onChange={(event) => {
+                onUploadCases(event.target.files?.[0])
+                event.currentTarget.value = ''
+              }}
+            />
+          </label>
+          <button type="button" onClick={onResetCases}>Restaurar</button>
         </div>
-      )}
-      {caseStats.length > 0 ? (
-        <div className="case-list">
-          <button
-            type="button"
-            className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
-            style={{ borderLeftColor: '#66736e' }}
-            onClick={() => onSelectCase('all')}
-          >
-            <strong>Todos los casos</strong>
-            <span>{result?.kpis.completed ?? 0} pacientes completados</span>
-            <small>Vista completa de la actividad simulada.</small>
-          </button>
-          {caseStats.map((stat) => (
+        <p className="case-yaml-file">{fileName}</p>
+        {diagnostics.length > 0 && (
+          <div className="case-yaml-diagnostics">
+            {diagnostics.map((diagnostic, index) => (
+              <p key={`${diagnostic.line}-${index}`} className={diagnostic.level}>{diagnostic.message}</p>
+            ))}
+          </div>
+        )}
+        {caseStats.length > 0 ? (
+          <div className="case-list">
             <button
-              key={stat.id}
               type="button"
-              className={`case-item ${selectedCaseId === stat.id ? 'is-active' : ''}`}
-              style={{ borderLeftColor: stat.color }}
-              onClick={() => onSelectCase(stat.id)}
+              className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
+              style={{ borderLeftColor: '#66736e' }}
+              onClick={() => onSelectCase('all')}
             >
-              <strong>{stat.label}</strong>
-              <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
-              <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
+              <strong>Todos los casos</strong>
+              <span>{result?.kpis.completed ?? 0} pacientes completados</span>
+              <small>Vista completa de la actividad simulada.</small>
             </button>
-          ))}
-        </div>
-      ) : (
-        <p className="muted">Ejecutando mezcla clinica.</p>
-      )}
+            {caseStats.map((stat) => (
+              <button
+                key={stat.id}
+                type="button"
+                className={`case-item ${selectedCaseId === stat.id ? 'is-active' : ''}`}
+                style={{ borderLeftColor: stat.color }}
+                onClick={() => onSelectCase(stat.id)}
+              >
+                <strong>{stat.label}</strong>
+                <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
+                <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Ejecutando mezcla clinica.</p>
+        )}
+      </section>
+      <SimulationStaffPanel result={result} agentLayer={agentLayer} onChangeAgentLayer={onChangeAgentLayer} />
+    </>
+  )
+}
+
+function SimulationStaffPanel({
+  result,
+  agentLayer,
+  onChangeAgentLayer,
+}: {
+  result: SimulationResult | null
+  agentLayer: SimulationAgentLayer
+  onChangeAgentLayer: (layer: SimulationAgentLayer) => void
+}) {
+  const staffStats = result?.staffStats ?? []
+  return (
+    <section className="panel-section">
+      <h2>Personal</h2>
+      <div className="agent-layer-grid" aria-label="Capa visible de simulacion">
+        <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => onChangeAgentLayer('all')}>Todo</button>
+        <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => onChangeAgentLayer('patients')}>Casos</button>
+        <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => onChangeAgentLayer('staff')}>Personal</button>
+      </div>
+      <div className="case-list">
+        {staffStats.map((stat) => (
+          <article key={stat.role} className="case-item staff-item" style={{ borderLeftColor: stat.color }}>
+            <strong>{stat.label}</strong>
+            <span>{stat.count} en turno · {stat.moving} con ruta</span>
+            <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Turno local'}</small>
+          </article>
+        ))}
+      </div>
     </section>
   )
 }
@@ -1247,6 +1290,8 @@ function SimulationControls({
       <section className="panel-section">
         <h2>Resultado</h2>
         <Metric label="Pacientes" value={String(result?.kpis.completed ?? 0)} />
+        <Metric label="Personal" value={String(result?.kpis.staffOnShift ?? 0)} />
+        <Metric label="Personal movil" value={String(result?.kpis.staffInMotion ?? 0)} />
         <Metric label="ED P90" value={`${result?.kpis.edP90Minutes ?? 0} min`} />
         <Metric label="Traslado medio" value={`${result?.kpis.averageTravelMinutes ?? 0} min`} />
         <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
