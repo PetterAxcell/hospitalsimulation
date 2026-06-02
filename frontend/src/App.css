@@ -441,8 +441,9 @@ th {
 }
 
 .script-modal {
+  position: relative;
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   width: min(1120px, calc(100vw - 32px));
   height: min(880px, calc(100vh - 32px));
   height: min(880px, calc(100dvh - 32px));
@@ -498,7 +499,7 @@ th {
 }
 
 .script-toolbar {
-  grid-row: 3;
+  grid-row: 2;
   padding: 10px 16px;
   border-bottom: 1px solid #e4ebe6;
 }
@@ -524,7 +525,7 @@ th {
 }
 
 .script-modal textarea {
-  grid-row: 4;
+  grid-row: 3;
   min-width: 0;
   min-height: 0;
   width: 100%;
@@ -541,31 +542,131 @@ th {
   line-height: 1.55;
 }
 
-.script-help {
-  grid-row: 2;
+.script-info-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.9fr) minmax(0, 1fr);
-  gap: 12px;
-  max-height: 150px;
-  overflow: auto;
-  padding: 10px 16px;
+  place-items: center;
+  padding: 24px;
+  background: rgba(16, 32, 28, 0.48);
+}
+
+.script-info-modal {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(960px, calc(100vw - 48px));
+  max-height: min(760px, calc(100dvh - 48px));
+  overflow: hidden;
+  border: 1px solid #c9d4ce;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 20px 70px rgba(18, 31, 26, 0.34);
+}
+
+.script-info-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 18px;
   border-bottom: 1px solid #e4ebe6;
   background: #f7faf7;
 }
 
-.script-help h3 {
-  margin: 0 0 5px;
+.script-info-header span {
+  color: #66736e;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.script-info-header h2 {
+  margin: 3px 0 5px;
+  font-size: 20px;
+}
+
+.script-info-header p {
+  max-width: 680px;
+  margin: 0;
+  color: #55645e;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.script-info-header button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #c5d0ca;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #33413b;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.script-info-body {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding: 14px 18px 18px;
+  background: #fbfcf8;
+}
+
+.script-info-card {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dce5df;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.script-info-card h3,
+.script-info-card h4 {
+  margin: 0;
+}
+
+.script-info-card h3 {
   font-size: 13px;
 }
 
-.script-help p {
+.script-info-card h4 {
+  color: #66736e;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.script-info-card p,
+.script-info-card li {
   margin: 0;
   color: #55645e;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
-.script-help pre {
+.script-info-card ol,
+.script-info-card ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.script-code-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.script-code-pair > div {
+  min-width: 0;
+}
+
+.script-info-card pre {
   margin: 0;
   overflow: auto;
   padding: 10px;
@@ -573,10 +674,11 @@ th {
   background: #10201c;
   color: #eef8f3;
   font-size: 12px;
+  line-height: 1.45;
 }
 
 .script-diagnostics {
-  grid-row: 5;
+  grid-row: 4;
   min-height: 38px;
   max-height: 96px;
   overflow: auto;
@@ -600,7 +702,7 @@ th {
 }
 
 .script-modal-footer {
-  grid-row: 6;
+  grid-row: 5;
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -820,11 +922,6 @@ th {
     height: calc(100dvh - 12px);
   }
 
-  .script-help {
-    grid-template-columns: 1fr;
-    max-height: 180px;
-  }
-
   .script-modal-header,
   .script-toolbar,
   .script-diagnostics,
@@ -836,6 +933,33 @@ th {
   .script-modal textarea {
     padding: 12px 10px;
     font-size: 12px;
+  }
+
+  .script-info-backdrop {
+    padding: 10px;
+  }
+
+  .script-info-modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  .script-info-header {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 12px;
+  }
+
+  .script-info-header button {
+    align-self: flex-start;
+  }
+
+  .script-info-body {
+    padding: 12px;
+  }
+
+  .script-code-pair {
+    grid-template-columns: 1fr;
   }
 
   .script-modal-footer {

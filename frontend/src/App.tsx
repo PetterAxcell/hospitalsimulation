@@ -408,12 +408,10 @@ function PlanningScriptModal({
             <p>{fileName}</p>
           </div>
           <div className="script-modal-actions">
-            <button type="button" className="info-action" onClick={onToggleHelp} aria-expanded={helpOpen}>Info</button>
+            <button type="button" className="info-action" onClick={onToggleHelp} aria-haspopup="dialog" aria-expanded={helpOpen}>Info</button>
             <button type="button" onClick={onClose}>Cerrar</button>
           </div>
         </header>
-
-        {helpOpen && <PlanningScriptHelp />}
 
         <div className="script-toolbar">
           <label className="file-action">
@@ -458,28 +456,145 @@ function PlanningScriptModal({
           </div>
         </div>
       </section>
+      {helpOpen && <PlanningScriptHelpModal onClose={onToggleHelp} />}
     </div>
   )
 }
 
-function PlanningScriptHelp() {
+function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
   return (
-    <section className="script-help">
-      <div>
-        <h3>Formato YAML</h3>
-        <p>Una plantilla define `plan`, `corridors`, `rooms`, `verticals` y `connections`. Cada bloque usa `template`, `floor`, `at` y `size`.</p>
-      </div>
-      <pre>{`connections:
+    <div className="script-info-backdrop" role="presentation">
+      <section className="script-info-modal" role="dialog" aria-modal="true" aria-labelledby="script-info-title">
+        <header className="script-info-header">
+          <div>
+            <span>Manual YAML</span>
+            <h2 id="script-info-title">Aprender la estructura del plan</h2>
+            <p>Lee el plan como una receta: primero contexto, luego piezas espaciales y al final las relaciones que hacen funcionar la simulacion.</p>
+          </div>
+          <button type="button" onClick={onClose}>Cerrar</button>
+        </header>
+
+        <div className="script-info-body">
+          <section className="script-info-card">
+            <h3>Mapa mental</h3>
+            <ol>
+              <li><strong>`plan`</strong> define nombre, m2 objetivo, parcela y plantas.</li>
+              <li><strong>`clear`</strong> decide si el YAML reemplaza el plano actual.</li>
+              <li><strong>`corridors`</strong> crea pasillos publicos, clinicos o logisticos.</li>
+              <li><strong>`rooms`</strong> crea servicios hospitalarios desde el catalogo.</li>
+              <li><strong>`verticals`</strong> replica nucleos por planta y los agrupa.</li>
+              <li><strong>`connections`</strong> declara accesos logicos entre bloques.</li>
+            </ol>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Una sala, paso a paso</h3>
+            <p>El parser toma cada entrada de `rooms`, resuelve el alias de `template`, convierte la planta a numero y calcula posicion, tamano y area.</p>
+            <div className="script-code-pair">
+              <div>
+                <h4>YAML que escribes</h4>
+                <pre>{`rooms:
+  - template: boxes
+    id: boxes-pb
+    floor: PB
+    at: [47, 27]
+    size: [21, 16]
+    capacity: 60`}</pre>
+              </div>
+              <div>
+                <h4>Objeto que genera</h4>
+                <pre>{`{
+  id: 'boxes-pb',
+  templateId: 'edBoxes',
+  floor: 0,
+  x: 47,
+  y: 27,
+  w: 21,
+  h: 16,
+  capacity: 60,
+  areaSqm: 3024,
+  connectionIds: []
+}`}</pre>
+              </div>
+            </div>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Pasillos y conexiones</h3>
+            <p>Un pasillo es una sala de tipo circulacion. Una conexion no dibuja geometria nueva: anade referencias cruzadas para que el motor entienda que hay acceso.</p>
+            <div className="script-code-pair">
+              <div>
+                <h4>YAML que escribes</h4>
+                <pre>{`corridors:
+  - template: clinical
+    id: clinical-pb
+    floor: PB
+    at: [0, 31]
+    size: [100, 7]
+
+connections:
   - from: boxes-pb
-    to: clinical-pb
-verticals:
-  - group: asc-core-central
-    floors: S1..P8`}</pre>
-      <div>
-        <h3>Conexiones</h3>
-        <p>`connections` une bloques con pasillos sin crear pasillos intermedios. `verticals` conecta plantas por grupo y rango de plantas.</p>
-      </div>
-    </section>
+    to: clinical-pb`}</pre>
+              </div>
+              <div>
+                <h4>Efecto interno</h4>
+                <pre>{`boxes-pb.connectionIds = [
+  'clinical-pb'
+]
+
+clinical-pb.connectionIds = [
+  'boxes-pb'
+]`}</pre>
+              </div>
+            </div>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Verticales por grupo</h3>
+            <p>`verticals` crea una copia por planta. `group` es la llave humana para conectar todo el nucleo sin escribir cada id generado.</p>
+            <div className="script-code-pair">
+              <div>
+                <h4>YAML que escribes</h4>
+                <pre>{`verticals:
+  - template: core
+    group: asc-core-central
+    floors: S1..P2
+    at: [50, 20]
+    size: [8, 8]`}</pre>
+              </div>
+              <div>
+                <h4>Objetos que genera</h4>
+                <pre>{`[
+  { id: 'verticalCore-asc-core-central--1',
+    floor: -1,
+    verticalGroupId: 'asc-core-central' },
+  { id: 'verticalCore-asc-core-central-0',
+    floor: 0,
+    verticalGroupId: 'asc-core-central' },
+  { id: 'verticalCore-asc-core-central-1',
+    floor: 1,
+    verticalGroupId: 'asc-core-central' },
+  { id: 'verticalCore-asc-core-central-2',
+    floor: 2,
+    verticalGroupId: 'asc-core-central' }
+]`}</pre>
+              </div>
+            </div>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Reglas para escribir sin perderse</h3>
+            <ul>
+              <li>Usa `id` estables si luego vas a conectar bloques.</li>
+              <li>Usa `PB`, `P1`, `P2`, `S1` o numeros para plantas.</li>
+              <li>Usa `at: [x, y]` y `size: [w, h]`; el lienzo es de 100 x 70 unidades.</li>
+              <li>Usa listas con guion en `rooms`, `corridors`, `verticals` y `connections`.</li>
+              <li>Alias utiles: `hall`, `waiting`, `boxes`, `triage`, `icu`, `ward`, `public`, `clinical`, `logistics`, `core`, `stair`.</li>
+            </ul>
+          </section>
+        </div>
+      </section>
+    </div>
   )
 }
 
