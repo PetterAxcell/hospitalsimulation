@@ -58,12 +58,13 @@ export function clampRoom(room: PlacedRoom): PlacedRoom {
 }
 
 export function overlapScore(rooms: PlacedRoom[], floor: number): number {
-  const floorRooms = rooms.filter((room) => room.floor === floor && room.kind !== 'circulation')
+  const floorRooms = rooms.filter((room) => room.floor === floor && room.kind !== 'future')
   let overlaps = 0
   for (let i = 0; i < floorRooms.length; i += 1) {
     for (let j = i + 1; j < floorRooms.length; j += 1) {
       const a = floorRooms[i]
       const b = floorRooms[j]
+      if (a.kind === 'circulation' && b.kind === 'circulation') continue
       const overlapX = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
       const overlapY = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
       overlaps += overlapX * overlapY

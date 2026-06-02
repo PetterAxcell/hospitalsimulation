@@ -105,11 +105,11 @@ function evaluateCorridorAccess(rooms: PlacedRoom[]): ArchitectureRuleResult {
   const sample = disconnected.slice(0, 4).map((room) => room.name).join(', ')
   return {
     id: 'flow-corridor-access',
-    label: 'Puertas conectadas a pasillos',
+    label: 'Bloques conectados a pasillos',
     status: disconnected.length ? 'fail' : 'ok',
     evidence: disconnected.length
-      ? `${disconnected.length} salas sin puerta a pasillo: ${sample}${disconnected.length > 4 ? '...' : ''}`
-      : 'Todas las salas asistenciales y publicas tienen puerta a pasillo; los conectores verticales enlazan plantas desde esa red',
+      ? `${disconnected.length} bloques sin puerta a pasillo: ${sample}${disconnected.length > 4 ? '...' : ''}`
+      : 'Todos los bloques operativos tienen puerta fisica a pasillo; los conectores verticales enlazan plantas desde esa red',
     category: 'flujos',
   }
 }
@@ -119,11 +119,11 @@ function evaluatePassageContinuity(rooms: PlacedRoom[]): ArchitectureRuleResult 
   const sample = disconnected.slice(0, 4).map((room) => `${room.name} ${room.floor}`).join(', ')
   return {
     id: 'flow-passage-continuity',
-    label: 'Pasillos conectados',
+    label: 'Red de circulacion conectada',
     status: disconnected.length ? 'fail' : 'ok',
     evidence: disconnected.length
-      ? `${disconnected.length} pasillos fuera de la red principal: ${sample}${disconnected.length > 4 ? '...' : ''}`
-      : 'Todos los pasillos pertenecen a una red de circulacion conectada',
+      ? `${disconnected.length} elementos fuera de la red principal: ${sample}${disconnected.length > 4 ? '...' : ''}`
+      : 'Pasillos, escaleras y nucleos verticales pertenecen a una red de circulacion conectada',
     category: 'flujos',
   }
 }

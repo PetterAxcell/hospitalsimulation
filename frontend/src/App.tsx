@@ -7,6 +7,7 @@ import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine
 import {
   defaultDoorForRoom,
   disconnectedPassages,
+  disconnectedPatientRooms,
   doorConnectsToCorridor,
   doorWorldPosition,
   hasPassageAccess,
@@ -113,7 +114,7 @@ function App() {
       const door = defaultDoorForRoom(nextRoom, current.rooms)
       const roomWithDoor = clampRoom({ ...nextRoom, doors: door ? [door] : [] })
       const rooms = [...current.rooms, roomWithDoor]
-      return { ...current, rooms: door ? ensureDoorCorridorConnector(rooms, roomWithDoor, door).map(clampRoom) : rooms }
+      return { ...current, rooms }
     })
     setSelectedRoomId(nextRoom.id)
   }
@@ -175,7 +176,7 @@ function App() {
       const roomsWithDoor = current.rooms.map((room) => (room.id === roomId ? updatedRoom : room))
       return {
         ...current,
-        rooms: (snap.magnetized ? ensureDoorCorridorConnector(roomsWithDoor, updatedRoom, door) : stripDoorConnectors(roomsWithDoor, roomId, door.id)).map(clampRoom),
+        rooms: roomsWithDoor.map(clampRoom),
       }
     })
     setDoorToolRoomId(undefined)
@@ -191,7 +192,7 @@ function App() {
       const roomsWithDoor = current.rooms.map((room) => (room.id === roomId ? updatedRoom : room))
       return {
         ...current,
-        rooms: (snap.magnetized ? ensureDoorCorridorConnector(roomsWithDoor, updatedRoom, door) : stripDoorConnectors(roomsWithDoor, roomId, doorId)).map(clampRoom),
+        rooms: roomsWithDoor.map(clampRoom),
       }
     })
   }
@@ -199,11 +200,9 @@ function App() {
   function removeDoor(roomId: string, doorId: string) {
     setPlan((current) => ({
       ...current,
-      rooms: current.rooms
-        .filter((room) => !connectorIdsForDoor(roomId, doorId).includes(room.id))
-        .map((room) => (
-          room.id === roomId ? clampRoom({ ...room, doors: (room.doors ?? []).filter((door) => door.id !== doorId) }) : room
-        )),
+      rooms: current.rooms.map((room) => (
+        room.id === roomId ? clampRoom({ ...room, doors: (room.doors ?? []).filter((door) => door.id !== doorId) }) : room
+      )),
     }))
   }
 
@@ -362,6 +361,8 @@ function App() {
                 <Metric label="Bloques" value={String(activeFloorRooms.length)} />
                 <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
               </section>
+
+              <AccessAlerts plan={plan} selectedFloor={selectedFloor} />
             </>
           )}
         </aside>
@@ -691,6 +692,48 @@ connections:
   )
 }
 
+function AccessAlerts({ plan, selectedFloor }: { plan: HospitalPlan; selectedFloor: number }) {
+  const disconnectedBlocks = disconnectedPatientRooms(plan.rooms)
+  const disconnectedCirculation = disconnectedPassages(plan.rooms)
+  const floorOverlap = overlapScore(plan.rooms, selectedFloor)
+  const hasIssues = disconnectedBlocks.length > 0 || disconnectedCirculation.length > 0 || floorOverlap > 0
+
+  return (
+    <section className="panel-section">
+      <h2>Alertas accesos</h2>
+      <div className="rule-list compact">
+        {hasIssues ? (
+          <>
+            {disconnectedBlocks.slice(0, 4).map((room) => (
+              <article key={`block-${room.id}`} className="rule-item fail">
+                <strong>{room.name}</strong>
+                <span>{floorLabel(room.floor)} sin puerta fisica a pasillo.</span>
+              </article>
+            ))}
+            {disconnectedCirculation.slice(0, 4).map((room) => (
+              <article key={`passage-${room.id}`} className="rule-item fail">
+                <strong>{room.name}</strong>
+                <span>{floorLabel(room.floor)} fuera de la red principal de circulacion.</span>
+              </article>
+            ))}
+            {floorOverlap > 0 && (
+              <article className="rule-item fail">
+                <strong>Solapes en {floorLabel(selectedFloor)}</strong>
+                <span>{floorOverlap} unidades de superficie solapada.</span>
+              </article>
+            )}
+          </>
+        ) : (
+          <article className="rule-item ok">
+            <strong>Red accesible</strong>
+            <span>Todos los bloques operativos y elementos de circulacion estan conectados.</span>
+          </article>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function ClinicalCasesModal({
   source,
   result,
@@ -983,7 +1026,7 @@ function RoomInspector({
   }
   const accessRequired = requiresCorridorAccess(room)
   const hasCorridor = hasPassageAccess(allRooms, room)
-  const isDisconnectedPassage = room.kind === 'circulation' && disconnectedPassages(allRooms).some((item) => item.id === room.id)
+  const isDisconnectedPassage = isPassage(room) && disconnectedPassages(allRooms).some((item) => item.id === room.id)
 
   return (
     <>
@@ -1030,8 +1073,8 @@ function RoomInspector({
         <div className="status-metrics">
           <Metric label="m2 calculados" value={formatNumber(room.areaSqm)} />
           <Metric
-            label={room.kind === 'circulation' ? 'Red pasillos' : 'Acceso pasillo'}
-            value={room.kind === 'circulation' ? (isDisconnectedPassage ? 'Aislado' : 'Conectado') : accessRequired ? (hasCorridor ? 'Conectado' : 'Sin pasillo') : 'Opcional'}
+            label={isPassage(room) ? 'Red circulacion' : 'Acceso pasillo'}
+            value={isPassage(room) ? (isDisconnectedPassage ? 'Aislado' : 'Conectado') : accessRequired ? (hasCorridor ? 'Conectado' : 'Sin pasillo') : 'Opcional'}
           />
         </div>
       </section>
@@ -1520,8 +1563,7 @@ function connectRoomToNearestCorridor(rooms: PlacedRoom[], target: PlacedRoom): 
   const preservedDoors = (target.doors ?? []).slice(1)
   const primaryDoor: RoomDoor = { ...suggestedDoor, id: doorId }
   const connectedRoom = clampRoom({ ...target, doors: [primaryDoor, ...preservedDoors] })
-  const roomsWithDoor = rooms.map((room) => (room.id === target.id ? connectedRoom : room))
-  return ensureDoorCorridorConnector(roomsWithDoor, connectedRoom, primaryDoor)
+  return rooms.map((room) => (room.id === target.id ? connectedRoom : room))
 }
 
 function snapDoorToCorridor(
@@ -1531,7 +1573,7 @@ function snapDoorToCorridor(
   id: string,
   force = false,
 ): { door: RoomDoor; magnetized: boolean } {
-  const corridors = corridorCandidatesForDoor(rooms, room, id)
+  const corridors = corridorCandidatesForDoor(rooms, room)
   if (!corridors.length) return { door: snapDoorToRoom(room, point, id), magnetized: false }
 
   const candidates = corridors.map((corridor) => {
@@ -1559,97 +1601,11 @@ function doorCandidateForCorridor(room: PlacedRoom, corridor: PlacedRoom, point:
   }
 }
 
-function ensureDoorCorridorConnector(rooms: PlacedRoom[], room: PlacedRoom, door: RoomDoor): PlacedRoom[] {
-  const connectorIds = connectorIdsForDoor(room.id, door.id)
-  const roomsWithoutConnector = rooms.filter((candidate) => !connectorIds.includes(candidate.id))
-  if (doorTouchesCorridor(roomsWithoutConnector, room, door, 0.2)) return roomsWithoutConnector
-
-  const nearestCorridor = nearestCorridorForDoor(roomsWithoutConnector, room, door)
-  if (!nearestCorridor) return roomsWithoutConnector
-
-  return [
-    ...roomsWithoutConnector,
-    ...createConnectorCorridors(room, door, nearestCorridor, connectorIdForDoor(room.id, door.id)),
-  ]
-}
-
-function createConnectorCorridors(room: PlacedRoom, door: RoomDoor, corridor: PlacedRoom, baseId: string): PlacedRoom[] {
-  const doorPoint = doorWorldPosition(room, door)
-  const targetPoint = closestPointOnRect(doorPoint, corridor)
-  const aligned = door.side === 'top' || door.side === 'bottom'
-    ? doorPoint.x >= corridor.x && doorPoint.x <= corridor.x + corridor.w
-    : doorPoint.y >= corridor.y && doorPoint.y <= corridor.y + corridor.h
-  if (aligned) return [createConnectorSegment(room, corridor, baseId, doorPoint, targetPoint)]
-
-  const bendPoint = door.side === 'top' || door.side === 'bottom'
-    ? { x: doorPoint.x, y: targetPoint.y }
-    : { x: targetPoint.x, y: doorPoint.y }
-
-  return [
-    createConnectorSegment(room, corridor, `${baseId}-a`, doorPoint, bendPoint),
-    createConnectorSegment(room, corridor, `${baseId}-b`, bendPoint, targetPoint),
-  ]
-}
-
-function createConnectorSegment(
-  room: PlacedRoom,
-  corridor: PlacedRoom,
-  id: string,
-  from: DoorPoint,
-  to: DoorPoint,
-): PlacedRoom {
-  const connectorWidth = 2.8
-  const horizontal = Math.abs(to.x - from.x) >= Math.abs(to.y - from.y)
-  const x = horizontal ? Math.min(from.x, to.x) - connectorWidth / 2 : from.x - connectorWidth / 2
-  const y = horizontal ? from.y - connectorWidth / 2 : Math.min(from.y, to.y) - connectorWidth / 2
-  const w = horizontal ? Math.max(connectorWidth, Math.abs(to.x - from.x) + connectorWidth) : connectorWidth
-  const h = horizontal ? connectorWidth : Math.max(connectorWidth, Math.abs(to.y - from.y) + connectorWidth)
-
-  return clampRoom({
-    id,
-    templateId: corridor.templateId,
-    name: `Umbral ${room.name}`,
-    kind: 'circulation',
-    floor: room.floor,
-    x,
-    y,
-    w,
-    h,
-    capacity: 0,
-    areaSqm: areaSqmForDimensions(w, h),
-    equipment: [],
-    staffModel: corridor.staffModel.length ? corridor.staffModel : ['circulacion'],
-  })
-}
-
-function nearestCorridorForDoor(rooms: PlacedRoom[], room: PlacedRoom, door: RoomDoor): PlacedRoom | undefined {
-  const point = doorWorldPosition(room, door)
-  return corridorCandidatesForDoor(rooms, room, door.id)
-    .map((corridor) => ({ corridor, distance: pointToRectDistance(point, corridor), corridorDistance: rectangleDistance(room, corridor) }))
-    .sort((a, b) => a.distance - b.distance || a.corridorDistance - b.corridorDistance)[0]?.corridor
-}
-
-function corridorCandidatesForDoor(rooms: PlacedRoom[], room: PlacedRoom, doorId: string): PlacedRoom[] {
-  const connectorIds = connectorIdsForDoor(room.id, doorId)
+function corridorCandidatesForDoor(rooms: PlacedRoom[], room: PlacedRoom): PlacedRoom[] {
   return rooms.filter((candidate) =>
     candidate.floor === room.floor
     && candidate.kind === 'circulation'
     && candidate.id !== room.id
-    && !connectorIds.includes(candidate.id),
-  )
-}
-
-function stripDoorConnectors(rooms: PlacedRoom[], roomId: string, doorId: string): PlacedRoom[] {
-  const connectorIds = connectorIdsForDoor(roomId, doorId)
-  return rooms.filter((room) => !connectorIds.includes(room.id))
-}
-
-function doorTouchesCorridor(rooms: PlacedRoom[], room: PlacedRoom, door: RoomDoor, tolerance: number): boolean {
-  const point = doorWorldPosition(room, door)
-  return rooms.some((candidate) =>
-    candidate.floor === room.floor
-    && candidate.kind === 'circulation'
-    && pointInsideRoom(point, candidate, tolerance),
   )
 }
 
@@ -1702,24 +1658,8 @@ function rectangleDistance(a: PlacedRoom, b: PlacedRoom): number {
   return Math.hypot(dx, dy)
 }
 
-function pointInsideRoom(point: DoorPoint, room: PlacedRoom, tolerance: number): boolean {
-  return point.x >= room.x - tolerance
-    && point.x <= room.x + room.w + tolerance
-    && point.y >= room.y - tolerance
-    && point.y <= room.y + room.h + tolerance
-}
-
 function rangesTouch(a1: number, a2: number, b1: number, b2: number, tolerance: number): boolean {
   return Math.min(a2, b2) - Math.max(a1, b1) >= -tolerance
-}
-
-function connectorIdForDoor(roomId: string, doorId: string): string {
-  return `connector-${roomId}-${doorId}`
-}
-
-function connectorIdsForDoor(roomId: string, doorId: string): string[] {
-  const baseId = connectorIdForDoor(roomId, doorId)
-  return [baseId, `${baseId}-a`, `${baseId}-b`]
 }
 
 function clampValue(value: number, min: number, max: number): number {

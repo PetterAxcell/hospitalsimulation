@@ -1,6 +1,6 @@
 import { parse as parseYaml } from 'yaml'
 import { ROOM_TEMPLATES, templateById } from '../data/catalog'
-import { addDefaultDoors } from './circulation'
+import { addDefaultDoors, disconnectedPassages, disconnectedPatientRooms } from './circulation'
 import { areaSqmForDimensions, clampRoom } from './geometry'
 import type { HospitalPlan, PlacedRoom, RoomTemplate } from '../types'
 
@@ -88,48 +88,48 @@ rooms:
   - template: hall
     id: hall-pb
     floor: PB
-    at: [8, 28]
-    size: [18, 20]
+    at: [29, 17]
+    size: [18, 14]
   - template: waiting
     id: waiting-pb
     floor: PB
-    at: [26, 42]
+    at: [26, 38]
     size: [20, 12]
   - template: ambulances
     id: ambulance-pb
     floor: PB
-    at: [74, 15]
+    at: [80, 20]
     size: [15, 11]
   - template: triage
     id: triage-pb
     floor: PB
-    at: [58, 17]
+    at: [68, 23]
     size: [11, 8]
   - template: resus
     id: resus-pb
     floor: PB
-    at: [68, 28]
+    at: [78, 38]
     size: [14, 10]
   - template: boxes
     id: boxes-pb
     floor: PB
-    at: [47, 27]
+    at: [56, 38]
     size: [21, 16]
   - template: observation
     id: observation-pb
     floor: PB
-    at: [47, 45]
-    size: [19, 11]
+    at: [77, 48]
+    size: [19, 10]
   - template: imaging
     id: imaging-pb
     floor: PB
-    at: [42, 14]
+    at: [56, 7]
     size: [16, 11]
 
 verticals:
   - template: core
     floors: S1..P8
-    at: [50, 20]
+    at: [56, 23]
     size: [8, 8]
     group: asc-core-central
     name: Nucleo vertical central
@@ -250,6 +250,32 @@ function createScriptState(basePlan: HospitalPlan): ScriptState {
 
 function finishResult(state: ScriptState): PlanningLanguageResult {
   const rooms = addDefaultDoors(state.rooms.map(clampRoom))
+  const overlaps = overlappingRoomPairs(rooms)
+  if (overlaps.length > 0) {
+    state.diagnostics.push({
+      level: 'warning',
+      line: 1,
+      message: `${overlaps.length} solapes geometricos: ${overlaps.slice(0, 3).join(', ')}${overlaps.length > 3 ? '...' : ''}`,
+    })
+  }
+  const disconnected = disconnectedPatientRooms(rooms)
+  if (disconnected.length > 0) {
+    const sample = disconnected.slice(0, 4).map((room) => room.name).join(', ')
+    state.diagnostics.push({
+      level: 'warning',
+      line: 1,
+      message: `${disconnected.length} bloques quedan sin acceso fisico a pasillo: ${sample}${disconnected.length > 4 ? '...' : ''}`,
+    })
+  }
+  const disconnectedCorridors = disconnectedPassages(rooms)
+  if (disconnectedCorridors.length > 0) {
+    const sample = disconnectedCorridors.slice(0, 4).map((room) => room.name).join(', ')
+    state.diagnostics.push({
+      level: 'warning',
+      line: 1,
+      message: `${disconnectedCorridors.length} elementos de circulacion quedan fuera de la red principal: ${sample}${disconnectedCorridors.length > 4 ? '...' : ''}`,
+    })
+  }
   return {
     plan: {
       ...state.plan,
@@ -259,6 +285,23 @@ function finishResult(state: ScriptState): PlanningLanguageResult {
     diagnostics: state.diagnostics,
     appliedLines: state.appliedLines,
   }
+}
+
+function overlappingRoomPairs(rooms: PlacedRoom[]): string[] {
+  const overlaps: string[] = []
+  const activeRooms = rooms.filter((room) => room.kind !== 'future')
+  for (let i = 0; i < activeRooms.length; i += 1) {
+    for (let j = i + 1; j < activeRooms.length; j += 1) {
+      const a = activeRooms[i]
+      const b = activeRooms[j]
+      if (a.floor !== b.floor) continue
+      if (a.kind === 'circulation' && b.kind === 'circulation') continue
+      const overlapX = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x))
+      const overlapY = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y))
+      if (overlapX * overlapY > 0.01) overlaps.push(`${a.name} / ${b.name}`)
+    }
+  }
+  return overlaps
 }
 
 function roomFromStructuredEntry(value: unknown, state: ScriptState, command: 'room' | 'corridor'): PlacedRoom {

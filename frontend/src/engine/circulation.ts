@@ -1,7 +1,7 @@
 import type { DoorSide, PlacedRoom, RoomDoor } from '../types'
 
-const CONNECT_TOLERANCE = 0.8
-const DOOR_TOUCH_TOLERANCE = 4
+const CONNECT_TOLERANCE = 0.35
+const DOOR_TOUCH_TOLERANCE = 0.35
 const VERTICAL_ALIGNMENT_TOLERANCE = 1.2
 const DEFAULT_DOOR_OFFSET = 0.5
 
@@ -20,20 +20,7 @@ function isCorridor(room: PlacedRoom): boolean {
 
 export function requiresCorridorAccess(room: PlacedRoom): boolean {
   if (isPassage(room)) return false
-  return [
-    'public',
-    'waiting',
-    'emergency',
-    'diagnostic',
-    'laboratory',
-    'surgery',
-    'critical',
-    'inpatient',
-    'ambulatory',
-    'maternalChild',
-    'oncology',
-    'pharmacy',
-  ].includes(room.kind)
+  return room.kind !== 'future'
 }
 
 export function disconnectedPassages(rooms: PlacedRoom[]): PlacedRoom[] {
@@ -42,7 +29,7 @@ export function disconnectedPassages(rooms: PlacedRoom[]): PlacedRoom[] {
   const graph = buildPassageGraph(passages)
   const components = passageComponents(passages, graph)
   const largest = components.sort((a, b) => b.size - a.size)[0] ?? new Set<string>()
-  return passages.filter((room) => room.kind === 'circulation' && !largest.has(room.id))
+  return passages.filter((room) => !largest.has(room.id))
 }
 
 export function roomsTouchOrOverlap(a: PlacedRoom, b: PlacedRoom, tolerance = CONNECT_TOLERANCE): boolean {
@@ -84,7 +71,7 @@ export function doorConnectsToCorridor(rooms: PlacedRoom[], room: PlacedRoom, do
   return rooms.some((candidate) =>
     candidate.floor === room.floor
     && isCorridor(candidate)
-    && (pointInsideRoom(point, candidate, DOOR_TOUCH_TOLERANCE) || explicitRoomsConnect(room, candidate)),
+    && (pointInsideRoom(point, candidate, DOOR_TOUCH_TOLERANCE) || explicitRoomsPhysicallyConnect(room, candidate)),
   )
 }
 
@@ -171,7 +158,7 @@ function accessPassages(passages: PlacedRoom[], room: PlacedRoom): PlacedRoom[] 
     passage.floor === room.floor
     && isCorridor(passage)
     && (
-      explicitRoomsConnect(room, passage)
+      explicitRoomsPhysicallyConnect(room, passage)
       || ((room.doors?.some((door) => pointInsideRoom(doorWorldPosition(room, door), passage, DOOR_TOUCH_TOLERANCE))) ?? false)
     ),
   )
@@ -198,7 +185,7 @@ export function connectedCorridorGroups(rooms: PlacedRoom[], floor: number): Pla
 
       for (const next of corridors) {
         if (!remaining.has(next.id)) continue
-        if (roomsTouchOrOverlap(current, next) || explicitRoomsConnect(current, next)) {
+        if (roomsTouchOrOverlap(current, next) || explicitRoomsPhysicallyConnect(current, next)) {
           remaining.delete(next.id)
           queue.push(next.id)
         }
@@ -229,7 +216,7 @@ function buildPassageGraph(passages: PlacedRoom[]): Map<string, string[]> {
 }
 
 function passagesConnect(a: PlacedRoom, b: PlacedRoom): boolean {
-  if (explicitRoomsConnect(a, b)) return true
+  if (explicitRoomsPhysicallyConnect(a, b)) return true
   if (a.floor === b.floor) {
     if (isCorridor(a) && isCorridor(b)) return roomsTouchOrOverlap(a, b)
     if (a.kind === 'vertical' && isCorridor(b)) return a.doors?.some((door) => pointInsideRoom(doorWorldPosition(a, door), b, DOOR_TOUCH_TOLERANCE)) ?? false
@@ -242,6 +229,12 @@ function passagesConnect(a: PlacedRoom, b: PlacedRoom): boolean {
 
 function explicitRoomsConnect(a: PlacedRoom, b: PlacedRoom): boolean {
   return (a.connectionIds?.includes(b.id) ?? false) || (b.connectionIds?.includes(a.id) ?? false)
+}
+
+function explicitRoomsPhysicallyConnect(a: PlacedRoom, b: PlacedRoom): boolean {
+  if (!explicitRoomsConnect(a, b)) return false
+  if (a.floor === b.floor) return roomsTouchOrOverlap(a, b)
+  return a.kind === 'vertical' && b.kind === 'vertical' && verticalConnectorsMatch(a, b)
 }
 
 function footprintsOverlap(a: PlacedRoom, b: PlacedRoom, tolerance: number): boolean {
