@@ -1,0 +1,1062 @@
+import { Suspense, lazy, useMemo, useState } from 'react'
+import './App.css'
+import { HospitalCanvas } from './components/HospitalCanvas'
+import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
+import { createTertiaryHospitalPlan } from './data/presets'
+import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
+import {
+  defaultDoorForRoom,
+  disconnectedPassages,
+  doorConnectsToCorridor,
+  doorWorldPosition,
+  hasPassageAccess,
+  requiresCorridorAccess,
+  snapDoorToRoom,
+  type DoorPoint,
+} from './engine/circulation'
+import {
+  areaSqmForDimensions,
+  clampRoom,
+  distance,
+  metersToWorldUnits,
+  overlapScore,
+  roomByNode,
+  worldUnitsToMeters,
+} from './engine/geometry'
+import { compilePlanningScript, DEFAULT_PLANNING_SCRIPT, type PlanningLanguageResult } from './engine/planningLanguage'
+import { DEFAULT_SIMULATION_SETTINGS, type SimulationSettings } from './engine/simulation'
+import type { DoorSide, HospitalPlan, PlacedRoom, RoomDoor, SimulationResult } from './types'
+
+type WorkspaceTab = 'plan' | 'simulation' | 'script' | 'services' | 'analysis'
+
+const INITIAL_PLAN = createTertiaryHospitalPlan()
+const DOOR_MAGNET_DISTANCE = 6
+const SimulationCanvas = lazy(() =>
+  import('./components/SimulationCanvas').then((module) => ({ default: module.SimulationCanvas })),
+)
+
+function App() {
+  const [plan, setPlan] = useState<HospitalPlan>(INITIAL_PLAN)
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('plan')
+  const [selectedFloor, setSelectedFloor] = useState(0)
+  const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(plan.rooms[0]?.id)
+  const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
+  const [templateToAdd, setTemplateToAdd] = useState('edBoxes')
+  const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null)
+  const [scriptSource, setScriptSource] = useState(DEFAULT_PLANNING_SCRIPT)
+  const [scriptResult, setScriptResult] = useState<PlanningLanguageResult | null>(null)
+
+  const selectedRoom = plan.rooms.find((room) => room.id === selectedRoomId)
+  const activeFloorRooms = plan.rooms.filter((room) => room.floor === selectedFloor)
+  const floorArea = activeFloorRooms.reduce((sum, room) => sum + room.areaSqm, 0)
+  const totalArea = plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
+  const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
+
+  function updateRoom(nextRoom: PlacedRoom) {
+    setPlan((current) => ({
+      ...current,
+      rooms: current.rooms.map((room) => (room.id === nextRoom.id ? clampRoom(nextRoom) : room)),
+    }))
+  }
+
+  function addRoom() {
+    addRoomFromTemplate(templateToAdd)
+  }
+
+  function addRoomFromTemplate(templateId: string) {
+    const nextId = `${templateId}-${Date.now()}`
+    const template = templateById(templateId)
+    const w = template.kind === 'circulation' ? 22 : Math.max(8, Math.min(22, Math.sqrt(template.defaultAreaSqm) / 4))
+    const h = template.kind === 'circulation' ? 5 : Math.max(7, Math.min(16, Math.sqrt(template.defaultAreaSqm) / 5))
+    const nextRoom: PlacedRoom = {
+      id: nextId,
+      templateId: template.id,
+      name: template.name,
+      kind: template.kind,
+      floor: selectedFloor,
+      x: 8,
+      y: 8,
+      w,
+      h,
+      capacity: template.defaultCapacity,
+      areaSqm: areaSqmForDimensions(w, h),
+      equipment: template.equipment,
+      staffModel: template.staffModel,
+      simulationNode: template.simulationNode,
+      verticalGroupId: template.kind === 'vertical' ? `${template.id}-${selectedFloor}` : undefined,
+      servesFloors: template.kind === 'vertical' ? [selectedFloor] : undefined,
+    }
+    setPlan((current) => {
+      const door = defaultDoorForRoom(nextRoom, current.rooms)
+      const roomWithDoor = clampRoom({ ...nextRoom, doors: door ? [door] : [] })
+      const rooms = [...current.rooms, roomWithDoor]
+      return { ...current, rooms: door ? ensureDoorCorridorConnector(rooms, roomWithDoor, door).map(clampRoom) : rooms }
+    })
+    setSelectedRoomId(nextRoom.id)
+  }
+
+  function autoConnectSelectedToCorridor() {
+    if (!selectedRoom) return
+    setPlan((current) => {
+      const target = current.rooms.find((room) => room.id === selectedRoom.id)
+      if (!target || !requiresCorridorAccess(target)) return current
+      const nextRooms = connectRoomToNearestCorridor(current.rooms, target)
+      return nextRooms ? { ...current, rooms: nextRooms.map(clampRoom) } : current
+    })
+  }
+
+  function autoConnectFloorToCorridors() {
+    setPlan((current) => {
+      let rooms = current.rooms.map(clampRoom)
+      const floorTargets = rooms.filter((room) => room.floor === selectedFloor && requiresCorridorAccess(room))
+      floorTargets.forEach((target) => {
+        const freshTarget = rooms.find((room) => room.id === target.id)
+        if (!freshTarget || hasPassageAccess(rooms, freshTarget)) return
+        const nextRooms = connectRoomToNearestCorridor(rooms, freshTarget)
+        if (nextRooms) rooms = nextRooms.map(clampRoom)
+      })
+      return { ...current, rooms }
+    })
+  }
+
+  function duplicateSelected() {
+    if (!selectedRoom) return
+    const copyId = `${selectedRoom.templateId}-${Date.now()}`
+    const copy = clampRoom({
+      ...selectedRoom,
+      id: copyId,
+      name: `${selectedRoom.name} copia`,
+      x: selectedRoom.x + 4,
+      y: selectedRoom.y + 4,
+      doors: selectedRoom.doors?.map((door, index) => ({ ...door, id: `${copyId}-door-${index + 1}` })) ?? [],
+      locked: false,
+    })
+    setPlan((current) => ({ ...current, rooms: [...current.rooms, copy] }))
+    setSelectedRoomId(copy.id)
+  }
+
+  function removeSelected() {
+    if (!selectedRoom) return
+    setPlan((current) => ({ ...current, rooms: current.rooms.filter((room) => room.id !== selectedRoom.id) }))
+    setSelectedRoomId(plan.rooms.find((room) => room.id !== selectedRoom.id)?.id)
+    if (doorToolRoomId === selectedRoom.id) setDoorToolRoomId(undefined)
+  }
+
+  function addDoorAtPoint(roomId: string, point: DoorPoint) {
+    setPlan((current) => {
+      const target = current.rooms.find((room) => room.id === roomId)
+      if (!target) return current
+      const snap = snapDoorToCorridor(target, current.rooms, point, `${target.id}-door-${Date.now()}`)
+      const door = snap.door
+      const updatedRoom = clampRoom({ ...target, doors: [...(target.doors ?? []), door] })
+      const roomsWithDoor = current.rooms.map((room) => (room.id === roomId ? updatedRoom : room))
+      return {
+        ...current,
+        rooms: (snap.magnetized ? ensureDoorCorridorConnector(roomsWithDoor, updatedRoom, door) : stripDoorConnectors(roomsWithDoor, roomId, door.id)).map(clampRoom),
+      }
+    })
+    setDoorToolRoomId(undefined)
+  }
+
+  function moveDoor(roomId: string, doorId: string, point: DoorPoint) {
+    setPlan((current) => {
+      const target = current.rooms.find((room) => room.id === roomId)
+      if (!target) return current
+      const snap = snapDoorToCorridor(target, current.rooms, point, doorId)
+      const door = snap.door
+      const updatedRoom = clampRoom({ ...target, doors: (target.doors ?? []).map((item) => (item.id === doorId ? door : item)) })
+      const roomsWithDoor = current.rooms.map((room) => (room.id === roomId ? updatedRoom : room))
+      return {
+        ...current,
+        rooms: (snap.magnetized ? ensureDoorCorridorConnector(roomsWithDoor, updatedRoom, door) : stripDoorConnectors(roomsWithDoor, roomId, doorId)).map(clampRoom),
+      }
+    })
+  }
+
+  function removeDoor(roomId: string, doorId: string) {
+    setPlan((current) => ({
+      ...current,
+      rooms: current.rooms
+        .filter((room) => !connectorIdsForDoor(roomId, doorId).includes(room.id))
+        .map((room) => (
+          room.id === roomId ? clampRoom({ ...room, doors: (room.doors ?? []).filter((door) => door.id !== doorId) }) : room
+        )),
+    }))
+  }
+
+  function runPlanningScript() {
+    const result = compilePlanningScript(scriptSource, plan)
+    setScriptResult(result)
+    if (result.diagnostics.some((diagnostic) => diagnostic.level === 'error')) return
+    setPlan(result.plan)
+    setSelectedFloor(result.plan.floors.includes(selectedFloor) ? selectedFloor : result.plan.floors[0] ?? 0)
+    setSelectedRoomId(result.plan.rooms[0]?.id)
+    setDoorToolRoomId(undefined)
+  }
+
+  return (
+    <main className="app-shell">
+      <header className="app-header">
+        <div>
+          <h1>{plan.name}</h1>
+          <p>Editor y simulador espacial para hospital terciario de alta complejidad</p>
+        </div>
+        <div className="header-metrics">
+          <Metric label="m2 objetivo" value={formatNumber(plan.targetAreaSqm)} />
+          <Metric label="m2 modelados" value={formatNumber(totalArea)} />
+          <Metric label="Plantas" value={String(plan.floors.length)} />
+          <Metric label="Estancias" value={String(plan.rooms.length)} />
+        </div>
+      </header>
+
+      <nav className="workspace-tabs" aria-label="Modulos">
+        <TabButton id="plan" active={activeTab} onClick={setActiveTab}>Planificador</TabButton>
+        <TabButton id="simulation" active={activeTab} onClick={setActiveTab}>Simulacion</TabButton>
+        <TabButton id="script" active={activeTab} onClick={setActiveTab}>Script</TabButton>
+        <TabButton id="services" active={activeTab} onClick={setActiveTab}>Servicios</TabButton>
+        <TabButton id="analysis" active={activeTab} onClick={setActiveTab}>Analisis</TabButton>
+      </nav>
+
+      <section className="workbench">
+        <aside className="left-panel">
+          <section className="panel-section">
+            <h2>Plantas</h2>
+            <div className="floor-grid">
+              {plan.floors.map((floor) => (
+                <button
+                  key={floor}
+                  type="button"
+                  className={floor === selectedFloor ? 'is-active' : ''}
+                  onClick={() => setSelectedFloor(floor)}
+                >
+                  {floorLabel(floor)}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel-section">
+            <h2>Construir</h2>
+            <label>
+              Elemento
+              <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
+                {ROOM_TEMPLATES.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.shortName} · {KIND_LABELS[template.kind]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
+            <div className="quick-build-grid" aria-label="Pasillos rapidos">
+              <button type="button" onClick={() => addRoomFromTemplate('publicCorridor')}>Pasillo publico</button>
+              <button type="button" onClick={() => addRoomFromTemplate('clinicalCorridor')}>Pasillo clinico</button>
+              <button type="button" onClick={() => addRoomFromTemplate('logisticsCorridor')}>Pasillo logistico</button>
+              <button type="button" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
+            </div>
+          </section>
+
+          <section className="panel-section">
+            <h2>Planta activa</h2>
+            <Metric label="m2 planta" value={formatNumber(floorArea)} />
+            <Metric label="Bloques" value={String(activeFloorRooms.length)} />
+            <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
+          </section>
+        </aside>
+
+        <section className="main-panel">
+          {activeTab === 'plan' && (
+            <HospitalCanvas
+              plan={plan}
+              selectedFloor={selectedFloor}
+              selectedRoomId={selectedRoomId}
+              doorToolRoomId={doorToolRoomId}
+              onSelectRoom={setSelectedRoomId}
+              onChangeRoom={updateRoom}
+              onAddDoorAtPoint={addDoorAtPoint}
+              onMoveDoor={moveDoor}
+            />
+          )}
+
+          {activeTab === 'simulation' && (
+            <Suspense fallback={<div className="simulation-loading">Cargando motor 2D...</div>}>
+              <SimulationCanvas
+                plan={plan}
+                selectedFloor={selectedFloor}
+                settings={simulationSettings}
+                onResult={setSimulationResult}
+              />
+            </Suspense>
+          )}
+
+          {activeTab === 'script' && (
+            <PlanningScriptPanel
+              source={scriptSource}
+              result={scriptResult}
+              onChange={setScriptSource}
+              onRun={runPlanningScript}
+              onReset={() => setScriptSource(DEFAULT_PLANNING_SCRIPT)}
+            />
+          )}
+
+          {activeTab === 'services' && <ServiceMatrix plan={plan} />}
+          {activeTab === 'analysis' && <AnalysisPanel plan={plan} result={simulationResult} rules={rules} />}
+        </section>
+
+        <aside className="right-panel">
+          {activeTab === 'simulation' ? (
+            <SimulationControls
+              settings={simulationSettings}
+              onChange={setSimulationSettings}
+              result={simulationResult}
+              rules={rules}
+            />
+          ) : activeTab === 'script' ? (
+            <PlanningScriptSummary result={scriptResult} />
+          ) : (
+            <RoomInspector
+              room={selectedRoom}
+              allRooms={plan.rooms}
+              floors={plan.floors}
+              onChange={updateRoom}
+              onDuplicate={duplicateSelected}
+              onRemove={removeSelected}
+              doorToolActive={doorToolRoomId === selectedRoom?.id}
+              onStartDoorTool={() => selectedRoom && setDoorToolRoomId(doorToolRoomId === selectedRoom.id ? undefined : selectedRoom.id)}
+              onRemoveDoor={removeDoor}
+              onAutoConnect={autoConnectSelectedToCorridor}
+            />
+          )}
+        </aside>
+      </section>
+    </main>
+  )
+}
+
+function PlanningScriptPanel({
+  source,
+  result,
+  onChange,
+  onRun,
+  onReset,
+}: {
+  source: string
+  result: PlanningLanguageResult | null
+  onChange: (value: string) => void
+  onRun: () => void
+  onReset: () => void
+}) {
+  return (
+    <div className="script-panel">
+      <div className="script-toolbar">
+        <button type="button" className="primary-action" onClick={onRun}>Ejecutar</button>
+        <button type="button" onClick={onReset}>Restaurar ejemplo</button>
+        {result && <span>{result.appliedLines} lineas aplicadas</span>}
+      </div>
+      <textarea
+        aria-label="Script de planificacion"
+        spellCheck={false}
+        value={source}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {result?.diagnostics.length ? (
+        <div className="script-diagnostics">
+          {result.diagnostics.map((diagnostic) => (
+            <p key={`${diagnostic.line}-${diagnostic.message}`} className={diagnostic.level}>
+              Linea {diagnostic.line}: {diagnostic.message}
+            </p>
+          ))}
+        </div>
+      ) : (
+        <div className="script-diagnostics">
+          <p className="muted">{result ? 'Sin errores.' : 'Sin ejecutar.'}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PlanningScriptSummary({ result }: { result: PlanningLanguageResult | null }) {
+  const hasErrors = result?.diagnostics.some((diagnostic) => diagnostic.level === 'error') ?? false
+  return (
+    <>
+      <section className="panel-section">
+        <h2>Script</h2>
+        <Metric label="Estado" value={!result ? 'Pendiente' : hasErrors ? 'Error' : 'OK'} />
+        <Metric label="Lineas" value={String(result?.appliedLines ?? 0)} />
+        <Metric label="Bloques" value={String(result?.plan.rooms.length ?? 0)} />
+      </section>
+      <section className="panel-section">
+        <h2>Salida</h2>
+        <p className="muted">
+          {!result
+            ? 'Esperando ejecucion.'
+            : hasErrors
+              ? 'El plan no se ha modificado.'
+              : `${formatNumber(result.plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0))} m2 modelados.`}
+        </p>
+      </section>
+    </>
+  )
+}
+
+interface TabButtonProps {
+  id: WorkspaceTab
+  active: WorkspaceTab
+  children: string
+  onClick: (tab: WorkspaceTab) => void
+}
+
+function TabButton({ id, active, children, onClick }: TabButtonProps) {
+  return (
+    <button type="button" className={active === id ? 'is-active' : ''} onClick={() => onClick(id)}>
+      {children}
+    </button>
+  )
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function RoomInspector({
+  room,
+  allRooms,
+  floors,
+  onChange,
+  onDuplicate,
+  onRemove,
+  doorToolActive,
+  onStartDoorTool,
+  onRemoveDoor,
+  onAutoConnect,
+}: {
+  room?: PlacedRoom
+  allRooms: PlacedRoom[]
+  floors: number[]
+  onChange: (room: PlacedRoom) => void
+  onDuplicate: () => void
+  onRemove: () => void
+  doorToolActive: boolean
+  onStartDoorTool: () => void
+  onRemoveDoor: (roomId: string, doorId: string) => void
+  onAutoConnect: () => void
+}) {
+  if (!room) {
+    return (
+      <section className="panel-section">
+        <h2>Elemento</h2>
+        <p className="muted">Selecciona un bloque del plano.</p>
+      </section>
+    )
+  }
+  const accessRequired = requiresCorridorAccess(room)
+  const hasCorridor = hasPassageAccess(allRooms, room)
+  const isDisconnectedPassage = room.kind === 'circulation' && disconnectedPassages(allRooms).some((item) => item.id === room.id)
+
+  return (
+    <>
+      <section className="panel-section">
+        <h2>Elemento</h2>
+        <label>
+          Nombre
+          <input value={room.name} onChange={(event) => onChange({ ...room, name: event.target.value })} />
+        </label>
+        <label>
+          Planta
+          <select value={room.floor} onChange={(event) => onChange(changeRoomFloor(room, Number(event.target.value)))}>
+            {floors.map((floor) => (
+              <option key={floor} value={floor}>{floorLabel(floor)}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Capacidad
+          <input type="number" value={room.capacity} onChange={(event) => onChange({ ...room, capacity: Number(event.target.value) })} />
+        </label>
+        <div className="dimension-grid">
+          <label>
+            Ancho (m)
+            <input
+              type="number"
+              min={12}
+              step={3}
+              value={worldUnitsToMeters(room.w)}
+              onChange={(event) => onChange(resizeRoomInMeters(room, 'w', Number(event.target.value)))}
+            />
+          </label>
+          <label>
+            Alto (m)
+            <input
+              type="number"
+              min={12}
+              step={3}
+              value={worldUnitsToMeters(room.h)}
+              onChange={(event) => onChange(resizeRoomInMeters(room, 'h', Number(event.target.value)))}
+            />
+          </label>
+        </div>
+        <div className="status-metrics">
+          <Metric label="m2 calculados" value={formatNumber(room.areaSqm)} />
+          <Metric
+            label={room.kind === 'circulation' ? 'Red pasillos' : 'Acceso pasillo'}
+            value={room.kind === 'circulation' ? (isDisconnectedPassage ? 'Aislado' : 'Conectado') : accessRequired ? (hasCorridor ? 'Conectado' : 'Sin pasillo') : 'Opcional'}
+          />
+        </div>
+      </section>
+
+      <section className="panel-section">
+        <h2>Equipamiento</h2>
+        <div className="tag-list">
+          {room.equipment.map((item) => <span key={item}>{item}</span>)}
+        </div>
+      </section>
+
+      {room.kind === 'vertical' && (
+        <section className="panel-section">
+          <h2>Conexion vertical</h2>
+          <label>
+            Familia de conector
+            <input
+              value={room.verticalGroupId ?? ''}
+              onChange={(event) => onChange({ ...room, verticalGroupId: event.target.value })}
+              placeholder="ascensor-central"
+            />
+          </label>
+          <FloorConnectionSelector room={room} floors={floors} onChange={onChange} />
+        </section>
+      )}
+
+      <section className="panel-section">
+        <h2>Personal</h2>
+        <div className="tag-list">
+          {room.staffModel.map((item) => <span key={item}>{item}</span>)}
+        </div>
+      </section>
+
+      <section className="panel-section">
+        <h2>Puertas</h2>
+        <Metric label="Puertas" value={String(room.doors?.length ?? 0)} />
+        <button
+          type="button"
+          className={doorToolActive ? 'primary-action' : undefined}
+          onClick={onStartDoorTool}
+          disabled={room.kind === 'circulation' || room.kind === 'future'}
+        >
+          {doorToolActive ? 'Colocando puerta' : 'Anadir puerta'}
+        </button>
+        <button
+          type="button"
+          className="secondary-action"
+          onClick={onAutoConnect}
+          disabled={!accessRequired || hasCorridor}
+        >
+          Conectar a pasillo cercano
+        </button>
+        <div className="tag-list">
+          {(room.doors ?? []).map((door, index) => {
+            const connected = doorConnectsToCorridor(allRooms, room, door)
+            return (
+              <button
+                key={door.id}
+                type="button"
+                className={`door-chip ${connected ? 'connected' : 'blocked'}`}
+                onClick={() => onRemoveDoor(room.id, door.id)}
+                title="Click para eliminar"
+              >
+                Puerta {index + 1} · {connected ? 'pasillo' : 'sin pasillo'}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <div className="button-row">
+        <button type="button" onClick={onDuplicate}>Duplicar</button>
+        <button type="button" onClick={onRemove}>Eliminar</button>
+      </div>
+    </>
+  )
+}
+
+function FloorConnectionSelector({
+  room,
+  floors,
+  onChange,
+}: {
+  room: PlacedRoom
+  floors: number[]
+  onChange: (room: PlacedRoom) => void
+}) {
+  const servedFloors = normalizeServedFloors(room.servesFloors ?? [room.floor], room.floor)
+
+  return (
+    <div className="floor-connection-editor">
+      <span>Plantas conectadas</span>
+      <div className="floor-selector-grid">
+        {floors.map((floor) => {
+          const isActive = servedFloors.includes(floor)
+          return (
+            <button
+              key={floor}
+              type="button"
+              className={`${isActive ? 'is-active' : ''} ${floor === room.floor ? 'is-anchor' : ''}`}
+              onClick={() => onChange({ ...room, servesFloors: toggleServedFloor(servedFloors, floor, room.floor) })}
+            >
+              {floorLabel(floor)}
+            </button>
+          )
+        })}
+      </div>
+      <div className="floor-quick-actions">
+        <button type="button" onClick={() => onChange({ ...room, servesFloors: [room.floor] })}>Solo esta</button>
+        <button type="button" onClick={() => onChange({ ...room, servesFloors: adjacentFloorRange(floors, room.floor) })}>Tramo +1</button>
+        <button type="button" onClick={() => onChange({ ...room, servesFloors: floors })}>Todas</button>
+      </div>
+    </div>
+  )
+}
+
+function SimulationControls({
+  settings,
+  result,
+  rules,
+  onChange,
+}: {
+  settings: SimulationSettings
+  result: SimulationResult | null
+  rules: ArchitectureRuleResult[]
+  onChange: (settings: SimulationSettings) => void
+}) {
+  const failingRules = rules.filter((rule) => rule.status !== 'ok')
+
+  return (
+    <>
+      <section className="panel-section">
+        <h2>Parametros</h2>
+        <label>
+          Llegadas/hora
+          <input
+            type="range"
+            min={3}
+            max={24}
+            value={settings.arrivalsPerHour}
+            onChange={(event) => onChange({ ...settings, arrivalsPerHour: Number(event.target.value) })}
+          />
+          <output>{settings.arrivalsPerHour}</output>
+        </label>
+        <label>
+          Duracion horas
+          <input
+            type="range"
+            min={8}
+            max={72}
+            value={settings.durationHours}
+            onChange={(event) => onChange({ ...settings, durationHours: Number(event.target.value) })}
+          />
+          <output>{settings.durationHours}</output>
+        </label>
+        <label>
+          Velocidad
+          <input
+            type="range"
+            min={20}
+            max={360}
+            step={10}
+            value={settings.speed}
+            onChange={(event) => onChange({ ...settings, speed: Number(event.target.value) })}
+          />
+          <output>{settings.speed}x</output>
+        </label>
+      </section>
+
+      <section className="panel-section">
+        <h2>Resultado</h2>
+        <Metric label="Pacientes" value={String(result?.kpis.completed ?? 0)} />
+        <Metric label="ED P90" value={`${result?.kpis.edP90Minutes ?? 0} min`} />
+        <Metric label="Traslado medio" value={`${result?.kpis.averageTravelMinutes ?? 0} min`} />
+        <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
+        <Metric label="Sin puerta" value={String(result?.kpis.blockedPatients ?? 0)} />
+      </section>
+
+      <section className="panel-section">
+        <h2>Reglas arquitectura</h2>
+        <Metric label="Correctas" value={String(rules.filter((rule) => rule.status === 'ok').length)} />
+        <Metric label="Avisos" value={String(rules.filter((rule) => rule.status === 'warn').length)} />
+        <Metric label="Criticas" value={String(rules.filter((rule) => rule.status === 'fail').length)} />
+        <div className="rule-list compact">
+          {failingRules.slice(0, 6).map((rule) => (
+            <article key={rule.id} className={`rule-item ${rule.status}`}>
+              <strong>{rule.label}</strong>
+              <span>{rule.evidence}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
+function ServiceMatrix({ plan }: { plan: HospitalPlan }) {
+  const rows = Object.entries(
+    plan.rooms.reduce<Record<string, { count: number; area: number; capacity: number }>>((acc, room) => {
+      const label = KIND_LABELS[room.kind]
+      acc[label] ??= { count: 0, area: 0, capacity: 0 }
+      acc[label].count += 1
+      acc[label].area += room.areaSqm
+      acc[label].capacity += room.capacity
+      return acc
+    }, {}),
+  ).sort((a, b) => b[1].area - a[1].area)
+
+  return (
+    <div className="table-panel">
+      <table>
+        <thead>
+          <tr>
+            <th>Servicio</th>
+            <th>Bloques</th>
+            <th>m2</th>
+            <th>Capacidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([kind, value]) => (
+            <tr key={kind}>
+              <td>{kind}</td>
+              <td>{value.count}</td>
+              <td>{formatNumber(value.area)}</td>
+              <td>{value.capacity}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AnalysisPanel({
+  plan,
+  result,
+  rules,
+}: {
+  plan: HospitalPlan
+  result: SimulationResult | null
+  rules: ArchitectureRuleResult[]
+}) {
+  const ed = roomByNode(plan.rooms, 'ed_bay')
+  const imaging = roomByNode(plan.rooms, 'imaging')
+  const or = roomByNode(plan.rooms, 'or')
+  const icu = roomByNode(plan.rooms, 'icu')
+  const ward = roomByNode(plan.rooms, 'ward')
+  const routes = [
+    ['ED a imagen', ed, imaging],
+    ['ED a quirofano', ed, or],
+    ['Quirofano a UCI', or, icu],
+    ['PACU a ward', roomByNode(plan.rooms, 'pacu'), ward],
+  ] as const
+  const groupedRules = rules.reduce<Record<string, ArchitectureRuleResult[]>>((acc, rule) => {
+    acc[rule.category] ??= []
+    acc[rule.category].push(rule)
+    return acc
+  }, {})
+
+  return (
+    <div className="analysis-grid">
+      <section className="analysis-block">
+        <h2>Recorridos criticos</h2>
+        {routes.map(([label, a, b]) => (
+          <Metric key={label} label={label} value={a && b ? `${Math.round(distance(a, b))}` : '-'} />
+        ))}
+      </section>
+      <section className="analysis-block">
+        <h2>Seguridad funcional</h2>
+        <div className="rule-list">
+          {Object.entries(groupedRules).map(([category, categoryRules]) => (
+            <div key={category} className="rule-category">
+              <h3>{category}</h3>
+              {categoryRules.map((rule) => (
+                <article key={rule.id} className={`rule-item ${rule.status}`}>
+                  <strong>{rule.label}</strong>
+                  <span>{rule.evidence}</span>
+                </article>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="analysis-block">
+        <h2>Simulacion</h2>
+        <Metric label="Zona mas cargada" value={result?.kpis.hottestRoomName ?? '-'} />
+        <Metric label="Avisos" value={String(rules.filter((rule) => rule.status !== 'ok').length)} />
+      </section>
+    </div>
+  )
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('es-ES').format(Math.round(value))
+}
+
+function floorLabel(floor: number) {
+  if (floor < 0) return `S${Math.abs(floor)}`
+  if (floor === 0) return 'PB'
+  return `P${floor}`
+}
+
+function resizeRoomInMeters(room: PlacedRoom, dimension: 'w' | 'h', meters: number): PlacedRoom {
+  if (!Number.isFinite(meters)) return room
+  return clampRoom({ ...room, [dimension]: metersToWorldUnits(meters) })
+}
+
+function changeRoomFloor(room: PlacedRoom, floor: number): PlacedRoom {
+  if (!Number.isFinite(floor)) return room
+  const nextFloor = Math.round(floor)
+  return clampRoom({
+    ...room,
+    floor: nextFloor,
+    servesFloors: room.kind === 'vertical' ? normalizeServedFloors(room.servesFloors ?? [room.floor], nextFloor) : room.servesFloors,
+  })
+}
+
+function normalizeServedFloors(floors: number[], anchorFloor: number): number[] {
+  const normalized = new Set(floors.map((floor) => Math.round(floor)).filter((floor) => Number.isFinite(floor)))
+  normalized.add(anchorFloor)
+  return [...normalized].sort((a, b) => a - b)
+}
+
+function toggleServedFloor(floors: number[], floor: number, anchorFloor: number): number[] {
+  const next = new Set(floors)
+  if (next.has(floor) && floor !== anchorFloor) next.delete(floor)
+  else next.add(floor)
+  next.add(anchorFloor)
+  return [...next].sort((a, b) => a - b)
+}
+
+function adjacentFloorRange(floors: number[], anchorFloor: number): number[] {
+  const index = floors.indexOf(anchorFloor)
+  const adjacent = floors[index + 1] ?? floors[index - 1] ?? anchorFloor
+  return normalizeServedFloors([anchorFloor, adjacent], anchorFloor)
+}
+
+function connectRoomToNearestCorridor(rooms: PlacedRoom[], target: PlacedRoom): PlacedRoom[] | undefined {
+  const point = target.doors?.[0] ? doorWorldPosition(target, target.doors[0]) : { x: target.x + target.w / 2, y: target.y + target.h / 2 }
+  const doorId = target.doors?.[0]?.id ?? `${target.id}-door-1`
+  const suggestedDoor = snapDoorToCorridor(target, rooms, point, doorId, true).door
+
+  const preservedDoors = (target.doors ?? []).slice(1)
+  const primaryDoor: RoomDoor = { ...suggestedDoor, id: doorId }
+  const connectedRoom = clampRoom({ ...target, doors: [primaryDoor, ...preservedDoors] })
+  const roomsWithDoor = rooms.map((room) => (room.id === target.id ? connectedRoom : room))
+  return ensureDoorCorridorConnector(roomsWithDoor, connectedRoom, primaryDoor)
+}
+
+function snapDoorToCorridor(
+  room: PlacedRoom,
+  rooms: PlacedRoom[],
+  point: DoorPoint,
+  id: string,
+  force = false,
+): { door: RoomDoor; magnetized: boolean } {
+  const corridors = corridorCandidatesForDoor(rooms, room, id)
+  if (!corridors.length) return { door: snapDoorToRoom(room, point, id), magnetized: false }
+
+  const candidates = corridors.map((corridor) => {
+    const door = doorCandidateForCorridor(room, corridor, point, id)
+    const doorPoint = doorWorldPosition(room, door)
+    return {
+      door,
+      distance: pointToRectDistance(doorPoint, corridor),
+      corridorDistance: rectangleDistance(room, corridor),
+    }
+  })
+
+  const best = candidates.sort((a, b) => a.distance - b.distance || a.corridorDistance - b.corridorDistance)[0]
+  if (!force && best.distance > DOOR_MAGNET_DISTANCE) return { door: snapDoorToRoom(room, point, id), magnetized: false }
+  return { door: best.door, magnetized: true }
+}
+
+function doorCandidateForCorridor(room: PlacedRoom, corridor: PlacedRoom, point: DoorPoint, id: string): RoomDoor {
+  const side = doorSideFacingCorridor(room, corridor)
+  const corridorPoint = closestPointOnRect(point, corridor)
+  return {
+    id,
+    side,
+    offset: doorOffsetForSide(room, side, corridorPoint),
+  }
+}
+
+function ensureDoorCorridorConnector(rooms: PlacedRoom[], room: PlacedRoom, door: RoomDoor): PlacedRoom[] {
+  const connectorIds = connectorIdsForDoor(room.id, door.id)
+  const roomsWithoutConnector = rooms.filter((candidate) => !connectorIds.includes(candidate.id))
+  if (doorTouchesCorridor(roomsWithoutConnector, room, door, 0.2)) return roomsWithoutConnector
+
+  const nearestCorridor = nearestCorridorForDoor(roomsWithoutConnector, room, door)
+  if (!nearestCorridor) return roomsWithoutConnector
+
+  return [
+    ...roomsWithoutConnector,
+    ...createConnectorCorridors(room, door, nearestCorridor, connectorIdForDoor(room.id, door.id)),
+  ]
+}
+
+function createConnectorCorridors(room: PlacedRoom, door: RoomDoor, corridor: PlacedRoom, baseId: string): PlacedRoom[] {
+  const doorPoint = doorWorldPosition(room, door)
+  const targetPoint = closestPointOnRect(doorPoint, corridor)
+  const aligned = door.side === 'top' || door.side === 'bottom'
+    ? doorPoint.x >= corridor.x && doorPoint.x <= corridor.x + corridor.w
+    : doorPoint.y >= corridor.y && doorPoint.y <= corridor.y + corridor.h
+  if (aligned) return [createConnectorSegment(room, corridor, baseId, doorPoint, targetPoint)]
+
+  const bendPoint = door.side === 'top' || door.side === 'bottom'
+    ? { x: doorPoint.x, y: targetPoint.y }
+    : { x: targetPoint.x, y: doorPoint.y }
+
+  return [
+    createConnectorSegment(room, corridor, `${baseId}-a`, doorPoint, bendPoint),
+    createConnectorSegment(room, corridor, `${baseId}-b`, bendPoint, targetPoint),
+  ]
+}
+
+function createConnectorSegment(
+  room: PlacedRoom,
+  corridor: PlacedRoom,
+  id: string,
+  from: DoorPoint,
+  to: DoorPoint,
+): PlacedRoom {
+  const connectorWidth = 2.8
+  const horizontal = Math.abs(to.x - from.x) >= Math.abs(to.y - from.y)
+  const x = horizontal ? Math.min(from.x, to.x) - connectorWidth / 2 : from.x - connectorWidth / 2
+  const y = horizontal ? from.y - connectorWidth / 2 : Math.min(from.y, to.y) - connectorWidth / 2
+  const w = horizontal ? Math.max(connectorWidth, Math.abs(to.x - from.x) + connectorWidth) : connectorWidth
+  const h = horizontal ? connectorWidth : Math.max(connectorWidth, Math.abs(to.y - from.y) + connectorWidth)
+
+  return clampRoom({
+    id,
+    templateId: corridor.templateId,
+    name: `Umbral ${room.name}`,
+    kind: 'circulation',
+    floor: room.floor,
+    x,
+    y,
+    w,
+    h,
+    capacity: 0,
+    areaSqm: areaSqmForDimensions(w, h),
+    equipment: [],
+    staffModel: corridor.staffModel.length ? corridor.staffModel : ['circulacion'],
+  })
+}
+
+function nearestCorridorForDoor(rooms: PlacedRoom[], room: PlacedRoom, door: RoomDoor): PlacedRoom | undefined {
+  const point = doorWorldPosition(room, door)
+  return corridorCandidatesForDoor(rooms, room, door.id)
+    .map((corridor) => ({ corridor, distance: pointToRectDistance(point, corridor), corridorDistance: rectangleDistance(room, corridor) }))
+    .sort((a, b) => a.distance - b.distance || a.corridorDistance - b.corridorDistance)[0]?.corridor
+}
+
+function corridorCandidatesForDoor(rooms: PlacedRoom[], room: PlacedRoom, doorId: string): PlacedRoom[] {
+  const connectorIds = connectorIdsForDoor(room.id, doorId)
+  return rooms.filter((candidate) =>
+    candidate.floor === room.floor
+    && candidate.kind === 'circulation'
+    && candidate.id !== room.id
+    && !connectorIds.includes(candidate.id),
+  )
+}
+
+function stripDoorConnectors(rooms: PlacedRoom[], roomId: string, doorId: string): PlacedRoom[] {
+  const connectorIds = connectorIdsForDoor(roomId, doorId)
+  return rooms.filter((room) => !connectorIds.includes(room.id))
+}
+
+function doorTouchesCorridor(rooms: PlacedRoom[], room: PlacedRoom, door: RoomDoor, tolerance: number): boolean {
+  const point = doorWorldPosition(room, door)
+  return rooms.some((candidate) =>
+    candidate.floor === room.floor
+    && candidate.kind === 'circulation'
+    && pointInsideRoom(point, candidate, tolerance),
+  )
+}
+
+function doorSideFacingCorridor(room: PlacedRoom, corridor: PlacedRoom): DoorSide {
+  const candidates: Array<{ side: DoorSide; distance: number; aligned: boolean }> = [
+    {
+      side: 'top',
+      distance: Math.abs(room.y - (corridor.y + corridor.h)),
+      aligned: rangesTouch(room.x, room.x + room.w, corridor.x, corridor.x + corridor.w, 0),
+    },
+    {
+      side: 'right',
+      distance: Math.abs(room.x + room.w - corridor.x),
+      aligned: rangesTouch(room.y, room.y + room.h, corridor.y, corridor.y + corridor.h, 0),
+    },
+    {
+      side: 'bottom',
+      distance: Math.abs(room.y + room.h - corridor.y),
+      aligned: rangesTouch(room.x, room.x + room.w, corridor.x, corridor.x + corridor.w, 0),
+    },
+    {
+      side: 'left',
+      distance: Math.abs(room.x - (corridor.x + corridor.w)),
+      aligned: rangesTouch(room.y, room.y + room.h, corridor.y, corridor.y + corridor.h, 0),
+    },
+  ]
+  return candidates.sort((a, b) => Number(b.aligned) - Number(a.aligned) || a.distance - b.distance)[0].side
+}
+
+function doorOffsetForSide(room: PlacedRoom, side: DoorSide, point: DoorPoint): number {
+  if (side === 'top' || side === 'bottom') return clampValue((point.x - room.x) / room.w, 0.08, 0.92)
+  return clampValue((point.y - room.y) / room.h, 0.08, 0.92)
+}
+
+function closestPointOnRect(point: DoorPoint, room: PlacedRoom): DoorPoint {
+  return {
+    x: clampValue(point.x, room.x, room.x + room.w),
+    y: clampValue(point.y, room.y, room.y + room.h),
+  }
+}
+
+function pointToRectDistance(point: DoorPoint, room: PlacedRoom): number {
+  const closest = closestPointOnRect(point, room)
+  return Math.hypot(point.x - closest.x, point.y - closest.y)
+}
+
+function rectangleDistance(a: PlacedRoom, b: PlacedRoom): number {
+  const dx = Math.max(0, Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w)))
+  const dy = Math.max(0, Math.max(a.y - (b.y + b.h), b.y - (a.y + a.h)))
+  return Math.hypot(dx, dy)
+}
+
+function pointInsideRoom(point: DoorPoint, room: PlacedRoom, tolerance: number): boolean {
+  return point.x >= room.x - tolerance
+    && point.x <= room.x + room.w + tolerance
+    && point.y >= room.y - tolerance
+    && point.y <= room.y + room.h + tolerance
+}
+
+function rangesTouch(a1: number, a2: number, b1: number, b2: number, tolerance: number): boolean {
+  return Math.min(a2, b2) - Math.max(a1, b1) >= -tolerance
+}
+
+function connectorIdForDoor(roomId: string, doorId: string): string {
+  return `connector-${roomId}-${doorId}`
+}
+
+function connectorIdsForDoor(roomId: string, doorId: string): string[] {
+  const baseId = connectorIdForDoor(roomId, doorId)
+  return [baseId, `${baseId}-a`, `${baseId}-b`]
+}
+
+function clampValue(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+export default App

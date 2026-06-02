@@ -1,0 +1,44 @@
+# Frontend hospital planner
+
+Aplicacion React/TypeScript para disenar y simular un hospital terciario multi-planta.
+
+## Stack
+
+- React para paneles, formularios, KPIs y estado de producto.
+- Phaser 3 para la vista de simulacion top-down tipo RPG/pixel-art.
+- Vite para desarrollo y build.
+
+La simulacion se carga con `React.lazy`, de forma que Phaser solo entra en el bundle cuando se abre la pestana `Simulacion`.
+
+## Uso
+
+```bash
+npm install
+npm run dev
+```
+
+Validacion:
+
+```bash
+npm run lint
+npm run build
+```
+
+Deploy Cloudflare Pages:
+
+```bash
+npm run deploy
+```
+
+El proyecto Pages esperado es `simlab`; el dominio custom es opcional.
+
+## Estructura
+
+```text
+src/components/HospitalCanvas.tsx     Editor de Vision en canvas 2D con bloques, puertas, pasillos y conectores verticales
+src/components/SimulationCanvas.tsx   Escena Phaser top-down
+src/data/catalog.ts                   Catalogo de servicios y equipamiento
+src/data/presets.ts                   Preset hospital terciario 290.000 m2
+src/engine/simulation.ts              Simulacion ligera de agentes y rutas
+src/engine/architectureRules.ts       Reglas arquitectonicas iniciales
+```
