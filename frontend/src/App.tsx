@@ -755,9 +755,9 @@ function SimulationControls({
           Velocidad
           <input
             type="range"
-            min={20}
+            min={1}
             max={360}
-            step={10}
+            step={1}
             value={settings.speed}
             onChange={(event) => onChange({ ...settings, speed: Number(event.target.value) })}
           />
