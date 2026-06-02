@@ -1,3 +1,4 @@
+import { parse as parseYaml } from 'yaml'
 import { ROOM_TEMPLATES, templateById } from '../data/catalog'
 import { addDefaultDoors } from './circulation'
 import { areaSqmForDimensions, clampRoom } from './geometry'
@@ -56,107 +57,167 @@ const TEMPLATE_ALIASES: Record<string, string> = {
   ward: 'ward',
 }
 
-export const DEFAULT_PLANNING_SCRIPT = `plan "Hospital script 290.000 m2"
-target 290000
-site 210000
-floors S1 PB P1 P2 P3 P4 P5 P6 P7 P8
-clear
+export const DEFAULT_PLANNING_SCRIPT = `plan:
+  name: Hospital script 290.000 m2
+  target: 290000
+  site: 210000
+  floors: [S1, PB, P1, P2, P3, P4, P5, P6, P7, P8]
+clear: true
 
-# Circulacion base
-corridor clinical floor PB at 0 31 size 100 7 name "Pasillo clinico principal"
-corridor public floor PB at 47 0 size 9 70 name "Pasillo publico vertical"
-corridor logistics floor PB at 0 58 size 100 5 name "Pasillo logistico"
+corridors:
+  - template: clinical
+    floor: PB
+    at: [0, 31]
+    size: [100, 7]
+    name: Pasillo clinico principal
+  - template: public
+    floor: PB
+    at: [47, 0]
+    size: [9, 70]
+    name: Pasillo publico vertical
+  - template: logistics
+    floor: PB
+    at: [0, 58]
+    size: [100, 5]
+    name: Pasillo logistico
 
-# Urgencias y diagnostico
-room hall floor PB at 8 28 size 18 20
-room waiting floor PB at 26 42 size 20 12
-room ambulances floor PB at 74 15 size 15 11
-room triage floor PB at 58 17 size 11 8
-room resus floor PB at 68 28 size 14 10
-room boxes floor PB at 47 27 size 21 16
-room observation floor PB at 47 45 size 19 11
-room imaging floor PB at 42 14 size 16 11
+rooms:
+  - template: hall
+    floor: PB
+    at: [8, 28]
+    size: [18, 20]
+  - template: waiting
+    floor: PB
+    at: [26, 42]
+    size: [20, 12]
+  - template: ambulances
+    floor: PB
+    at: [74, 15]
+    size: [15, 11]
+  - template: triage
+    floor: PB
+    at: [58, 17]
+    size: [11, 8]
+  - template: resus
+    floor: PB
+    at: [68, 28]
+    size: [14, 10]
+  - template: boxes
+    floor: PB
+    at: [47, 27]
+    size: [21, 16]
+  - template: observation
+    floor: PB
+    at: [47, 45]
+    size: [19, 11]
+  - template: imaging
+    floor: PB
+    at: [42, 14]
+    size: [16, 11]
 
-# Nucleo vertical
-vertical core floors S1..P8 at 50 20 size 8 8 group asc-core-central name "Nucleo vertical central"`
+verticals:
+  - template: core
+    floors: S1..P8
+    at: [50, 20]
+    size: [8, 8]
+    group: asc-core-central
+    name: Nucleo vertical central`
 
 export function compilePlanningScript(source: string, basePlan: HospitalPlan): PlanningLanguageResult {
-  const state: ScriptState = {
+  if (!looksLikeYaml(source)) {
+    const state = createScriptState(basePlan)
+    return {
+      plan: state.plan,
+      diagnostics: [{
+        level: 'error',
+        line: 1,
+        message: 'El planificador solo acepta plantillas YAML con claves como plan, clear, rooms, corridors o verticals.',
+      }],
+      appliedLines: 0,
+    }
+  }
+
+  return compileStructuredTemplate(source, basePlan)
+}
+
+function compileStructuredTemplate(source: string, basePlan: HospitalPlan): PlanningLanguageResult {
+  const state = createScriptState(basePlan)
+  let document: unknown
+
+  try {
+    document = parseYaml(source)
+  } catch (error) {
+    return {
+      plan: state.plan,
+      diagnostics: [{
+        level: 'error',
+        line: 1,
+        message: error instanceof Error ? error.message : String(error),
+      }],
+      appliedLines: 0,
+    }
+  }
+
+  try {
+    const root = requireRecord(document, 'La plantilla YAML debe ser un objeto')
+    const planConfig = asRecord(root.plan)
+
+    if (planConfig) {
+      const name = optionalString(planConfig.name)
+      const target = optionalNumber(planConfig.target ?? planConfig.targetAreaSqm)
+      const site = optionalNumber(planConfig.site ?? planConfig.siteAreaSqm)
+      const floors = floorTokensFromValue(planConfig.floors)
+      if (name) state.plan.name = name
+      if (target !== undefined) state.plan.targetAreaSqm = target
+      if (site !== undefined) state.plan.siteAreaSqm = site
+      if (floors.length > 0) {
+        state.plan.floors = parseFloorList(floors, state.plan.floors)
+        state.rooms = state.rooms.filter((room) => state.plan.floors.includes(room.floor))
+      }
+      state.appliedLines += 1
+    }
+
+    if (root.clear === true) {
+      state.rooms = []
+      state.appliedLines += 1
+    }
+
+    for (const item of listFromValue(root.corridors)) {
+      state.rooms.push(roomFromStructuredEntry(item, state, 'corridor'))
+      state.appliedLines += 1
+    }
+
+    for (const item of listFromValue(root.rooms)) {
+      state.rooms.push(roomFromStructuredEntry(item, state, 'room'))
+      state.appliedLines += 1
+    }
+
+    for (const item of listFromValue(root.verticals)) {
+      state.rooms.push(...verticalsFromStructuredEntry(item, state))
+      state.appliedLines += 1
+    }
+  } catch (error) {
+    state.diagnostics.push({
+      level: 'error',
+      line: 1,
+      message: error instanceof Error ? error.message : String(error),
+    })
+  }
+
+  return finishResult(state)
+}
+
+function createScriptState(basePlan: HospitalPlan): ScriptState {
+  return {
     plan: clonePlan(basePlan),
     rooms: basePlan.rooms.map((room) => ({ ...room, doors: room.doors?.map((door) => ({ ...door })) })),
     diagnostics: [],
     appliedLines: 0,
     sequence: 0,
   }
+}
 
-  source.split(/\r?\n/).forEach((rawLine, index) => {
-    const lineNumber = index + 1
-    const line = stripComment(rawLine).trim()
-    if (!line) return
-
-    const tokens = tokenize(line)
-    if (tokens.length === 0) return
-
-    const command = tokens[0].toLowerCase()
-    try {
-      if (command === 'plan') {
-        requireTokenCount(tokens, 2, 'plan necesita un nombre entre comillas')
-        state.plan.name = tokens.slice(1).join(' ')
-        state.appliedLines += 1
-        return
-      }
-
-      if (command === 'target') {
-        state.plan.targetAreaSqm = parsePositiveNumber(tokens[1], 'target')
-        state.appliedLines += 1
-        return
-      }
-
-      if (command === 'site') {
-        state.plan.siteAreaSqm = parsePositiveNumber(tokens[1], 'site')
-        state.appliedLines += 1
-        return
-      }
-
-      if (command === 'floors') {
-        const floors = parseFloorList(tokens.slice(1), state.plan.floors)
-        if (floors.length === 0) throw new Error('floors necesita al menos una planta')
-        state.plan.floors = floors
-        state.rooms = state.rooms.filter((room) => floors.includes(room.floor))
-        state.appliedLines += 1
-        return
-      }
-
-      if (command === 'clear') {
-        state.rooms = []
-        state.appliedLines += 1
-        return
-      }
-
-      if (command === 'room' || command === 'corridor') {
-        const room = parseRoomCommand(tokens, state, lineNumber, command)
-        state.rooms.push(room)
-        state.appliedLines += 1
-        return
-      }
-
-      if (command === 'vertical') {
-        const rooms = parseVerticalCommand(tokens, state, lineNumber)
-        state.rooms.push(...rooms)
-        state.appliedLines += 1
-        return
-      }
-
-      throw new Error(`Comando desconocido: ${tokens[0]}`)
-    } catch (error) {
-      state.diagnostics.push({
-        level: 'error',
-        line: lineNumber,
-        message: error instanceof Error ? error.message : String(error),
-      })
-    }
-  })
-
+function finishResult(state: ScriptState): PlanningLanguageResult {
   const rooms = addDefaultDoors(state.rooms.map(clampRoom))
   return {
     plan: {
@@ -169,26 +230,16 @@ export function compilePlanningScript(source: string, basePlan: HospitalPlan): P
   }
 }
 
-function parseRoomCommand(
-  tokens: string[],
-  state: ScriptState,
-  lineNumber: number,
-  command: 'room' | 'corridor',
-): PlacedRoom {
-  requireTokenCount(tokens, 2, `${command} necesita una plantilla`)
-  const template = resolveTemplate(tokens[1], command)
-  const floorToken = valueAfter(tokens, 'floor') ?? valueAfter(tokens, 'on')
-  const at = pairAfter(tokens, 'at')
-  const size = pairAfter(tokens, 'size')
-  const id = valueAfter(tokens, 'id')
-  const name = valueAfter(tokens, 'name')
-  const capacity = valueAfter(tokens, 'capacity')
+function roomFromStructuredEntry(value: unknown, state: ScriptState, command: 'room' | 'corridor'): PlacedRoom {
+  const item = requireRecord(value, `${command} debe ser un objeto`)
+  const template = resolveTemplate(requiredString(item.template, `${command}.template`), command)
+  const floor = parseFloor(requiredString(item.floor, `${command}.floor`))
+  const at = pairFromValue(item.at, `${command}.at`)
+  const size = pairFromValue(item.size, `${command}.size`)
+  const id = optionalString(item.id)
+  const name = optionalString(item.name)
+  const capacity = optionalNumber(item.capacity)
 
-  if (!floorToken) throw new Error(`${command} necesita floor`)
-  if (!at) throw new Error(`${command} necesita at x y`)
-  if (!size) throw new Error(`${command} necesita size w h`)
-
-  const floor = parseFloor(floorToken)
   if (!state.plan.floors.includes(floor)) {
     state.plan.floors = [...state.plan.floors, floor].sort((a, b) => a - b)
   }
@@ -200,27 +251,22 @@ function parseRoomCommand(
     y: at[1],
     w: size[0],
     h: size[1],
-    id: id ?? `${template.id}-${lineNumber}-${state.sequence += 1}`,
+    id: id ?? `${template.id}-yaml-${state.sequence += 1}`,
     name,
-    capacity: capacity ? parsePositiveNumber(capacity, 'capacity') : undefined,
+    capacity,
   })
 }
 
-function parseVerticalCommand(tokens: string[], state: ScriptState, lineNumber: number): PlacedRoom[] {
-  requireTokenCount(tokens, 2, 'vertical necesita una plantilla')
-  const template = resolveTemplate(tokens[1], 'vertical')
-  const floorsToken = valuesAfter(tokens, 'floors')
-  const at = pairAfter(tokens, 'at')
-  const size = pairAfter(tokens, 'size')
-  const group = valueAfter(tokens, 'group') ?? `${template.id}-${lineNumber}`
-  const name = valueAfter(tokens, 'name')
+function verticalsFromStructuredEntry(value: unknown, state: ScriptState): PlacedRoom[] {
+  const item = requireRecord(value, 'vertical debe ser un objeto')
+  const template = resolveTemplate(requiredString(item.template, 'vertical.template'), 'vertical')
+  const floors = parseFloorList(floorTokensFromValue(item.floors), state.plan.floors)
+  const at = pairFromValue(item.at, 'vertical.at')
+  const size = pairFromValue(item.size, 'vertical.size')
+  const group = optionalString(item.group) ?? `${template.id}-yaml-${state.sequence += 1}`
+  const name = optionalString(item.name)
 
-  if (!at) throw new Error('vertical necesita at x y')
-  if (!size) throw new Error('vertical necesita size w h')
-
-  const floors = floorsToken.length > 0 ? parseFloorList(floorsToken, state.plan.floors) : state.plan.floors
-  if (floors.length === 0) throw new Error('vertical necesita floors o un plan con plantas')
-
+  if (floors.length === 0) throw new Error('vertical.floors necesita al menos una planta')
   for (const floor of floors) {
     if (!state.plan.floors.includes(floor)) state.plan.floors.push(floor)
   }
@@ -238,6 +284,55 @@ function parseVerticalCommand(tokens: string[], state: ScriptState, lineNumber: 
     verticalGroupId: group,
     servesFloors: floors,
   }))
+}
+
+function looksLikeYaml(source: string): boolean {
+  return /^\s*(plan|target|site|floors|clear|rooms|corridors|verticals)\s*:/m.test(source)
+}
+
+function requireRecord(value: unknown, message: string): Record<string, unknown> {
+  const record = asRecord(value)
+  if (!record) throw new Error(message)
+  return record
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+}
+
+function requiredString(value: unknown, label: string): string {
+  const text = optionalString(value)
+  if (!text) throw new Error(`${label} necesita texto`)
+  return text
+}
+
+function optionalString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined
+  return String(value)
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  const parsed = Number(String(value).replace(',', '.'))
+  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`Numero no valido: ${value}`)
+  return parsed
+}
+
+function pairFromValue(value: unknown, label: string): [number, number] {
+  if (!Array.isArray(value) || value.length !== 2) throw new Error(`${label} necesita [x, y]`)
+  return [parsePositiveNumber(String(value[0]), label), parsePositiveNumber(String(value[1]), label)]
+}
+
+function floorTokensFromValue(value: unknown): string[] {
+  if (value === undefined || value === null) return []
+  if (Array.isArray(value)) return value.flatMap((item) => floorTokensFromValue(item))
+  return String(value).split(/[\s,]+/).filter(Boolean)
+}
+
+function listFromValue(value: unknown): unknown[] {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) throw new Error('Las listas YAML deben ser arrays')
+  return value
 }
 
 function buildRoom({
@@ -330,71 +425,11 @@ function parseFloor(raw: string): number {
   throw new Error(`Planta no reconocida: ${raw}`)
 }
 
-function valueAfter(tokens: string[], key: string): string | undefined {
-  const index = tokens.findIndex((token) => token.toLowerCase() === key)
-  return index >= 0 ? tokens[index + 1] : undefined
-}
-
-function valuesAfter(tokens: string[], key: string): string[] {
-  const index = tokens.findIndex((token) => token.toLowerCase() === key)
-  if (index < 0) return []
-  const values: string[] = []
-  for (let cursor = index + 1; cursor < tokens.length; cursor += 1) {
-    if (['at', 'capacity', 'floor', 'group', 'id', 'name', 'on', 'size'].includes(tokens[cursor].toLowerCase())) break
-    values.push(tokens[cursor])
-  }
-  return values
-}
-
-function pairAfter(tokens: string[], key: string): [number, number] | undefined {
-  const first = valueAfter(tokens, key)
-  const index = tokens.findIndex((token) => token.toLowerCase() === key)
-  const second = index >= 0 ? tokens[index + 2] : undefined
-  if (!first || !second) return undefined
-  return [parsePositiveNumber(first, key), parsePositiveNumber(second, key)]
-}
-
 function parsePositiveNumber(raw: string | undefined, label: string): number {
   if (!raw) throw new Error(`${label} necesita un valor numerico`)
   const value = Number(raw.replace(',', '.'))
   if (!Number.isFinite(value) || value < 0) throw new Error(`${label} no es un numero valido: ${raw}`)
   return value
-}
-
-function tokenize(line: string): string[] {
-  const tokens: string[] = []
-  const pattern = /"([^"\\]*(?:\\.[^"\\]*)*)"|[^\s]+/g
-  let match: RegExpExecArray | null
-  while ((match = pattern.exec(line)) !== null) {
-    tokens.push(match[1] ? match[1].replace(/\\"/g, '"') : match[0])
-  }
-  return tokens
-}
-
-function stripComment(line: string): string {
-  let quoted = false
-  let escaped = false
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index]
-    if (escaped) {
-      escaped = false
-      continue
-    }
-    if (char === '\\') {
-      escaped = true
-      continue
-    }
-    if (char === '"') {
-      quoted = !quoted
-      continue
-    }
-    if (char === '#' && !quoted) return line.slice(0, index)
-  }
-  return line
-}
-
-function requireTokenCount(tokens: string[], count: number, message: string) {
-  if (tokens.length < count) throw new Error(message)
 }
 
 function clonePlan(plan: HospitalPlan): HospitalPlan {

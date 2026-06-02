@@ -27,7 +27,7 @@ import { compilePlanningScript, DEFAULT_PLANNING_SCRIPT, type PlanningLanguageRe
 import { DEFAULT_SIMULATION_SETTINGS, type SimulationSettings } from './engine/simulation'
 import type { DoorSide, HospitalPlan, PlacedRoom, RoomDoor, SimulationResult } from './types'
 
-type WorkspaceTab = 'plan' | 'simulation' | 'script' | 'services' | 'analysis'
+type WorkspaceTab = 'plan' | 'simulation' | 'services' | 'analysis'
 
 const INITIAL_PLAN = createTertiaryHospitalPlan()
 const DOOR_MAGNET_DISTANCE = 6
@@ -46,6 +46,9 @@ function App() {
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null)
   const [scriptSource, setScriptSource] = useState(DEFAULT_PLANNING_SCRIPT)
   const [scriptResult, setScriptResult] = useState<PlanningLanguageResult | null>(null)
+  const [scriptFileName, setScriptFileName] = useState('plantilla.yaml')
+  const [isScriptModalOpen, setScriptModalOpen] = useState(false)
+  const [isScriptHelpOpen, setScriptHelpOpen] = useState(false)
 
   const selectedRoom = plan.rooms.find((room) => room.id === selectedRoomId)
   const activeFloorRooms = plan.rooms.filter((room) => room.floor === selectedFloor)
@@ -185,7 +188,7 @@ function App() {
     }))
   }
 
-  function runPlanningScript() {
+  function savePlanningScript() {
     const result = compilePlanningScript(scriptSource, plan)
     setScriptResult(result)
     if (result.diagnostics.some((diagnostic) => diagnostic.level === 'error')) return
@@ -193,6 +196,30 @@ function App() {
     setSelectedFloor(result.plan.floors.includes(selectedFloor) ? selectedFloor : result.plan.floors[0] ?? 0)
     setSelectedRoomId(result.plan.rooms[0]?.id)
     setDoorToolRoomId(undefined)
+    setScriptModalOpen(false)
+  }
+
+  async function loadPlanningTemplate(file: File | undefined) {
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith('.yaml')) {
+      setScriptFileName(file.name)
+      setScriptResult({
+        plan,
+        diagnostics: [{
+          level: 'error',
+          line: 1,
+          message: 'Solo se pueden subir archivos .yaml.',
+        }],
+        appliedLines: 0,
+      })
+      setScriptModalOpen(true)
+      return
+    }
+    const nextSource = await file.text()
+    setScriptSource(nextSource)
+    setScriptFileName(file.name)
+    setScriptResult(null)
+    setScriptModalOpen(true)
   }
 
   return (
@@ -213,7 +240,6 @@ function App() {
       <nav className="workspace-tabs" aria-label="Modulos">
         <TabButton id="plan" active={activeTab} onClick={setActiveTab}>Planificador</TabButton>
         <TabButton id="simulation" active={activeTab} onClick={setActiveTab}>Simulacion</TabButton>
-        <TabButton id="script" active={activeTab} onClick={setActiveTab}>Script</TabButton>
         <TabButton id="services" active={activeTab} onClick={setActiveTab}>Servicios</TabButton>
         <TabButton id="analysis" active={activeTab} onClick={setActiveTab}>Analisis</TabButton>
       </nav>
@@ -255,6 +281,7 @@ function App() {
               <button type="button" onClick={() => addRoomFromTemplate('logisticsCorridor')}>Pasillo logistico</button>
               <button type="button" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
             </div>
+            <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
           </section>
 
           <section className="panel-section">
@@ -290,16 +317,6 @@ function App() {
             </Suspense>
           )}
 
-          {activeTab === 'script' && (
-            <PlanningScriptPanel
-              source={scriptSource}
-              result={scriptResult}
-              onChange={setScriptSource}
-              onRun={runPlanningScript}
-              onReset={() => setScriptSource(DEFAULT_PLANNING_SCRIPT)}
-            />
-          )}
-
           {activeTab === 'services' && <ServiceMatrix plan={plan} />}
           {activeTab === 'analysis' && <AnalysisPanel plan={plan} result={simulationResult} rules={rules} />}
         </section>
@@ -312,8 +329,6 @@ function App() {
               result={simulationResult}
               rules={rules}
             />
-          ) : activeTab === 'script' ? (
-            <PlanningScriptSummary result={scriptResult} />
           ) : (
             <RoomInspector
               room={selectedRoom}
@@ -330,74 +345,134 @@ function App() {
           )}
         </aside>
       </section>
+
+      {isScriptModalOpen && (
+        <PlanningScriptModal
+          source={scriptSource}
+          result={scriptResult}
+          fileName={scriptFileName}
+          helpOpen={isScriptHelpOpen}
+          onChange={setScriptSource}
+          onSave={savePlanningScript}
+          onReset={() => {
+            setScriptSource(DEFAULT_PLANNING_SCRIPT)
+            setScriptFileName('plantilla.yaml')
+            setScriptResult(null)
+          }}
+          onUpload={loadPlanningTemplate}
+          onToggleHelp={() => setScriptHelpOpen((current) => !current)}
+          onClose={() => setScriptModalOpen(false)}
+        />
+      )}
     </main>
   )
 }
 
-function PlanningScriptPanel({
+function PlanningScriptModal({
   source,
   result,
+  fileName,
+  helpOpen,
   onChange,
-  onRun,
+  onSave,
   onReset,
+  onUpload,
+  onToggleHelp,
+  onClose,
 }: {
   source: string
   result: PlanningLanguageResult | null
+  fileName: string
+  helpOpen: boolean
   onChange: (value: string) => void
-  onRun: () => void
+  onSave: () => void
   onReset: () => void
+  onUpload: (file: File | undefined) => void
+  onToggleHelp: () => void
+  onClose: () => void
 }) {
+  const hasErrors = result?.diagnostics.some((diagnostic) => diagnostic.level === 'error') ?? false
+  const modeledArea = result?.plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0) ?? 0
+
   return (
-    <div className="script-panel">
-      <div className="script-toolbar">
-        <button type="button" className="primary-action" onClick={onRun}>Ejecutar</button>
-        <button type="button" onClick={onReset}>Restaurar ejemplo</button>
-        {result && <span>{result.appliedLines} lineas aplicadas</span>}
-      </div>
-      <textarea
-        aria-label="Script de planificacion"
-        spellCheck={false}
-        value={source}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {result?.diagnostics.length ? (
-        <div className="script-diagnostics">
-          {result.diagnostics.map((diagnostic) => (
-            <p key={`${diagnostic.line}-${diagnostic.message}`} className={diagnostic.level}>
-              Linea {diagnostic.line}: {diagnostic.message}
-            </p>
-          ))}
+    <div className="modal-backdrop" role="presentation">
+      <section className="script-modal" role="dialog" aria-modal="true" aria-labelledby="script-modal-title">
+        <header className="script-modal-header">
+          <div>
+            <h2 id="script-modal-title">Programar plan</h2>
+            <p>{fileName}</p>
+          </div>
+          <div className="script-modal-actions">
+            <button type="button" className="info-action" onClick={onToggleHelp} aria-expanded={helpOpen}>Info</button>
+            <button type="button" onClick={onClose}>Cerrar</button>
+          </div>
+        </header>
+
+        {helpOpen && <PlanningScriptHelp />}
+
+        <div className="script-toolbar">
+          <label className="file-action">
+            Subir .yaml
+            <input
+              type="file"
+              accept=".yaml,text/yaml,application/yaml,application/x-yaml"
+              onChange={(event) => {
+                void onUpload(event.currentTarget.files?.[0])
+                event.currentTarget.value = ''
+              }}
+            />
+          </label>
+          {result && <span>{hasErrors ? 'No aplicado' : `${result.appliedLines} instrucciones aplicadas`}</span>}
         </div>
-      ) : (
-        <div className="script-diagnostics">
-          <p className="muted">{result ? 'Sin errores.' : 'Sin ejecutar.'}</p>
+
+        <textarea
+          aria-label="Plantilla de planificacion"
+          spellCheck={false}
+          value={source}
+          onChange={(event) => onChange(event.target.value)}
+        />
+
+        <footer className="script-diagnostics">
+          {result?.diagnostics.length ? (
+            result.diagnostics.map((diagnostic) => (
+              <p key={`${diagnostic.line}-${diagnostic.message}`} className={diagnostic.level}>
+                Linea {diagnostic.line}: {diagnostic.message}
+              </p>
+            ))
+          ) : (
+            <p className="muted">{result ? `OK · ${formatNumber(modeledArea)} m2 modelados` : 'Sin ejecutar.'}</p>
+          )}
+        </footer>
+
+        <div className="script-modal-footer">
+          <button type="button" onClick={onReset}>Restaurar ejemplo</button>
+          <div className="script-footer-actions">
+            <button type="button" onClick={onClose}>Cancelar</button>
+            <button type="button" className="primary-action" onClick={onSave}>Guardar plan</button>
+          </div>
         </div>
-      )}
+      </section>
     </div>
   )
 }
 
-function PlanningScriptSummary({ result }: { result: PlanningLanguageResult | null }) {
-  const hasErrors = result?.diagnostics.some((diagnostic) => diagnostic.level === 'error') ?? false
+function PlanningScriptHelp() {
   return (
-    <>
-      <section className="panel-section">
-        <h2>Script</h2>
-        <Metric label="Estado" value={!result ? 'Pendiente' : hasErrors ? 'Error' : 'OK'} />
-        <Metric label="Lineas" value={String(result?.appliedLines ?? 0)} />
-        <Metric label="Bloques" value={String(result?.plan.rooms.length ?? 0)} />
-      </section>
-      <section className="panel-section">
-        <h2>Salida</h2>
-        <p className="muted">
-          {!result
-            ? 'Esperando ejecucion.'
-            : hasErrors
-              ? 'El plan no se ha modificado.'
-              : `${formatNumber(result.plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0))} m2 modelados.`}
-        </p>
-      </section>
-    </>
+    <section className="script-help">
+      <div>
+        <h3>Formato YAML</h3>
+        <p>Una plantilla define `plan`, `clear`, `corridors`, `rooms` y `verticals`. Cada bloque usa `template`, `floor`, `at` y `size`.</p>
+      </div>
+      <pre>{`rooms:
+  - template: boxes
+    floor: PB
+    at: [47, 27]
+    size: [21, 16]`}</pre>
+      <div>
+        <h3>Archivo</h3>
+        <p>El modal solo acepta archivos `.yaml`. Para programar el plan, pega YAML valido o sube una plantilla YAML estructurada.</p>
+      </div>
+    </section>
   )
 }
 

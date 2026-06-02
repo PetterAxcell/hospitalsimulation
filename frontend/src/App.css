@@ -400,8 +400,7 @@ output {
 }
 
 .table-panel,
-.analysis-grid,
-.script-panel {
+.analysis-grid {
   height: calc(100vh - 156px);
   overflow: auto;
   border: 1px solid #c9d4ce;
@@ -431,36 +430,74 @@ th {
   font-size: 11px;
 }
 
-.script-panel {
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  min-height: 0;
+  place-items: center;
+  padding: 24px;
+  background: rgba(13, 23, 20, 0.42);
 }
 
+.script-modal {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(240px, 1fr) auto auto;
+  width: min(980px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid #c9d4ce;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 60px rgba(18, 31, 26, 0.28);
+}
+
+.script-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  padding: 16px;
+  border-bottom: 1px solid #e4ebe6;
+}
+
+.script-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.script-modal-header p {
+  margin: 4px 0 0;
+  color: #66736e;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.script-modal-actions,
 .script-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid #e4ebe6;
 }
 
-.script-toolbar button {
+.script-modal-actions button,
+.script-toolbar button,
+.file-action {
   min-height: 36px;
   padding: 0 14px;
   border: 1px solid #c5d0ca;
   border-radius: 6px;
   background: #ffffff;
   color: #33413b;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
 }
 
-.script-toolbar .primary-action {
-  border-color: #2b9a8e;
-  background: #d9f3ef;
-  color: #1f615b;
+.script-toolbar {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4ebe6;
 }
 
 .script-toolbar span {
@@ -469,12 +506,26 @@ th {
   font-weight: 800;
 }
 
-.script-panel textarea {
+.file-action {
+  display: inline-grid;
+  place-items: center;
+  margin: 0;
+}
+
+.file-action input {
+  display: none;
+}
+
+.info-action {
+  min-width: 54px;
+}
+
+.script-modal textarea {
   min-width: 0;
   min-height: 0;
   width: 100%;
   height: 100%;
-  padding: 14px;
+  padding: 14px 16px;
   border: 0;
   resize: none;
   outline: none;
@@ -485,9 +536,42 @@ th {
   line-height: 1.55;
 }
 
+.script-help {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.9fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4ebe6;
+  background: #f7faf7;
+}
+
+.script-help h3 {
+  margin: 0 0 5px;
+  font-size: 13px;
+}
+
+.script-help p {
+  margin: 0;
+  color: #55645e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.script-help pre {
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 6px;
+  background: #10201c;
+  color: #eef8f3;
+  font-size: 12px;
+}
+
 .script-diagnostics {
   min-height: 44px;
-  padding: 10px 12px;
+  max-height: 120px;
+  overflow: auto;
+  padding: 10px 16px;
   border-top: 1px solid #e4ebe6;
   background: #fbfcf8;
 }
@@ -504,6 +588,42 @@ th {
 
 .script-diagnostics .warning {
   color: #8a640f;
+}
+
+.script-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid #e4ebe6;
+  background: #ffffff;
+}
+
+.script-modal-footer button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid #c5d0ca;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #33413b;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.script-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.script-footer-actions .primary-action {
+  width: auto;
+  border-color: #2b9a8e;
+  background: #d9f3ef;
+  color: #1f615b;
 }
 
 .analysis-grid {
@@ -627,9 +747,34 @@ th {
   .hospital-canvas,
   .simulation-stage,
   .table-panel,
-  .script-panel,
   .analysis-grid {
     height: 620px;
+  }
+
+  .modal-backdrop {
+    padding: 10px;
+  }
+
+  .script-modal {
+    max-height: calc(100vh - 20px);
+  }
+
+  .script-help {
+    grid-template-columns: 1fr;
+  }
+
+  .script-modal-footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .script-footer-actions {
+    justify-content: stretch;
+  }
+
+  .script-footer-actions button,
+  .script-modal-footer > button {
+    flex: 1 1 auto;
   }
 
   .analysis-grid {
