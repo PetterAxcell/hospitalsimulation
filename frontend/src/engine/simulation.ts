@@ -581,6 +581,7 @@ export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number)
       const currentRoom = rooms.find((room) => room.id === current.roomId)
       const nextRoom = rooms.find((room) => room.id === next.roomId)
       if (!currentRoom || !nextRoom) return null
+      if (current.roomId === next.roomId) return jitterInRoom(currentRoom, agent.id, false)
       const followingRoom = rooms.find((room) => room.id === agent.route[i + 2]?.roomId)
       const segmentDuration = Math.max(1, next.at - current.at)
       const currentIsPassage = isPassage(currentRoom)
@@ -734,7 +735,13 @@ function dwellMinutes(room: PlacedRoom, severity: Severity, rng: () => number): 
 }
 
 function addStaffAgents(plan: HospitalPlan, agents: SimAgent[]) {
-  const staffRooms = plan.rooms.filter((room) => room.staffModel.length > 0 && room.kind !== 'public' && room.kind !== 'green')
+  const staffRooms = plan.rooms.filter((room) =>
+    room.staffModel.length > 0
+    && !isPassage(room)
+    && room.kind !== 'public'
+    && room.kind !== 'green'
+    && room.kind !== 'future',
+  )
   staffRooms.slice(0, 28).forEach((room, index) => {
     agents.push({
       id: `s-${index + 1}`,
