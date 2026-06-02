@@ -462,16 +462,17 @@ function PlanningScriptHelp() {
     <section className="script-help">
       <div>
         <h3>Formato YAML</h3>
-        <p>Una plantilla define `plan`, `clear`, `corridors`, `rooms` y `verticals`. Cada bloque usa `template`, `floor`, `at` y `size`.</p>
+        <p>Una plantilla define `plan`, `corridors`, `rooms`, `verticals` y `connections`. Cada bloque usa `template`, `floor`, `at` y `size`.</p>
       </div>
-      <pre>{`rooms:
-  - template: boxes
-    floor: PB
-    at: [47, 27]
-    size: [21, 16]`}</pre>
+      <pre>{`connections:
+  - from: boxes-pb
+    to: clinical-pb
+verticals:
+  - group: asc-core-central
+    floors: S1..P8`}</pre>
       <div>
-        <h3>Archivo</h3>
-        <p>El modal solo acepta archivos `.yaml`. Para programar el plan, pega YAML valido o sube una plantilla YAML estructurada.</p>
+        <h3>Conexiones</h3>
+        <p>`connections` une bloques con pasillos sin crear pasillos intermedios. `verticals` conecta plantas por grupo y rango de plantas.</p>
       </div>
     </section>
   )

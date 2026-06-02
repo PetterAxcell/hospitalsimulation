@@ -52,6 +52,7 @@ export function clampRoom(room: PlacedRoom): PlacedRoom {
     areaSqm: areaSqmForDimensions(w, h),
     capacity: room.kind === 'circulation' || room.kind === 'future' ? Math.max(0, Math.round(room.capacity)) : Math.max(1, Math.round(room.capacity)),
     doors: room.doors?.map((door) => ({ ...door, offset: Math.max(0, Math.min(1, door.offset)) })),
+    connectionIds: room.connectionIds ? [...new Set(room.connectionIds.filter(Boolean))] : undefined,
     servesFloors: room.servesFloors?.map((floor) => Math.round(floor)).sort((a, b) => a - b),
   }
 }

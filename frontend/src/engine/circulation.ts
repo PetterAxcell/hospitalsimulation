@@ -84,7 +84,7 @@ export function doorConnectsToCorridor(rooms: PlacedRoom[], room: PlacedRoom, do
   return rooms.some((candidate) =>
     candidate.floor === room.floor
     && isCorridor(candidate)
-    && pointInsideRoom(point, candidate, DOOR_TOUCH_TOLERANCE),
+    && (pointInsideRoom(point, candidate, DOOR_TOUCH_TOLERANCE) || explicitRoomsConnect(room, candidate)),
   )
 }
 
@@ -168,9 +168,47 @@ export function findPassagePath(rooms: PlacedRoom[], from: PlacedRoom, to: Place
 function accessPassages(passages: PlacedRoom[], room: PlacedRoom): PlacedRoom[] {
   if (isPassage(room)) return [room]
   return passages.filter((passage) =>
-    isCorridor(passage)
-    && ((room.doors?.some((door) => pointInsideRoom(doorWorldPosition(room, door), passage, DOOR_TOUCH_TOLERANCE))) ?? false),
+    passage.floor === room.floor
+    && isCorridor(passage)
+    && (
+      explicitRoomsConnect(room, passage)
+      || ((room.doors?.some((door) => pointInsideRoom(doorWorldPosition(room, door), passage, DOOR_TOUCH_TOLERANCE))) ?? false)
+    ),
   )
+}
+
+export function connectedCorridorGroups(rooms: PlacedRoom[], floor: number): PlacedRoom[][] {
+  const corridors = rooms.filter((room) => room.floor === floor && isCorridor(room))
+  const remaining = new Set(corridors.map((room) => room.id))
+  const byId = new Map(corridors.map((room) => [room.id, room]))
+  const groups: PlacedRoom[][] = []
+
+  while (remaining.size > 0) {
+    const start = [...remaining][0]
+    const group: PlacedRoom[] = []
+    const queue = [start]
+    remaining.delete(start)
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+      if (!currentId) break
+      const current = byId.get(currentId)
+      if (!current) continue
+      group.push(current)
+
+      for (const next of corridors) {
+        if (!remaining.has(next.id)) continue
+        if (roomsTouchOrOverlap(current, next) || explicitRoomsConnect(current, next)) {
+          remaining.delete(next.id)
+          queue.push(next.id)
+        }
+      }
+    }
+
+    groups.push(group)
+  }
+
+  return groups
 }
 
 function buildPassageGraph(passages: PlacedRoom[]): Map<string, string[]> {
@@ -191,6 +229,7 @@ function buildPassageGraph(passages: PlacedRoom[]): Map<string, string[]> {
 }
 
 function passagesConnect(a: PlacedRoom, b: PlacedRoom): boolean {
+  if (explicitRoomsConnect(a, b)) return true
   if (a.floor === b.floor) {
     if (isCorridor(a) && isCorridor(b)) return roomsTouchOrOverlap(a, b)
     if (a.kind === 'vertical' && isCorridor(b)) return a.doors?.some((door) => pointInsideRoom(doorWorldPosition(a, door), b, DOOR_TOUCH_TOLERANCE)) ?? false
@@ -199,6 +238,10 @@ function passagesConnect(a: PlacedRoom, b: PlacedRoom): boolean {
   }
   if (a.kind !== 'vertical' || b.kind !== 'vertical') return false
   return verticalConnectorsMatch(a, b)
+}
+
+function explicitRoomsConnect(a: PlacedRoom, b: PlacedRoom): boolean {
+  return (a.connectionIds?.includes(b.id) ?? false) || (b.connectionIds?.includes(a.id) ?? false)
 }
 
 function footprintsOverlap(a: PlacedRoom, b: PlacedRoom, tolerance: number): boolean {

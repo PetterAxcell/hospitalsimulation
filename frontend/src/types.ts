@@ -105,6 +105,7 @@ export interface PlacedRoom {
   staffModel: string[]
   simulationNode?: SimulationNode
   doors?: RoomDoor[]
+  connectionIds?: string[]
   verticalGroupId?: string
   servesFloors?: number[]
   locked?: boolean

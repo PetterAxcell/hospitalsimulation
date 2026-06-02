@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { KIND_COLORS } from '../data/catalog'
-import { disconnectedPassages, doorWorldPosition } from '../engine/circulation'
+import { connectedCorridorGroups, disconnectedPassages, doorWorldPosition } from '../engine/circulation'
 import { center, roomByNode } from '../engine/geometry'
 import { positionAt, runHospitalSimulation, type SimulationSettings } from '../engine/simulation'
 import type { AgentRole, EquipmentKind, HospitalPlan, PlacedRoom, RoomKind, SimAgent, SimulationResult } from '../types'
@@ -216,7 +216,10 @@ class HospitalGameScene extends Phaser.Scene {
 
     const rooms = snapshot.plan.rooms.filter((room) => room.floor === snapshot.selectedFloor)
     const disconnectedIds = new Set(disconnectedPassages(snapshot.plan.rooms).map((room) => room.id))
-    rooms.forEach((room) => {
+    connectedCorridorGroups(snapshot.plan.rooms, snapshot.selectedFloor).forEach((group) => {
+      this.drawCorridorGroup(group, group.some((room) => disconnectedIds.has(room.id)))
+    })
+    rooms.filter((room) => room.kind !== 'circulation').forEach((room) => {
       this.drawRoom(room, snapshot.result, disconnectedIds.has(room.id))
     })
 
@@ -224,6 +227,41 @@ class HospitalGameScene extends Phaser.Scene {
       this.drawFlowOverlay(snapshot)
     }
     this.drawLegend(snapshot.viewMode)
+  }
+
+  private drawCorridorGroup(rooms: PlacedRoom[], disconnectedPassage: boolean) {
+    if (!this.layers || rooms.length === 0) return
+    const g = this.add.graphics()
+    this.layers.staticLayer.add(g)
+
+    const fill = ROOM_FLOOR_COLORS.circulation
+    const stroke = disconnectedPassage ? '#dc2626' : ROOM_WALL_COLORS.circulation
+    const cells = corridorCells(rooms)
+    g.fillStyle(toColor(fill), 1)
+    cells.forEach((cell) => {
+      const [x, y] = cell.split(':').map(Number)
+      g.fillRect(tileX(x), tileY(y), TILE, TILE)
+    })
+
+    g.lineStyle(2, toColor(stroke), 1)
+    cells.forEach((cell) => {
+      const [x, y] = cell.split(':').map(Number)
+      if (!cells.has(cellKey(x, y - 1))) g.lineBetween(tileX(x), tileY(y), tileX(x + 1), tileY(y))
+      if (!cells.has(cellKey(x + 1, y))) g.lineBetween(tileX(x + 1), tileY(y), tileX(x + 1), tileY(y + 1))
+      if (!cells.has(cellKey(x, y + 1))) g.lineBetween(tileX(x), tileY(y + 1), tileX(x + 1), tileY(y + 1))
+      if (!cells.has(cellKey(x - 1, y))) g.lineBetween(tileX(x), tileY(y), tileX(x), tileY(y + 1))
+    })
+
+    g.lineStyle(1, toColor('#a7b3a4'), 0.3)
+    const bounds = boundsForRooms(rooms)
+    for (let x = Math.ceil(bounds.x); x < bounds.x + bounds.w + bounds.h; x += 2) {
+      g.lineBetween(tileX(x), tileY(bounds.y), tileX(x - bounds.h), tileY(bounds.y + bounds.h))
+    }
+
+    if (bounds.w >= 12 || bounds.h >= 12) {
+      const label = rooms.length === 1 ? rooms[0].name : `Red pasillos (${rooms.length})`
+      this.addPixelText(label.slice(0, 26), bounds.x + 0.7, bounds.y + 0.7, '#33413b', '#f7faf7', this.layers.staticLayer, 10)
+    }
   }
 
   private drawBackground(snapshot: SimulationSnapshot) {
@@ -513,10 +551,39 @@ function staticSceneKey(snapshot: SimulationSnapshot) {
     .filter((room) => room.floor === snapshot.selectedFloor)
     .map((room) => {
       const doors = (room.doors ?? []).map((door) => `${door.id}:${door.side}:${door.offset}`).join(',')
-      return `${room.id}:${room.x}:${room.y}:${room.w}:${room.h}:${room.kind}:${doors}:${snapshot.result.roomPressure[room.id] ?? 0}`
+      const connections = (room.connectionIds ?? []).join(',')
+      return `${room.id}:${room.x}:${room.y}:${room.w}:${room.h}:${room.kind}:${doors}:${connections}:${snapshot.result.roomPressure[room.id] ?? 0}`
     })
     .join('|')
   return `${snapshot.selectedFloor}:${snapshot.viewMode}:${snapshot.result.kpis.completed}:${rooms}`
+}
+
+function corridorCells(rooms: PlacedRoom[]): Set<string> {
+  const cells = new Set<string>()
+  rooms.forEach((room) => {
+    const minX = Math.max(0, Math.floor(room.x))
+    const maxX = Math.min(WORLD_W, Math.ceil(room.x + room.w))
+    const minY = Math.max(0, Math.floor(room.y))
+    const maxY = Math.min(WORLD_H, Math.ceil(room.y + room.h))
+    for (let y = minY; y < maxY; y += 1) {
+      for (let x = minX; x < maxX; x += 1) {
+        cells.add(cellKey(x, y))
+      }
+    }
+  })
+  return cells
+}
+
+function cellKey(x: number, y: number): string {
+  return `${x}:${y}`
+}
+
+function boundsForRooms(rooms: PlacedRoom[]): { x: number; y: number; w: number; h: number } {
+  const minX = Math.min(...rooms.map((room) => room.x))
+  const minY = Math.min(...rooms.map((room) => room.y))
+  const maxX = Math.max(...rooms.map((room) => room.x + room.w))
+  const maxY = Math.max(...rooms.map((room) => room.y + room.h))
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
 }
 
 function drawTileRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, fill: string, stroke: string) {

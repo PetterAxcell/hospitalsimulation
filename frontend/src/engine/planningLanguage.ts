@@ -66,16 +66,19 @@ clear: true
 
 corridors:
   - template: clinical
+    id: clinical-pb
     floor: PB
     at: [0, 31]
     size: [100, 7]
     name: Pasillo clinico principal
   - template: public
+    id: public-pb
     floor: PB
     at: [47, 0]
     size: [9, 70]
     name: Pasillo publico vertical
   - template: logistics
+    id: logistics-pb
     floor: PB
     at: [0, 58]
     size: [100, 5]
@@ -83,34 +86,42 @@ corridors:
 
 rooms:
   - template: hall
+    id: hall-pb
     floor: PB
     at: [8, 28]
     size: [18, 20]
   - template: waiting
+    id: waiting-pb
     floor: PB
     at: [26, 42]
     size: [20, 12]
   - template: ambulances
+    id: ambulance-pb
     floor: PB
     at: [74, 15]
     size: [15, 11]
   - template: triage
+    id: triage-pb
     floor: PB
     at: [58, 17]
     size: [11, 8]
   - template: resus
+    id: resus-pb
     floor: PB
     at: [68, 28]
     size: [14, 10]
   - template: boxes
+    id: boxes-pb
     floor: PB
     at: [47, 27]
     size: [21, 16]
   - template: observation
+    id: observation-pb
     floor: PB
     at: [47, 45]
     size: [19, 11]
   - template: imaging
+    id: imaging-pb
     floor: PB
     at: [42, 14]
     size: [16, 11]
@@ -121,7 +132,19 @@ verticals:
     at: [50, 20]
     size: [8, 8]
     group: asc-core-central
-    name: Nucleo vertical central`
+    name: Nucleo vertical central
+
+connections:
+  - from: hall-pb
+    to: public-pb
+  - from: waiting-pb
+    to: public-pb
+  - from: [triage-pb, resus-pb, boxes-pb, observation-pb, imaging-pb]
+    to: clinical-pb
+  - from: ambulance-pb
+    to: clinical-pb
+  - from: asc-core-central
+    to: clinical-pb`
 
 export function compilePlanningScript(source: string, basePlan: HospitalPlan): PlanningLanguageResult {
   if (!looksLikeYaml(source)) {
@@ -131,7 +154,7 @@ export function compilePlanningScript(source: string, basePlan: HospitalPlan): P
       diagnostics: [{
         level: 'error',
         line: 1,
-        message: 'El planificador solo acepta plantillas YAML con claves como plan, clear, rooms, corridors o verticals.',
+        message: 'El planificador solo acepta plantillas YAML con claves como plan, clear, rooms, corridors, verticals o connections.',
       }],
       appliedLines: 0,
     }
@@ -196,6 +219,10 @@ function compileStructuredTemplate(source: string, basePlan: HospitalPlan): Plan
       state.rooms.push(...verticalsFromStructuredEntry(item, state))
       state.appliedLines += 1
     }
+
+    for (const item of listFromValue(root.connections)) {
+      state.appliedLines += applyConnectionEntry(item, state)
+    }
   } catch (error) {
     state.diagnostics.push({
       level: 'error',
@@ -210,7 +237,11 @@ function compileStructuredTemplate(source: string, basePlan: HospitalPlan): Plan
 function createScriptState(basePlan: HospitalPlan): ScriptState {
   return {
     plan: clonePlan(basePlan),
-    rooms: basePlan.rooms.map((room) => ({ ...room, doors: room.doors?.map((door) => ({ ...door })) })),
+    rooms: basePlan.rooms.map((room) => ({
+      ...room,
+      doors: room.doors?.map((door) => ({ ...door })),
+      connectionIds: room.connectionIds ? [...room.connectionIds] : undefined,
+    })),
     diagnostics: [],
     appliedLines: 0,
     sequence: 0,
@@ -286,8 +317,77 @@ function verticalsFromStructuredEntry(value: unknown, state: ScriptState): Place
   }))
 }
 
+function applyConnectionEntry(value: unknown, state: ScriptState): number {
+  const item = requireRecord(value, 'connection debe ser un objeto')
+  const fromRooms = resolveRoomReferences(item.from, state)
+  const toRooms = resolveRoomReferences(item.to, state)
+  const floors = parseOptionalFloors(item.floor ?? item.floors, state.plan.floors)
+  let applied = 0
+
+  for (const fromRoom of fromRooms) {
+    for (const toRoom of toRooms) {
+      if (fromRoom.id === toRoom.id) continue
+      if (floors.length > 0 && (!floors.includes(fromRoom.floor) || !floors.includes(toRoom.floor))) continue
+      if (!connectionCanSpanFloors(fromRoom, toRoom)) continue
+      linkRooms(state, fromRoom.id, toRoom.id)
+      applied += 1
+    }
+  }
+
+  if (applied === 0) throw new Error(`connection sin pares compatibles: ${String(item.from)} -> ${String(item.to)}`)
+  return applied
+}
+
+function resolveRoomReferences(value: unknown, state: ScriptState): PlacedRoom[] {
+  const refs = listOrSingle(value).flatMap((item) => String(item).split(',')).map((item) => item.trim()).filter(Boolean)
+  if (refs.length === 0) throw new Error('connection necesita from/to')
+  const matches = refs.flatMap((ref) => roomsMatchingReference(ref, state.rooms))
+  const unique = [...new Map(matches.map((room) => [room.id, room])).values()]
+  if (unique.length === 0) throw new Error(`Referencia de bloque no encontrada: ${refs.join(', ')}`)
+  return unique
+}
+
+function roomsMatchingReference(rawRef: string, rooms: PlacedRoom[]): PlacedRoom[] {
+  const ref = rawRef.trim()
+  const normalized = sanitizeId(ref)
+  const templateId = TEMPLATE_ALIASES[ref] ?? ref
+  const normalizedTemplateId = TEMPLATE_ALIASES[normalized] ?? normalized
+  return rooms.filter((room) =>
+    room.id === ref
+    || room.id === normalized
+    || room.verticalGroupId === ref
+    || room.verticalGroupId === normalized
+    || room.templateId === templateId
+    || room.templateId === normalizedTemplateId
+    || room.simulationNode === ref
+    || room.name === ref
+    || sanitizeId(room.name) === normalized,
+  )
+}
+
+function parseOptionalFloors(value: unknown, currentFloors: number[]): number[] {
+  const tokens = floorTokensFromValue(value)
+  return tokens.length > 0 ? parseFloorList(tokens, currentFloors) : []
+}
+
+function connectionCanSpanFloors(a: PlacedRoom, b: PlacedRoom): boolean {
+  return a.floor === b.floor || (a.kind === 'vertical' && b.kind === 'vertical')
+}
+
+function linkRooms(state: ScriptState, fromId: string, toId: string) {
+  state.rooms = state.rooms.map((room) => {
+    if (room.id === fromId) return { ...room, connectionIds: addUnique(room.connectionIds, toId) }
+    if (room.id === toId) return { ...room, connectionIds: addUnique(room.connectionIds, fromId) }
+    return room
+  })
+}
+
+function addUnique(values: string[] | undefined, next: string): string[] {
+  return values?.includes(next) ? values : [...(values ?? []), next]
+}
+
 function looksLikeYaml(source: string): boolean {
-  return /^\s*(plan|target|site|floors|clear|rooms|corridors|verticals)\s*:/m.test(source)
+  return /^\s*(plan|target|site|floors|clear|rooms|corridors|verticals|connections)\s*:/m.test(source)
 }
 
 function requireRecord(value: unknown, message: string): Record<string, unknown> {
@@ -335,6 +435,11 @@ function listFromValue(value: unknown): unknown[] {
   return value
 }
 
+function listOrSingle(value: unknown): unknown[] {
+  if (value === undefined || value === null) return []
+  return Array.isArray(value) ? value : [value]
+}
+
 function buildRoom({
   template,
   floor,
@@ -375,6 +480,7 @@ function buildRoom({
     equipment: template.equipment,
     staffModel: template.staffModel,
     simulationNode: template.simulationNode,
+    connectionIds: [],
     verticalGroupId,
     servesFloors,
   })
@@ -436,7 +542,11 @@ function clonePlan(plan: HospitalPlan): HospitalPlan {
   return {
     ...plan,
     floors: [...plan.floors],
-    rooms: plan.rooms.map((room) => ({ ...room, doors: room.doors?.map((door) => ({ ...door })) })),
+    rooms: plan.rooms.map((room) => ({
+      ...room,
+      doors: room.doors?.map((door) => ({ ...door })),
+      connectionIds: room.connectionIds ? [...room.connectionIds] : undefined,
+    })),
   }
 }
 
