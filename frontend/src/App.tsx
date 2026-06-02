@@ -25,7 +25,7 @@ import {
 } from './engine/geometry'
 import { compilePlanningScript, DEFAULT_PLANNING_SCRIPT, type PlanningLanguageResult } from './engine/planningLanguage'
 import { DEFAULT_SIMULATION_SETTINGS, type SimulationSettings } from './engine/simulation'
-import type { DoorSide, HospitalPlan, PlacedRoom, RoomDoor, SimulationResult } from './types'
+import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationResult } from './types'
 
 type WorkspaceTab = 'plan' | 'simulation' | 'services' | 'analysis'
 
@@ -44,6 +44,7 @@ function App() {
   const [templateToAdd, setTemplateToAdd] = useState('edBoxes')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
   const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null)
+  const [selectedCaseId, setSelectedCaseId] = useState<PatientCaseFilter>('all')
   const [scriptSource, setScriptSource] = useState(DEFAULT_PLANNING_SCRIPT)
   const [scriptResult, setScriptResult] = useState<PlanningLanguageResult | null>(null)
   const [scriptFileName, setScriptFileName] = useState('plantilla.yaml')
@@ -312,7 +313,9 @@ function App() {
                 plan={plan}
                 selectedFloor={selectedFloor}
                 settings={simulationSettings}
+                selectedCaseId={selectedCaseId}
                 onResult={setSimulationResult}
+                onSelectCase={setSelectedCaseId}
               />
             </Suspense>
           )}
@@ -327,6 +330,8 @@ function App() {
               settings={simulationSettings}
               onChange={setSimulationSettings}
               result={simulationResult}
+              selectedCaseId={selectedCaseId}
+              onSelectCase={setSelectedCaseId}
               rules={rules}
             />
           ) : (
@@ -703,13 +708,17 @@ function FloorConnectionSelector({
 function SimulationControls({
   settings,
   result,
+  selectedCaseId,
   rules,
   onChange,
+  onSelectCase,
 }: {
   settings: SimulationSettings
   result: SimulationResult | null
+  selectedCaseId: PatientCaseFilter
   rules: ArchitectureRuleResult[]
   onChange: (settings: SimulationSettings) => void
+  onSelectCase: (caseId: PatientCaseFilter) => void
 }) {
   const failingRules = rules.filter((rule) => rule.status !== 'ok')
   const caseStats = (result?.caseStats ?? [])
@@ -754,6 +763,17 @@ function SimulationControls({
           />
           <output>{settings.speed}x</output>
         </label>
+        <label>
+          Caso visible
+          <select value={selectedCaseId} onChange={(event) => onSelectCase(event.target.value as PatientCaseFilter)}>
+            <option value="all">Todos los casos</option>
+            {(result?.caseStats ?? []).map((stat) => (
+              <option key={stat.id} value={stat.id}>
+                {stat.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </section>
 
       <section className="panel-section">
@@ -769,12 +789,28 @@ function SimulationControls({
         <h2>Casos clinicos</h2>
         {caseStats.length > 0 ? (
           <div className="case-list">
+            <button
+              type="button"
+              className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
+              style={{ borderLeftColor: '#66736e' }}
+              onClick={() => onSelectCase('all')}
+            >
+              <strong>Todos los casos</strong>
+              <span>{result?.kpis.completed ?? 0} pacientes completados</span>
+              <small>Vista completa de la actividad simulada.</small>
+            </button>
             {caseStats.slice(0, 7).map((stat) => (
-              <article key={stat.id} className="case-item" style={{ borderLeftColor: stat.color }}>
+              <button
+                key={stat.id}
+                type="button"
+                className={`case-item ${selectedCaseId === stat.id ? 'is-active' : ''}`}
+                style={{ borderLeftColor: stat.color }}
+                onClick={() => onSelectCase(stat.id)}
+              >
                 <strong>{stat.label}</strong>
                 <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
                 <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
-              </article>
+              </button>
             ))}
           </div>
         ) : (

@@ -4,13 +4,15 @@ import { KIND_COLORS } from '../data/catalog'
 import { connectedCorridorGroups, disconnectedPassages, doorWorldPosition } from '../engine/circulation'
 import { center, roomByNode } from '../engine/geometry'
 import { positionAt, runHospitalSimulation, type SimulationSettings } from '../engine/simulation'
-import type { AgentRole, EquipmentKind, HospitalPlan, PlacedRoom, RoomKind, SimAgent, SimulationResult } from '../types'
+import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationResult } from '../types'
 
 interface SimulationCanvasProps {
   plan: HospitalPlan
   selectedFloor: number
   settings: SimulationSettings
+  selectedCaseId: PatientCaseFilter
   onResult: (result: SimulationResult) => void
+  onSelectCase: (caseId: PatientCaseFilter) => void
 }
 
 type ViewMode = 'rpg' | 'flows' | 'rules'
@@ -21,6 +23,7 @@ interface SimulationSnapshot {
   result: SimulationResult
   minute: number
   viewMode: ViewMode
+  selectedCaseId: PatientCaseFilter
 }
 
 interface SceneLayers {
@@ -81,7 +84,7 @@ const ROOM_WALL_COLORS: Record<RoomKind, string> = {
   future: '#7b7f78',
 }
 
-export function SimulationCanvas({ plan, selectedFloor, settings, onResult }: SimulationCanvasProps) {
+export function SimulationCanvas({ plan, selectedFloor, settings, selectedCaseId, onResult, onSelectCase }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const sceneRef = useRef<HospitalGameScene | null>(null)
@@ -141,8 +144,8 @@ export function SimulationCanvas({ plan, selectedFloor, settings, onResult }: Si
   }, [])
 
   useEffect(() => {
-    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, viewMode })
-  }, [minute, plan, result, selectedFloor, viewMode])
+    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, viewMode, selectedCaseId })
+  }, [minute, plan, result, selectedCaseId, selectedFloor, viewMode])
 
   return (
     <div className="simulation-stage">
@@ -163,6 +166,14 @@ export function SimulationCanvas({ plan, selectedFloor, settings, onResult }: Si
           <option value="rpg">RPG</option>
           <option value="flows">Flujos</option>
           <option value="rules">Reglas</option>
+        </select>
+        <select value={selectedCaseId} onChange={(event) => onSelectCase(event.target.value as PatientCaseFilter)} aria-label="Caso clinico visible">
+          <option value="all">Todos los casos</option>
+          {result.caseStats.map((stat) => (
+            <option key={stat.id} value={stat.id}>
+              {stat.label}
+            </option>
+          ))}
         </select>
       </div>
       <div ref={hostRef} className="phaser-stage" role="img" aria-label="Simulacion top-down del hospital" />
@@ -445,7 +456,10 @@ class HospitalGameScene extends Phaser.Scene {
 
   private updateAgents(snapshot: SimulationSnapshot) {
     if (!this.layers) return
-    const active = snapshot.result.agents
+    const visibleAgents = snapshot.selectedCaseId === 'all'
+      ? snapshot.result.agents
+      : snapshot.result.agents.filter((agent) => agent.role === 'patient' && agent.caseId === snapshot.selectedCaseId)
+    const active = visibleAgents
       .map((agent) => ({ agent, pos: positionAt(agent, snapshot.plan.rooms, snapshot.minute) }))
       .filter((item) => item.pos && item.pos.room.floor === snapshot.selectedFloor)
 

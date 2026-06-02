@@ -1,4 +1,4 @@
-import { buildAccessiblePatientRoute, doorWorldPosition, isPassage } from './circulation'
+import { buildAccessiblePatientRoute, isPassage } from './circulation'
 import { distance, roomByNode } from './geometry'
 import type {
   HospitalPlan,
@@ -302,8 +302,7 @@ export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number)
         return jitterInRoom(currentRoom, agent.id, false)
       }
       const progress = Math.max(0, Math.min(1, (minute - stayUntil) / Math.max(1, next.at - stayUntil)))
-      const path = movementPathForSegment(currentRoom, nextRoom, followingRoom, agent.id)
-      const point = interpolatePath(path, smooth(progress))
+      const point = movementPointForSegment(currentRoom, nextRoom, followingRoom, agent.id, progress)
       return {
         room: displayRoomForSegment(currentRoom, nextRoom, progress),
         x: point.x,
@@ -317,6 +316,25 @@ export function positionAt(agent: SimAgent, rooms: PlacedRoom[], minute: number)
   return room ? jitterInRoom(room, agent.id, false) : null
 }
 
+function movementPointForSegment(
+  currentRoom: PlacedRoom,
+  nextRoom: PlacedRoom,
+  followingRoom: PlacedRoom | undefined,
+  id: string,
+  progress: number,
+): MovementPoint {
+  if (isPassage(currentRoom) && isPassage(nextRoom)) {
+    const nextTarget = followingRoom ?? currentRoom
+    const start = travelPoint(currentRoom, nextRoom, id)
+    const end = travelPoint(nextRoom, nextTarget, id)
+    const joint = passageJointPoint(currentRoom, nextRoom)
+    if (!joint) return progress < 0.5 ? start : end
+  }
+
+  const path = movementPathForSegment(currentRoom, nextRoom, followingRoom, id)
+  return interpolatePath(path, smooth(progress))
+}
+
 function movementPathForSegment(
   currentRoom: PlacedRoom,
   nextRoom: PlacedRoom,
@@ -326,15 +344,13 @@ function movementPathForSegment(
   const nextTarget = followingRoom ?? currentRoom
   if (!isPassage(currentRoom) && isPassage(nextRoom)) {
     return [
-      doorPointForPassage(currentRoom, nextRoom) ?? edgePointToward(currentRoom, nextRoom),
+      travelPoint(nextRoom, currentRoom, id),
       travelPoint(nextRoom, nextTarget, id),
     ]
   }
   if (isPassage(currentRoom) && !isPassage(nextRoom)) {
     return [
       travelPoint(currentRoom, nextRoom, id),
-      doorPointForPassage(nextRoom, currentRoom) ?? edgePointToward(nextRoom, currentRoom),
-      jitterInRoom(nextRoom, id, true),
     ]
   }
   if (isPassage(currentRoom) && isPassage(nextRoom)) {
@@ -343,13 +359,14 @@ function movementPathForSegment(
     const joint = passageJointPoint(currentRoom, nextRoom)
     return joint ? [start, joint, end] : [start, end]
   }
-  return [jitterInRoom(currentRoom, id, true), jitterInRoom(nextRoom, id, true)]
+  return [jitterInRoom(currentRoom, id, true)]
 }
 
 function displayRoomForSegment(currentRoom: PlacedRoom, nextRoom: PlacedRoom, progress: number): PlacedRoom {
   if (currentRoom.floor !== nextRoom.floor) return progress < 0.5 ? currentRoom : nextRoom
-  if (!isPassage(currentRoom) && isPassage(nextRoom)) return progress < 0.12 ? currentRoom : nextRoom
-  if (isPassage(currentRoom) && !isPassage(nextRoom)) return progress < 0.9 ? currentRoom : nextRoom
+  if (!isPassage(currentRoom) && isPassage(nextRoom)) return nextRoom
+  if (isPassage(currentRoom) && !isPassage(nextRoom)) return progress < 0.98 ? currentRoom : nextRoom
+  if (!isPassage(currentRoom) && !isPassage(nextRoom)) return progress < 0.98 ? currentRoom : nextRoom
   return progress < 0.5 ? currentRoom : nextRoom
 }
 
@@ -549,34 +566,6 @@ function travelPoint(room: PlacedRoom, targetRoom: PlacedRoom, id: string): Move
   return { x, y }
 }
 
-function doorPointForPassage(room: PlacedRoom, passage: PlacedRoom): MovementPoint | undefined {
-  const doors = room.doors ?? []
-  if (doors.length === 0) return undefined
-  return doors
-    .map((door) => {
-      const point = doorWorldPosition(room, door)
-      return { point, distance: pointToRectDistance(point, passage) }
-    })
-    .sort((a, b) => a.distance - b.distance)[0]?.point
-}
-
-function edgePointToward(room: PlacedRoom, targetRoom: PlacedRoom): MovementPoint {
-  const roomCenter = { x: room.x + room.w / 2, y: room.y + room.h / 2 }
-  const targetCenter = { x: targetRoom.x + targetRoom.w / 2, y: targetRoom.y + targetRoom.h / 2 }
-  const dx = targetCenter.x - roomCenter.x
-  const dy = targetCenter.y - roomCenter.y
-  if (Math.abs(dx) > Math.abs(dy)) {
-    return {
-      x: dx >= 0 ? room.x + room.w : room.x,
-      y: clamp(targetCenter.y, room.y + room.h * 0.12, room.y + room.h * 0.88),
-    }
-  }
-  return {
-    x: clamp(targetCenter.x, room.x + room.w * 0.12, room.x + room.w * 0.88),
-    y: dy >= 0 ? room.y + room.h : room.y,
-  }
-}
-
 function passageJointPoint(a: PlacedRoom, b: PlacedRoom): MovementPoint | undefined {
   if (a.floor !== b.floor) return undefined
   if (!rangesTouch(a.x, a.x + a.w, b.x, b.x + b.w, 0.9) || !rangesTouch(a.y, a.y + a.h, b.y, b.y + b.h, 0.9)) {
@@ -609,12 +598,6 @@ function interpolatePath(points: MovementPoint[], progress: number): MovementPoi
     remaining -= segmentLength
   }
   return points[points.length - 1]
-}
-
-function pointToRectDistance(point: MovementPoint, room: PlacedRoom): number {
-  const closestX = clamp(point.x, room.x, room.x + room.w)
-  const closestY = clamp(point.y, room.y, room.y + room.h)
-  return Math.hypot(point.x - closestX, point.y - closestY)
 }
 
 function rangesTouch(a1: number, a2: number, b1: number, b2: number, tolerance: number): boolean {

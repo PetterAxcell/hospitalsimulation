@@ -131,6 +131,7 @@ export type PatientCaseId =
   | 'ed_observation'
   | 'outpatient_consult'
   | 'scheduled_surgery'
+export type PatientCaseFilter = PatientCaseId | 'all'
 
 export type DoorSide = 'top' | 'right' | 'bottom' | 'left'
 
