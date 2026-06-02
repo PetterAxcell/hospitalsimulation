@@ -39,7 +39,36 @@ import {
 } from './engine/simulation'
 import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
 
-type WorkspaceTab = 'plan' | 'simulation' | 'saturation' | 'services' | 'analysis'
+type WorkspaceTab = 'plan' | 'simulation' | 'saturation' | 'top' | 'services' | 'analysis'
+type ProposalOwner = string
+
+interface ArchitectureScore {
+  value: number
+  blockedPenalty: number
+  waitPenalty: number
+  travelPenalty: number
+  verticalPenalty: number
+  rulePenalty: number
+  areaPenalty: number
+}
+
+interface ArchitectureProposal {
+  id: string
+  owner: ProposalOwner
+  title: string
+  score: ArchitectureScore
+  completed: number
+  blocked: number
+  edP90: number
+  averageTravel: number
+  verticalMoves: number
+  ruleIssues: number
+  modeledArea: number
+  roomCount: number
+  hottestRoomName: string
+  createdAt: string
+  source: 'demo' | 'submitted'
+}
 
 const INITIAL_PLAN = createTertiaryHospitalPlan()
 const DOOR_MAGNET_DISTANCE = 6
@@ -68,6 +97,8 @@ function App() {
   const [isScriptHelpOpen, setScriptHelpOpen] = useState(false)
   const [isClinicalCaseModalOpen, setClinicalCaseModalOpen] = useState(false)
   const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
+  const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
+  const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
 
   const selectedRoom = plan.rooms.find((room) => room.id === selectedRoomId)
   const activeFloorRooms = plan.rooms.filter((room) => room.floor === selectedFloor)
@@ -75,6 +106,14 @@ function App() {
   const totalArea = plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
   const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings, patientCases), [patientCases, plan, simulationSettings])
+  const topProposals = useMemo(
+    () => rankArchitectureProposals([
+      ...submittedProposals,
+      ...demoArchitectureProposals(plan, simulationResult, rules, totalArea),
+    ]),
+    [plan, rules, simulationResult, submittedProposals, totalArea],
+  )
+  const currentScore = useMemo(() => scoreArchitecture(plan, simulationResult, rules, totalArea), [plan, rules, simulationResult, totalArea])
   const simulationWorkspace = activeTab === 'simulation' || activeTab === 'saturation'
 
   function updateRoom(nextRoom: PlacedRoom) {
@@ -280,6 +319,19 @@ function App() {
     setSelectedCaseId('all')
   }
 
+  function submitCurrentArchitecture() {
+    const nextProposal = architectureProposalFromCurrentPlan({
+      owner: proposalOwner.trim() || 'Autor sin nombre',
+      plan,
+      result: simulationResult,
+      rules,
+      totalArea,
+      index: submittedProposals.length + 1,
+    })
+    setSubmittedProposals((current) => [nextProposal, ...current])
+    setActiveTab('top')
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -299,6 +351,7 @@ function App() {
         <TabButton id="plan" active={activeTab} onClick={setActiveTab}>Planificador</TabButton>
         <TabButton id="simulation" active={activeTab} onClick={setActiveTab}>Simulacion</TabButton>
         <TabButton id="saturation" active={activeTab} onClick={setActiveTab}>Saturacion</TabButton>
+        <TabButton id="top" active={activeTab} onClick={setActiveTab}>Top</TabButton>
         <TabButton id="services" active={activeTab} onClick={setActiveTab}>Servicios</TabButton>
         <TabButton id="analysis" active={activeTab} onClick={setActiveTab}>Analisis</TabButton>
       </nav>
@@ -349,12 +402,7 @@ function App() {
                   </select>
                 </label>
                 <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
-                <div className="quick-build-grid" aria-label="Pasillos rapidos">
-                  <button type="button" onClick={() => addRoomFromTemplate('publicCorridor')}>Pasillo publico</button>
-                  <button type="button" onClick={() => addRoomFromTemplate('clinicalCorridor')}>Pasillo clinico</button>
-                  <button type="button" onClick={() => addRoomFromTemplate('logisticsCorridor')}>Pasillo logistico</button>
-                  <button type="button" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
-                </div>
+                <button type="button" className="secondary-action" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
                 <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
               </section>
 
@@ -399,6 +447,7 @@ function App() {
             </Suspense>
           )}
 
+          {activeTab === 'top' && <TopPanel proposals={topProposals} />}
           {activeTab === 'services' && <ServiceMatrix plan={plan} />}
           {activeTab === 'saturation' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId={selectedCaseId} />}
           {activeTab === 'analysis' && <AnalysisPanel plan={plan} result={simulationResult} rules={rules} />}
@@ -411,6 +460,14 @@ function App() {
               onChange={setSimulationSettings}
               result={simulationResult}
               rules={rules}
+            />
+          ) : activeTab === 'top' ? (
+            <TopControls
+              owner={proposalOwner}
+              proposals={topProposals}
+              currentScore={currentScore}
+              onChangeOwner={setProposalOwner}
+              onSubmit={submitCurrentArchitecture}
             />
           ) : (
             <RoomInspector
@@ -1458,6 +1515,127 @@ function formatDemandRatio(score: number): string {
   return `${Math.round(score * 100)}%`
 }
 
+function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
+  const userRows = bestProposalByOwner(proposals)
+  const best = proposals[0]
+
+  return (
+    <div className="top-panel">
+      <section className="top-hero">
+        <div>
+          <span>Ranking por simulacion</span>
+          <h2>{best ? `${best.owner} lidera con ${formatScore(best.score.value)}` : 'Sin propuestas'}</h2>
+          <p>El score combina bloqueos, espera en urgencias, traslado medio, cambios de planta, reglas arquitectonicas y desviacion de m2.</p>
+        </div>
+        <div className="top-kpis">
+          <Metric label="Mejor usuario" value={best?.owner ?? '-'} />
+          <Metric label="Score ganador" value={best ? formatScore(best.score.value) : '-'} />
+          <Metric label="Propuestas" value={String(proposals.length)} />
+          <Metric label="Bloqueados mejor" value={String(best?.blocked ?? 0)} />
+        </div>
+      </section>
+
+      <div className="top-grid">
+        <section className="top-block wide">
+          <h3>Mejores arquitecturas propuestas</h3>
+          <div className="proposal-list">
+            {proposals.map((proposal, index) => (
+              <article key={proposal.id} className="proposal-card">
+                <header>
+                  <span>#{index + 1}</span>
+                  <div>
+                    <h4>{proposal.title}</h4>
+                    <p>{proposal.owner} · {proposal.createdAt}</p>
+                  </div>
+                  <strong>{formatScore(proposal.score.value)}</strong>
+                </header>
+                <div className="score-track" aria-hidden="true">
+                  <span style={{ width: `${proposal.score.value}%` }} />
+                </div>
+                <div className="proposal-metrics">
+                  <Metric label="ED P90" value={`${proposal.edP90} min`} />
+                  <Metric label="Traslado" value={`${proposal.averageTravel} min`} />
+                  <Metric label="Cambios planta" value={String(proposal.verticalMoves)} />
+                  <Metric label="Reglas abiertas" value={String(proposal.ruleIssues)} />
+                </div>
+                <small>{proposal.completed} completados · {proposal.blocked} bloqueados · zona caliente: {proposal.hottestRoomName}</small>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="top-block">
+          <h3>Top usuarios</h3>
+          <div className="leaderboard-list">
+            {userRows.map((proposal, index) => (
+              <article key={proposal.owner} className="leaderboard-row">
+                <strong>{index + 1}</strong>
+                <div>
+                  <h4>{proposal.owner}</h4>
+                  <span>{proposal.title}</span>
+                </div>
+                <b>{formatScore(proposal.score.value)}</b>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="top-block">
+          <h3>Lectura del score</h3>
+          {best ? (
+            <div className="score-breakdown">
+              <Metric label="Bloqueos" value={`-${formatScore(best.score.blockedPenalty)}`} />
+              <Metric label="Espera" value={`-${formatScore(best.score.waitPenalty)}`} />
+              <Metric label="Traslado" value={`-${formatScore(best.score.travelPenalty)}`} />
+              <Metric label="Vertical" value={`-${formatScore(best.score.verticalPenalty)}`} />
+              <Metric label="Reglas" value={`-${formatScore(best.score.rulePenalty)}`} />
+              <Metric label="m2" value={`-${formatScore(best.score.areaPenalty)}`} />
+            </div>
+          ) : (
+            <p className="muted">Registra una propuesta para iniciar el ranking.</p>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+function TopControls({
+  owner,
+  proposals,
+  currentScore,
+  onChangeOwner,
+  onSubmit,
+}: {
+  owner: ProposalOwner
+  proposals: ArchitectureProposal[]
+  currentScore: ArchitectureScore
+  onChangeOwner: (owner: ProposalOwner) => void
+  onSubmit: () => void
+}) {
+  const submittedCount = proposals.filter((proposal) => proposal.source === 'submitted').length
+  return (
+    <>
+      <section className="panel-section">
+        <h2>Registrar propuesta</h2>
+        <label>
+          Autor
+          <input value={owner} onChange={(event) => onChangeOwner(event.target.value)} placeholder="Nombre del autor o equipo" />
+        </label>
+        <Metric label="Score actual" value={formatScore(currentScore.value)} />
+        <button type="button" className="primary-action" onClick={onSubmit}>Guardar arquitectura actual</button>
+      </section>
+
+      <section className="panel-section">
+        <h2>Ranking</h2>
+        <Metric label="Propuestas guardadas" value={String(submittedCount)} />
+        <Metric label="Lider actual" value={proposals[0]?.owner ?? '-'} />
+        <Metric label="Mejor score" value={proposals[0] ? formatScore(proposals[0].score.value) : '-'} />
+      </section>
+    </>
+  )
+}
+
 function ServiceMatrix({ plan }: { plan: HospitalPlan }) {
   const rows = Object.entries(
     plan.rooms.reduce<Record<string, { count: number; area: number; capacity: number }>>((acc, room) => {
@@ -1553,6 +1731,218 @@ function AnalysisPanel({
       </section>
     </div>
   )
+}
+
+function demoArchitectureProposals(
+  plan: HospitalPlan,
+  result: SimulationResult | null,
+  rules: ArchitectureRuleResult[],
+  totalArea: number,
+): ArchitectureProposal[] {
+  const baseMetrics = metricsFromSimulation(result)
+  const variants: Array<{
+    owner: ProposalOwner
+    title: string
+    createdAt: string
+    metrics: ReturnType<typeof metricsFromSimulation>
+  }> = [
+    {
+      owner: 'Equipo A',
+      title: 'Urgencias compactas y diagnostico cercano',
+      createdAt: 'propuesta demo',
+      metrics: adjustArchitectureMetrics(baseMetrics, {
+        blockedFactor: 0.9,
+        edP90Factor: 0.86,
+        travelFactor: 0.92,
+        verticalFactor: 0.94,
+      }),
+    },
+    {
+      owner: 'Equipo B',
+      title: 'Hospitalizacion modular y altas tempranas',
+      createdAt: 'propuesta demo',
+      metrics: adjustArchitectureMetrics(baseMetrics, {
+        blockedFactor: 0.82,
+        edP90Factor: 0.92,
+        travelFactor: 0.88,
+        verticalFactor: 0.96,
+      }),
+    },
+    {
+      owner: 'Plano actual',
+      title: 'Plano actual colaborativo',
+      createdAt: 'simulacion actual',
+      metrics: baseMetrics,
+    },
+  ]
+
+  return variants.map((variant) => architectureProposalFromMetrics({
+    id: `demo-${variant.owner}`,
+    owner: variant.owner,
+    title: variant.title,
+    createdAt: variant.createdAt,
+    source: 'demo',
+    plan,
+    rules,
+    totalArea,
+    metrics: variant.metrics,
+  }))
+}
+
+function architectureProposalFromCurrentPlan({
+  owner,
+  plan,
+  result,
+  rules,
+  totalArea,
+  index,
+}: {
+  owner: ProposalOwner
+  plan: HospitalPlan
+  result: SimulationResult | null
+  rules: ArchitectureRuleResult[]
+  totalArea: number
+  index: number
+}): ArchitectureProposal {
+  const now = new Date()
+  return architectureProposalFromMetrics({
+    id: `submitted-${now.getTime()}`,
+    owner,
+    title: `Arquitectura ${index}`,
+    createdAt: new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(now),
+    source: 'submitted',
+    plan,
+    rules,
+    totalArea,
+    metrics: metricsFromSimulation(result),
+  })
+}
+
+function architectureProposalFromMetrics({
+  id,
+  owner,
+  title,
+  createdAt,
+  source,
+  plan,
+  rules,
+  totalArea,
+  metrics,
+}: {
+  id: string
+  owner: ProposalOwner
+  title: string
+  createdAt: string
+  source: ArchitectureProposal['source']
+  plan: HospitalPlan
+  rules: ArchitectureRuleResult[]
+  totalArea: number
+  metrics: ReturnType<typeof metricsFromSimulation>
+}): ArchitectureProposal {
+  return {
+    id,
+    owner,
+    title,
+    createdAt,
+    source,
+    score: scoreArchitecture(plan, metrics, rules, totalArea),
+    completed: metrics.completed,
+    blocked: metrics.blocked,
+    edP90: metrics.edP90,
+    averageTravel: metrics.averageTravel,
+    verticalMoves: metrics.verticalMoves,
+    ruleIssues: rules.filter((rule) => rule.status !== 'ok').length,
+    modeledArea: totalArea,
+    roomCount: plan.rooms.length,
+    hottestRoomName: metrics.hottestRoomName,
+  }
+}
+
+function metricsFromSimulation(result: SimulationResult | null) {
+  return {
+    completed: result?.kpis.completed ?? 0,
+    blocked: result?.kpis.blockedPatients ?? 0,
+    edP90: result?.kpis.edP90Minutes ?? 0,
+    averageTravel: result?.kpis.averageTravelMinutes ?? 0,
+    verticalMoves: result?.kpis.verticalMoves ?? 0,
+    hottestRoomName: result?.kpis.hottestRoomName ?? '-',
+  }
+}
+
+function adjustArchitectureMetrics(
+  metrics: ReturnType<typeof metricsFromSimulation>,
+  factors: { blockedFactor: number; edP90Factor: number; travelFactor: number; verticalFactor: number },
+): ReturnType<typeof metricsFromSimulation> {
+  return {
+    ...metrics,
+    blocked: Math.max(0, Math.round(metrics.blocked * factors.blockedFactor)),
+    edP90: Math.max(0, Math.round(metrics.edP90 * factors.edP90Factor)),
+    averageTravel: Math.max(0, Math.round(metrics.averageTravel * factors.travelFactor * 10) / 10),
+    verticalMoves: Math.max(0, Math.round(metrics.verticalMoves * factors.verticalFactor)),
+  }
+}
+
+function scoreArchitecture(
+  plan: HospitalPlan,
+  resultOrMetrics: SimulationResult | ReturnType<typeof metricsFromSimulation> | null,
+  rules: ArchitectureRuleResult[],
+  totalArea: number,
+): ArchitectureScore {
+  const metrics = isSimulationResult(resultOrMetrics) ? metricsFromSimulation(resultOrMetrics) : (resultOrMetrics ?? metricsFromSimulation(null))
+  const failCount = rules.filter((rule) => rule.status === 'fail').length
+  const warnCount = rules.filter((rule) => rule.status === 'warn').length
+  const areaDrift = Math.abs(totalArea - plan.targetAreaSqm) / Math.max(1, plan.targetAreaSqm)
+  const blockedPenalty = metrics.blocked * 2.4
+  const waitPenalty = Math.max(0, metrics.edP90 - 120) * 0.055
+  const travelPenalty = metrics.averageTravel * 0.35
+  const verticalPenalty = metrics.verticalMoves * 0.012
+  const rulePenalty = failCount * 8 + warnCount * 2.5
+  const areaPenalty = Math.min(12, areaDrift * 40)
+  const value = clampScore(100 - blockedPenalty - waitPenalty - travelPenalty - verticalPenalty - rulePenalty - areaPenalty)
+
+  return {
+    value,
+    blockedPenalty: roundScore(blockedPenalty),
+    waitPenalty: roundScore(waitPenalty),
+    travelPenalty: roundScore(travelPenalty),
+    verticalPenalty: roundScore(verticalPenalty),
+    rulePenalty: roundScore(rulePenalty),
+    areaPenalty: roundScore(areaPenalty),
+  }
+}
+
+function isSimulationResult(value: SimulationResult | ReturnType<typeof metricsFromSimulation> | null): value is SimulationResult {
+  return Boolean(value && 'kpis' in value)
+}
+
+function rankArchitectureProposals(proposals: ArchitectureProposal[]): ArchitectureProposal[] {
+  return [...proposals].sort((a, b) => (
+    b.score.value - a.score.value
+    || a.blocked - b.blocked
+    || a.edP90 - b.edP90
+    || a.averageTravel - b.averageTravel
+  ))
+}
+
+function bestProposalByOwner(proposals: ArchitectureProposal[]): ArchitectureProposal[] {
+  const bestByOwner = new Map<ProposalOwner, ArchitectureProposal>()
+  proposals.forEach((proposal) => {
+    const current = bestByOwner.get(proposal.owner)
+    if (!current || proposal.score.value > current.score.value) bestByOwner.set(proposal.owner, proposal)
+  })
+  return rankArchitectureProposals([...bestByOwner.values()])
+}
+
+function clampScore(value: number): number {
+  return roundScore(Math.max(0, Math.min(100, value)))
+}
+
+function roundScore(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+function formatScore(value: number): string {
+  return value.toFixed(1)
 }
 
 function formatNumber(value: number) {
