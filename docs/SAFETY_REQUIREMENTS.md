@@ -21,7 +21,7 @@ Fuentes base consultadas el 26 de mayo de 2026:
 | Evacuacion horizontal/refugio | Nuevo template `horizontalRefuge`; regla automatica por planta asistencial |
 | Sectorizacion PCI/control de humo | Nuevo template `fireCompartment`; regla automatica inicial por planta asistencial |
 | Halls, esperas y accesos publicos | Modelados en planta 0 |
-| Pasillos y circulacion | Templates editables para pasillo publico, pasillo clinico/camas y pasillo logistico limpio/sucio |
+| Pasillos y circulacion | Templates editables para pasillo publico, pasillo clinico/camas y pasillo logistico limpio/sucio, creados desde el selector `Elemento` |
 | Continuidad de pasillos | Regla automatica para detectar pasillos fuera de la red principal de circulacion |
 | Dimensiones y area | Ancho/alto editables; m2 calculados automaticamente desde la geometria |
 | Puertas y conexion | Puertas colocables en salas/patios; tienen efecto iman al acercarse a pasillos y crean umbrales de circulacion; rojo indica puerta sin pasillo o pasillo desconectado |

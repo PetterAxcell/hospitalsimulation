@@ -77,6 +77,7 @@ docs/
 - Los escenarios deben guardar parametros, version del plan, version del motor y version de reglas.
 - La UI puede tener simulacion ligera en cliente, pero los resultados oficiales deben venir de backend.
 - La futura simulacion de personas debe entrar como perfiles de agentes, no como hacks visuales dentro del canvas.
+- El ranking de usuarios debe separar preview local y resultado oficial: la UI puede mostrar un top inmediato, pero el backend debe guardar propuesta, usuario, version del plan, parametros de simulacion y score auditado.
 
 ## Decision sobre 2D, 3D y plantas
 
@@ -88,9 +89,17 @@ La representacion multi-planta debe tratar ascensores/montacargas y escaleras co
 
 - Todos los bloques pueden moverse y redimensionarse desde Vision o desde el inspector.
 - Los m2 no se editan manualmente: se calculan desde ancho x alto para evitar incoherencias al comparar alternativas.
-- Los pasillos son bloques de circulacion editables. Una sala queda conectada solo si tiene una puerta en su perimetro y esa puerta toca un pasillo de la misma planta.
+- Los pasillos son bloques de circulacion editables y se crean desde el selector `Elemento`, no desde botones separados. Una sala queda conectada solo si tiene una puerta en su perimetro y esa puerta toca un pasillo de la misma planta.
 - Al crear o mover una puerta, el editor aplica un efecto iman: fuera del radio de captura la puerta se mueve libre por la pared; dentro del radio se pega al bloque de pasillo cercano y crea o actualiza un umbral de circulacion estable asociado a esa puerta.
 - El color rojo en puertas indica que la puerta no toca ningun pasillo. El borde rojo en pasillos indica que ese tramo esta aislado de la red principal.
 - El boton de auto-conexion crea una primera propuesta de conector de pasillo entre una sala sin acceso y el pasillo mas cercano. Es una ayuda de trazado, no una validacion normativa.
 - Los conectores verticales usan botones de planta: `Solo esta`, `Tramo +1` y `Todas`. Ascensores/montacargas y escaleras se modelan como componentes distintos; un tramo puede conectar solo 0-1, 1-2, o cualquier conjunto explicito, y si se usa la misma familia en varias plantas debe mantener huella y posicion.
 - En Vision, las escaleras no se pintan como equipamiento interno. El bloque de escalera es la pieza arquitectonica; evitar iconos internos reduce duplicidades visuales al disenar.
+
+## Ranking de arquitecturas
+
+La pestana `Top` compara propuestas por autor con un score de 0 a 100 calculado desde la simulacion actual. La formula inicial penaliza pacientes bloqueados, espera P90 de urgencias, traslado medio, cambios de planta, reglas arquitectonicas abiertas y desviacion respecto a los m2 objetivo. Las propuestas demo sirven para probar la experiencia; las propuestas guardadas registran el estado actual del plano en memoria local.
+
+La fase productiva debe mover este ranking al backend para evitar manipulacion de resultados, comparar solo simulaciones con la misma version de parametros y guardar historico por usuario/proyecto.
+
+El `Top` es la vista inicial del producto porque orienta el trabajo hacia comparacion de alternativas antes que edicion de detalle. Los paneles laterales son contextuales: el panel izquierdo aparece en planificacion y simulacion/saturacion, donde sirve para plantas, construccion o casos clinicos; se oculta en `Top`, `Servicios` y `Analisis` para no introducir controles irrelevantes.
