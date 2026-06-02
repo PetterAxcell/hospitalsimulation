@@ -2,7 +2,7 @@
 
 El planificador convierte una plantilla `.yaml` en un `HospitalPlan`. El objetivo del formato es que una persona o un agente pueda programar un plan hospitalario de forma legible, versionable y repetible.
 
-El boton `Info` del modal `Programar plan` abre un manual autodidactico con ejemplos de YAML y del objeto interno que genera el parser.
+El boton `Info` del modal `Programar plan` abre un manual autodidactico con ejemplos de YAML y una vista grafica de los bloques que genera el parser.
 
 ## Estructura basica
 

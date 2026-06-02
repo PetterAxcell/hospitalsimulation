@@ -502,19 +502,18 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
     capacity: 60`}</pre>
               </div>
               <div>
-                <h4>Objeto que genera</h4>
-                <pre>{`{
-  id: 'boxes-pb',
-  templateId: 'edBoxes',
-  floor: 0,
-  x: 47,
-  y: 27,
-  w: 21,
-  h: 16,
-  capacity: 60,
-  areaSqm: 3024,
-  connectionIds: []
-}`}</pre>
+                <h4>Como se ve en bloque</h4>
+                <div className="script-plan-preview" aria-label="Vista grafica de boxes-pb en planta PB">
+                  <div className="script-preview-axis">Lienzo 100 x 70</div>
+                  <div className="script-preview-room">
+                    <strong>boxes-pb</strong>
+                    <span>Boxes ED</span>
+                    <small>PB · 21 x 16 · 3024 m2</small>
+                    <small>capacidad 60</small>
+                  </div>
+                  <span className="script-preview-marker x">x 47</span>
+                  <span className="script-preview-marker y">y 27</span>
+                </div>
               </div>
             </div>
           </section>
@@ -537,14 +536,19 @@ connections:
     to: clinical-pb`}</pre>
               </div>
               <div>
-                <h4>Efecto interno</h4>
-                <pre>{`boxes-pb.connectionIds = [
-  'clinical-pb'
-]
-
-clinical-pb.connectionIds = [
-  'boxes-pb'
-]`}</pre>
+                <h4>Como se ve conectado</h4>
+                <div className="script-connection-preview" aria-label="Vista grafica de boxes-pb conectado a clinical-pb">
+                  <div className="script-connection-room">
+                    <strong>boxes-pb</strong>
+                    <span>Boxes ED</span>
+                  </div>
+                  <div className="script-connection-line" />
+                  <div className="script-connection-corridor">
+                    <strong>clinical-pb</strong>
+                    <span>Pasillo clinico</span>
+                  </div>
+                  <small>La conexion crea acceso entre ambos bloques sin dibujar otro pasillo.</small>
+                </div>
               </div>
             </div>
           </section>
@@ -563,21 +567,19 @@ clinical-pb.connectionIds = [
     size: [8, 8]`}</pre>
               </div>
               <div>
-                <h4>Objetos que genera</h4>
-                <pre>{`[
-  { id: 'verticalCore-asc-core-central--1',
-    floor: -1,
-    verticalGroupId: 'asc-core-central' },
-  { id: 'verticalCore-asc-core-central-0',
-    floor: 0,
-    verticalGroupId: 'asc-core-central' },
-  { id: 'verticalCore-asc-core-central-1',
-    floor: 1,
-    verticalGroupId: 'asc-core-central' },
-  { id: 'verticalCore-asc-core-central-2',
-    floor: 2,
-    verticalGroupId: 'asc-core-central' }
-]`}</pre>
+                <h4>Como se ve por plantas</h4>
+                <div className="script-vertical-preview" aria-label="Vista grafica del grupo asc-core-central por plantas">
+                  {['P2', 'P1', 'PB', 'S1'].map((floor) => (
+                    <div className="script-vertical-floor" key={floor}>
+                      <span>{floor}</span>
+                      <div>
+                        <strong>core</strong>
+                        <small>asc-core-central</small>
+                      </div>
+                    </div>
+                  ))}
+                  <p>El mismo grupo aparece alineado en cada planta para formar un nucleo continuo.</p>
+                </div>
               </div>
             </div>
           </section>
