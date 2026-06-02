@@ -11,7 +11,6 @@ interface SimulationCanvasProps {
   selectedFloor: number
   settings: SimulationSettings
   selectedCaseId: PatientCaseFilter
-  onResult: (result: SimulationResult) => void
   onSelectCase: (caseId: PatientCaseFilter) => void
 }
 
@@ -29,8 +28,18 @@ interface SimulationSnapshot {
 interface SceneLayers {
   staticLayer: Phaser.GameObjects.Container
   overlayLayer: Phaser.GameObjects.Container
+  occupancyLayer: Phaser.GameObjects.Container
   agentLayer: Phaser.GameObjects.Container
 }
+
+interface RoomOccupancy {
+  total: number
+  patients: number
+  staff: number
+}
+
+type AgentPosition = NonNullable<ReturnType<typeof positionAt>>
+type ActiveAgent = { agent: SimAgent; pos: AgentPosition }
 
 const WORLD_W = 100
 const WORLD_H = 70
@@ -84,7 +93,7 @@ const ROOM_WALL_COLORS: Record<RoomKind, string> = {
   future: '#7b7f78',
 }
 
-export function SimulationCanvas({ plan, selectedFloor, settings, selectedCaseId, onResult, onSelectCase }: SimulationCanvasProps) {
+export function SimulationCanvas({ plan, selectedFloor, settings, selectedCaseId, onSelectCase }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const sceneRef = useRef<HospitalGameScene | null>(null)
@@ -92,10 +101,6 @@ export function SimulationCanvas({ plan, selectedFloor, settings, selectedCaseId
   const [playing, setPlaying] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('rpg')
   const result = useMemo(() => runHospitalSimulation(plan, settings), [plan, settings])
-
-  useEffect(() => {
-    onResult(result)
-  }, [onResult, result])
 
   useEffect(() => {
     let frame = 0
@@ -121,17 +126,17 @@ export function SimulationCanvas({ plan, selectedFloor, settings, selectedCaseId
       type: Phaser.AUTO,
       parent: hostRef.current,
       backgroundColor: '#17201c',
-      pixelArt: true,
-      roundPixels: true,
+      pixelArt: false,
+      roundPixels: false,
       scale: {
         mode: Phaser.Scale.RESIZE,
         width: hostRef.current.clientWidth,
         height: hostRef.current.clientHeight,
       },
       render: {
-        antialias: false,
-        pixelArt: true,
-        roundPixels: true,
+        antialias: true,
+        pixelArt: false,
+        roundPixels: false,
       },
       scene,
     })
@@ -186,6 +191,7 @@ class HospitalGameScene extends Phaser.Scene {
   private staticKey = ''
   private layers: SceneLayers | null = null
   private agentSprites = new Map<string, Phaser.GameObjects.Container>()
+  private occupancyBadges = new Map<string, Phaser.GameObjects.Container>()
 
   constructor() {
     super('hospital-game-scene')
@@ -216,9 +222,11 @@ class HospitalGameScene extends Phaser.Scene {
   private drawStatic(snapshot: SimulationSnapshot) {
     this.children.removeAll(true)
     this.agentSprites.clear()
+    this.occupancyBadges.clear()
     this.layers = {
       staticLayer: this.add.container(0, 0).setDepth(0),
       overlayLayer: this.add.container(0, 0).setDepth(40),
+      occupancyLayer: this.add.container(0, 0).setDepth(62),
       agentLayer: this.add.container(0, 0).setDepth(80),
     }
 
@@ -386,16 +394,24 @@ class HospitalGameScene extends Phaser.Scene {
 
   private drawRoomLabel(room: PlacedRoom, pressure: number) {
     if (!this.layers) return
-    const bg = this.add.rectangle(tileX(room.x + 0.55), tileY(room.y + 0.55), Math.min(room.w * TILE - 10, 150), 28, 0xffffff, 0.9)
+    const layout = roomLabelLayout(room)
+    if (!layout) return
+
+    const bg = this.add.rectangle(tileX(room.x + 0.45), tileY(room.y + 0.45), layout.width, layout.height, 0xffffff, 0.94)
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0xaab6ae, 0.9)
-    const label = this.add.text(tileX(room.x + 0.85), tileY(room.y + 0.75), `${room.name.slice(0, 22)}\n${room.floor}F  ${pressure}/${room.capacity}`, {
+    const label = this.add.text(
+      tileX(room.x + 0.75),
+      tileY(room.y + 0.62),
+      `${truncateText(room.name, layout.titleChars)}\nDem ${pressure} | Cap ${room.capacity}`,
+      {
       color: '#17201c',
-      fontFamily: 'monospace',
-      fontSize: '10px',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: `${layout.fontSize}px`,
       fontStyle: 'bold',
-      lineSpacing: 1,
-    }).setResolution(1)
+      lineSpacing: 2,
+    },
+    ).setResolution(2)
     this.layers.staticLayer.add([bg, label])
   }
 
@@ -446,10 +462,10 @@ class HospitalGameScene extends Phaser.Scene {
       group.add(this.add.rectangle(x, 8, 12, 12, toColor(color)).setOrigin(0, 0).setStrokeStyle(1, 0x33413b))
       group.add(this.add.text(x + 18, 7, label, {
         color: '#17201c',
-        fontFamily: 'monospace',
+        fontFamily: 'Arial, sans-serif',
         fontSize: '11px',
         fontStyle: 'bold',
-      }).setResolution(1))
+      }).setResolution(2))
     })
     this.layers.overlayLayer.add(group)
   }
@@ -459,13 +475,12 @@ class HospitalGameScene extends Phaser.Scene {
     const visibleAgents = snapshot.selectedCaseId === 'all'
       ? snapshot.result.agents
       : snapshot.result.agents.filter((agent) => agent.role === 'patient' && agent.caseId === snapshot.selectedCaseId)
-    const active = visibleAgents
+    const active: ActiveAgent[] = visibleAgents
       .map((agent) => ({ agent, pos: positionAt(agent, snapshot.plan.rooms, snapshot.minute) }))
-      .filter((item) => item.pos && item.pos.room.floor === snapshot.selectedFloor)
+      .filter((item): item is ActiveAgent => item.pos !== null && item.pos.room.floor === snapshot.selectedFloor)
 
     const activeIds = new Set<string>()
     active.forEach(({ agent, pos }) => {
-      if (!pos) return
       activeIds.add(agent.id)
       const sprite = this.agentSprites.get(agent.id) ?? this.createAgentSprite(agent)
       const bob = pos.moving ? Math.sin((snapshot.minute + Number(agent.id.replace(/\D/g, ''))) * 0.6) * 2 : 0
@@ -479,6 +494,77 @@ class HospitalGameScene extends Phaser.Scene {
     this.agentSprites.forEach((sprite, id) => {
       if (!activeIds.has(id)) sprite.setVisible(false)
     })
+
+    this.updateOccupancy(snapshot, active)
+  }
+
+  private updateOccupancy(snapshot: SimulationSnapshot, active: ActiveAgent[]) {
+    if (!this.layers) return
+    const counts = new Map<string, RoomOccupancy>()
+
+    active.forEach(({ agent, pos }) => {
+      const current = counts.get(pos.room.id) ?? { total: 0, patients: 0, staff: 0 }
+      current.total += 1
+      if (agent.role === 'patient') current.patients += 1
+      else current.staff += 1
+      counts.set(pos.room.id, current)
+    })
+
+    const visibleIds = new Set<string>()
+    snapshot.plan.rooms
+      .filter((room) => room.floor === snapshot.selectedFloor && room.kind !== 'green' && room.kind !== 'future')
+      .forEach((room) => {
+        const count = counts.get(room.id) ?? { total: 0, patients: 0, staff: 0 }
+        if (room.kind === 'circulation' && count.total === 0) return
+        visibleIds.add(room.id)
+        const badge = this.occupancyBadges.get(room.id) ?? this.createOccupancyBadge(room)
+        this.updateOccupancyBadge(badge, room, count)
+      })
+
+    this.occupancyBadges.forEach((badge, id) => {
+      badge.setVisible(visibleIds.has(id))
+    })
+  }
+
+  private createOccupancyBadge(room: PlacedRoom) {
+    const container = this.add.container(0, 0)
+    const bg = this.add.rectangle(0, 0, 68, 25, 0xffffff, 0.92)
+      .setOrigin(0, 0)
+      .setStrokeStyle(1, 0x66736e, 0.9)
+    const text = this.add.text(7, 4, '', {
+      color: '#17201c',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '13px',
+      fontStyle: 'bold',
+      lineSpacing: 1,
+    }).setResolution(2)
+    container.add([bg, text])
+    container.setData('bg', bg)
+    container.setData('text', text)
+    this.layers?.occupancyLayer.add(container)
+    this.occupancyBadges.set(room.id, container)
+    return container
+  }
+
+  private updateOccupancyBadge(container: Phaser.GameObjects.Container, room: PlacedRoom, count: RoomOccupancy) {
+    const bg = container.getData('bg') as Phaser.GameObjects.Rectangle
+    const text = container.getData('text') as Phaser.GameObjects.Text
+    const hasStaff = count.staff > 0
+    text.setText(hasStaff ? `${count.total} pers\nP ${count.patients} S ${count.staff}` : `${count.total} pers`)
+    text.setPosition(7, hasStaff ? 4 : 5)
+
+    const width = Math.max(64, Math.min(room.w * TILE - 8, text.width + 14))
+    const height = hasStaff ? 39 : 27
+    const ratio = room.capacity > 0 ? count.total / room.capacity : count.total > 0 ? 1 : 0
+    const fill = ratio > 0.85 ? '#fee2e2' : ratio > 0.45 ? '#fff3c4' : count.total > 0 ? '#e4f3ee' : '#ffffff'
+    const stroke = ratio > 0.85 ? '#dc2626' : ratio > 0.45 ? '#d9a441' : '#6aa89b'
+    bg.setSize(width, height)
+    bg.setFillStyle(toColor(fill), count.total > 0 ? 0.96 : 0.72)
+    bg.setStrokeStyle(1, toColor(stroke), count.total > 0 ? 1 : 0.5)
+
+    const x = Math.max(tileX(room.x) + 4, tileX(room.x + room.w) - width - 5)
+    const y = Math.max(tileY(room.y) + 4, tileY(room.y + room.h) - height - 5)
+    container.setPosition(x, y)
   }
 
   private createAgentSprite(agent: SimAgent) {
@@ -500,11 +586,11 @@ class HospitalGameScene extends Phaser.Scene {
     const roleLabel = this.add.text(8, -18, shortAgentLabel(agent), {
       color: '#17201c',
       backgroundColor: '#ffffff',
-      fontFamily: 'monospace',
-      fontSize: '9px',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '11px',
       fontStyle: 'bold',
       padding: { x: 3, y: 1 },
-    }).setResolution(1)
+    }).setResolution(2)
     roleLabel.setVisible(false)
     container.add(roleLabel)
     container.setData('roleLabel', roleLabel)
@@ -517,11 +603,11 @@ class HospitalGameScene extends Phaser.Scene {
     const label = this.add.text(tileX(x), tileY(y), text, {
       color,
       backgroundColor: background,
-      fontFamily: 'monospace',
+      fontFamily: 'Arial, sans-serif',
       fontSize: `${fontSize}px`,
       fontStyle: 'bold',
       padding: { x: 4, y: 2 },
-    }).setResolution(1)
+    }).setResolution(2)
     layer?.add(label)
     return label
   }
@@ -554,7 +640,7 @@ class HospitalGameScene extends Phaser.Scene {
 
   private layoutCamera() {
     if (!this.cameras.main) return
-    const zoom = Math.min(this.scale.width / WORLD_PX_W, this.scale.height / WORLD_PX_H)
+    const zoom = Math.max(this.scale.width / WORLD_PX_W, this.scale.height / WORLD_PX_H)
     this.cameras.main.setZoom(zoom)
     this.cameras.main.centerOn(WORLD_PX_W / 2, WORLD_PX_H / 2)
   }
@@ -752,6 +838,24 @@ function drawArrow(g: Phaser.GameObjects.Graphics, x1: number, y1: number, x2: n
     px2 - Math.cos(angle + 0.48) * 18,
     py2 - Math.sin(angle + 0.48) * 18,
   )
+}
+
+function roomLabelLayout(room: PlacedRoom): { width: number; height: number; fontSize: number; titleChars: number } | null {
+  const roomPxW = room.w * TILE
+  const roomPxH = room.h * TILE
+  if (roomPxW < 76 || roomPxH < 40) return null
+
+  const compact = roomPxW < 160 || roomPxH < 92
+  const fontSize = compact ? 13 : 15
+  const width = Math.max(74, Math.min(roomPxW - 10, compact ? 150 : 220))
+  const height = compact ? 42 : 48
+  const titleChars = Math.max(8, Math.floor((width - 14) / (fontSize * 0.54)))
+  return { width, height, fontSize, titleChars }
+}
+
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, Math.max(1, maxLength - 1))}.`
 }
 
 function equipmentCount(room: PlacedRoom) {

@@ -10,6 +10,7 @@ import {
   doorConnectsToCorridor,
   doorWorldPosition,
   hasPassageAccess,
+  isPassage,
   requiresCorridorAccess,
   snapDoorToRoom,
   type DoorPoint,
@@ -24,10 +25,10 @@ import {
   worldUnitsToMeters,
 } from './engine/geometry'
 import { compilePlanningScript, DEFAULT_PLANNING_SCRIPT, type PlanningLanguageResult } from './engine/planningLanguage'
-import { DEFAULT_SIMULATION_SETTINGS, type SimulationSettings } from './engine/simulation'
+import { DEFAULT_SIMULATION_SETTINGS, runHospitalSimulation, type SimulationSettings } from './engine/simulation'
 import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationResult } from './types'
 
-type WorkspaceTab = 'plan' | 'simulation' | 'services' | 'analysis'
+type WorkspaceTab = 'plan' | 'simulation' | 'saturation' | 'services' | 'analysis'
 
 const INITIAL_PLAN = createTertiaryHospitalPlan()
 const DOOR_MAGNET_DISTANCE = 6
@@ -43,7 +44,6 @@ function App() {
   const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
   const [templateToAdd, setTemplateToAdd] = useState('edBoxes')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
-  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null)
   const [selectedCaseId, setSelectedCaseId] = useState<PatientCaseFilter>('all')
   const [scriptSource, setScriptSource] = useState(DEFAULT_PLANNING_SCRIPT)
   const [scriptResult, setScriptResult] = useState<PlanningLanguageResult | null>(null)
@@ -56,6 +56,8 @@ function App() {
   const floorArea = activeFloorRooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const totalArea = plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
+  const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings), [plan, simulationSettings])
+  const simulationWorkspace = activeTab === 'simulation' || activeTab === 'saturation'
 
   function updateRoom(nextRoom: PlacedRoom) {
     setPlan((current) => ({
@@ -241,6 +243,7 @@ function App() {
       <nav className="workspace-tabs" aria-label="Modulos">
         <TabButton id="plan" active={activeTab} onClick={setActiveTab}>Planificador</TabButton>
         <TabButton id="simulation" active={activeTab} onClick={setActiveTab}>Simulacion</TabButton>
+        <TabButton id="saturation" active={activeTab} onClick={setActiveTab}>Saturacion</TabButton>
         <TabButton id="services" active={activeTab} onClick={setActiveTab}>Servicios</TabButton>
         <TabButton id="analysis" active={activeTab} onClick={setActiveTab}>Analisis</TabButton>
       </nav>
@@ -263,34 +266,44 @@ function App() {
             </div>
           </section>
 
-          <section className="panel-section">
-            <h2>Construir</h2>
-            <label>
-              Elemento
-              <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
-                {ROOM_TEMPLATES.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.shortName} · {KIND_LABELS[template.kind]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
-            <div className="quick-build-grid" aria-label="Pasillos rapidos">
-              <button type="button" onClick={() => addRoomFromTemplate('publicCorridor')}>Pasillo publico</button>
-              <button type="button" onClick={() => addRoomFromTemplate('clinicalCorridor')}>Pasillo clinico</button>
-              <button type="button" onClick={() => addRoomFromTemplate('logisticsCorridor')}>Pasillo logistico</button>
-              <button type="button" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
-            </div>
-            <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
-          </section>
+          {simulationWorkspace ? (
+            <SimulationCaseSelector
+              result={simulationResult}
+              selectedCaseId={selectedCaseId}
+              onSelectCase={setSelectedCaseId}
+            />
+          ) : (
+            <>
+              <section className="panel-section">
+                <h2>Construir</h2>
+                <label>
+                  Elemento
+                  <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
+                    {ROOM_TEMPLATES.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.shortName} · {KIND_LABELS[template.kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
+                <div className="quick-build-grid" aria-label="Pasillos rapidos">
+                  <button type="button" onClick={() => addRoomFromTemplate('publicCorridor')}>Pasillo publico</button>
+                  <button type="button" onClick={() => addRoomFromTemplate('clinicalCorridor')}>Pasillo clinico</button>
+                  <button type="button" onClick={() => addRoomFromTemplate('logisticsCorridor')}>Pasillo logistico</button>
+                  <button type="button" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
+                </div>
+                <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
+              </section>
 
-          <section className="panel-section">
-            <h2>Planta activa</h2>
-            <Metric label="m2 planta" value={formatNumber(floorArea)} />
-            <Metric label="Bloques" value={String(activeFloorRooms.length)} />
-            <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
-          </section>
+              <section className="panel-section">
+                <h2>Planta activa</h2>
+                <Metric label="m2 planta" value={formatNumber(floorArea)} />
+                <Metric label="Bloques" value={String(activeFloorRooms.length)} />
+                <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
+              </section>
+            </>
+          )}
         </aside>
 
         <section className="main-panel">
@@ -314,24 +327,22 @@ function App() {
                 selectedFloor={selectedFloor}
                 settings={simulationSettings}
                 selectedCaseId={selectedCaseId}
-                onResult={setSimulationResult}
                 onSelectCase={setSelectedCaseId}
               />
             </Suspense>
           )}
 
           {activeTab === 'services' && <ServiceMatrix plan={plan} />}
+          {activeTab === 'saturation' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId={selectedCaseId} />}
           {activeTab === 'analysis' && <AnalysisPanel plan={plan} result={simulationResult} rules={rules} />}
         </section>
 
         <aside className="right-panel">
-          {activeTab === 'simulation' ? (
+          {simulationWorkspace ? (
             <SimulationControls
               settings={simulationSettings}
               onChange={setSimulationSettings}
               result={simulationResult}
-              selectedCaseId={selectedCaseId}
-              onSelectCase={setSelectedCaseId}
               rules={rules}
             />
           ) : (
@@ -624,6 +635,55 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
+function SimulationCaseSelector({
+  result,
+  selectedCaseId,
+  onSelectCase,
+}: {
+  result: SimulationResult | null
+  selectedCaseId: PatientCaseFilter
+  onSelectCase: (caseId: PatientCaseFilter) => void
+}) {
+  const caseStats = (result?.caseStats ?? [])
+    .filter((stat) => stat.attempted > 0)
+    .sort((a, b) => b.completed - a.completed)
+
+  return (
+    <section className="panel-section">
+      <h2>Casos clinicos</h2>
+      {caseStats.length > 0 ? (
+        <div className="case-list">
+          <button
+            type="button"
+            className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
+            style={{ borderLeftColor: '#66736e' }}
+            onClick={() => onSelectCase('all')}
+          >
+            <strong>Todos los casos</strong>
+            <span>{result?.kpis.completed ?? 0} pacientes completados</span>
+            <small>Vista completa de la actividad simulada.</small>
+          </button>
+          {caseStats.map((stat) => (
+            <button
+              key={stat.id}
+              type="button"
+              className={`case-item ${selectedCaseId === stat.id ? 'is-active' : ''}`}
+              style={{ borderLeftColor: stat.color }}
+              onClick={() => onSelectCase(stat.id)}
+            >
+              <strong>{stat.label}</strong>
+              <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
+              <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">Ejecutando mezcla clinica.</p>
+      )}
+    </section>
+  )
+}
+
 function RoomInspector({
   room,
   allRooms,
@@ -825,22 +885,15 @@ function FloorConnectionSelector({
 function SimulationControls({
   settings,
   result,
-  selectedCaseId,
   rules,
   onChange,
-  onSelectCase,
 }: {
   settings: SimulationSettings
   result: SimulationResult | null
-  selectedCaseId: PatientCaseFilter
   rules: ArchitectureRuleResult[]
   onChange: (settings: SimulationSettings) => void
-  onSelectCase: (caseId: PatientCaseFilter) => void
 }) {
   const failingRules = rules.filter((rule) => rule.status !== 'ok')
-  const caseStats = (result?.caseStats ?? [])
-    .filter((stat) => stat.attempted > 0)
-    .sort((a, b) => b.completed - a.completed)
 
   return (
     <>
@@ -880,17 +933,6 @@ function SimulationControls({
           />
           <output>{settings.speed}x</output>
         </label>
-        <label>
-          Caso visible
-          <select value={selectedCaseId} onChange={(event) => onSelectCase(event.target.value as PatientCaseFilter)}>
-            <option value="all">Todos los casos</option>
-            {(result?.caseStats ?? []).map((stat) => (
-              <option key={stat.id} value={stat.id}>
-                {stat.label}
-              </option>
-            ))}
-          </select>
-        </label>
       </section>
 
       <section className="panel-section">
@@ -900,39 +942,6 @@ function SimulationControls({
         <Metric label="Traslado medio" value={`${result?.kpis.averageTravelMinutes ?? 0} min`} />
         <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
         <Metric label="Bloqueados" value={String(result?.kpis.blockedPatients ?? 0)} />
-      </section>
-
-      <section className="panel-section">
-        <h2>Casos clinicos</h2>
-        {caseStats.length > 0 ? (
-          <div className="case-list">
-            <button
-              type="button"
-              className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
-              style={{ borderLeftColor: '#66736e' }}
-              onClick={() => onSelectCase('all')}
-            >
-              <strong>Todos los casos</strong>
-              <span>{result?.kpis.completed ?? 0} pacientes completados</span>
-              <small>Vista completa de la actividad simulada.</small>
-            </button>
-            {caseStats.slice(0, 7).map((stat) => (
-              <button
-                key={stat.id}
-                type="button"
-                className={`case-item ${selectedCaseId === stat.id ? 'is-active' : ''}`}
-                style={{ borderLeftColor: stat.color }}
-                onClick={() => onSelectCase(stat.id)}
-              >
-                <strong>{stat.label}</strong>
-                <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
-                <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="muted">Ejecutando mezcla clinica.</p>
-        )}
       </section>
 
       <section className="panel-section">
@@ -951,6 +960,148 @@ function SimulationControls({
       </section>
     </>
   )
+}
+
+function SaturationPanel({
+  plan,
+  result,
+  selectedCaseId,
+}: {
+  plan: HospitalPlan
+  result: SimulationResult | null
+  selectedCaseId: PatientCaseFilter
+}) {
+  if (!result) {
+    return (
+      <div className="saturation-panel">
+        <p className="muted">Ejecutando simulacion.</p>
+      </div>
+    )
+  }
+
+  const selectedCase = selectedCaseId === 'all'
+    ? undefined
+    : result.caseStats.find((stat) => stat.id === selectedCaseId)
+  const pressure = pressureForCase(plan, result, selectedCaseId)
+  const bottlenecks = bottleneckRows(plan, pressure).slice(0, 12)
+  const maxScore = Math.max(1, ...bottlenecks.map((row) => row.score))
+  const activeCases = result.caseStats.filter((stat) => stat.attempted > 0).sort((a, b) => b.attempted - a.attempted).slice(0, 5)
+  const maxCaseLoad = Math.max(1, ...activeCases.map((stat) => stat.attempted))
+  const saturated = bottlenecks.filter((row) => row.score >= 1).length
+  const warning = bottlenecks.filter((row) => row.score >= 0.6 && row.score < 1).length
+
+  return (
+    <div className="saturation-panel">
+      <section className="saturation-hero">
+        <div>
+          <span>Saturacion por bloque</span>
+          <h2>{selectedCase ? selectedCase.label : 'Todos los casos clinicos'}</h2>
+          <p>Demanda acumulada de pacientes frente a capacidad declarada por bloque. Las barras rojas indican zonas por encima de su capacidad funcional.</p>
+        </div>
+        <div className="saturation-kpis">
+          <Metric label="Bloque critico" value={bottlenecks[0]?.room.name ?? '-'} />
+          <Metric label="Saturados" value={String(saturated)} />
+          <Metric label="En tension" value={String(warning)} />
+          <Metric label="Bloqueados" value={String(result.kpis.blockedPatients)} />
+        </div>
+      </section>
+
+      <div className="saturation-grid">
+        <section className="saturation-block wide">
+          <h3>Bloques con mayor presion</h3>
+          <div className="chart-list">
+            {bottlenecks.length > 0 ? (
+              bottlenecks.map((row) => (
+                <article key={row.room.id} className="chart-row">
+                  <div className="chart-row-head">
+                    <strong>{row.room.name}</strong>
+                    <span>{floorLabel(row.room.floor)} · {formatDemandRatio(row.score)}</span>
+                  </div>
+                  <div className="bar-track large" aria-hidden="true">
+                    <span
+                      className={`bar-fill ${row.score >= 1 ? 'danger' : row.score >= 0.6 ? 'warn' : ''}`}
+                      style={{ width: `${Math.max(4, Math.min(100, (row.score / maxScore) * 100))}%` }}
+                    />
+                  </div>
+                  <small>{row.count} pasos clinicos · capacidad {row.room.capacity} · {KIND_LABELS[row.room.kind]}</small>
+                </article>
+              ))
+            ) : (
+              <p className="muted">No hay demanda suficiente para detectar saturacion.</p>
+            )}
+          </div>
+        </section>
+
+        <section className="saturation-block">
+          <h3>Carga por caso</h3>
+          <div className="chart-list">
+            {activeCases.map((stat) => (
+              <article key={stat.id} className="chart-row compact">
+                <div className="chart-row-head">
+                  <strong>{stat.label}</strong>
+                  <span>{stat.completed}/{stat.attempted}</span>
+                </div>
+                <div className="bar-track" aria-hidden="true">
+                  <span className="bar-fill case" style={{ width: `${Math.max(5, (stat.attempted / maxCaseLoad) * 100)}%`, backgroundColor: stat.color }} />
+                </div>
+                <small>{stat.blocked} bloqueados</small>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="saturation-block">
+          <h3>Lectura operativa</h3>
+          <div className="rule-list compact">
+            {bottlenecks.slice(0, 4).map((row) => (
+              <article key={row.room.id} className={`rule-item ${row.score >= 1 ? 'fail' : row.score >= 0.6 ? 'warn' : 'ok'}`}>
+                <strong>{row.room.name}</strong>
+                <span>{formatDemandRatio(row.score)} de demanda relativa en {floorLabel(row.room.floor)}.</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+function pressureForCase(plan: HospitalPlan, result: SimulationResult, selectedCaseId: PatientCaseFilter): Record<string, number> {
+  if (selectedCaseId === 'all') return result.roomPressure
+
+  const serviceRoomIds = new Set(plan.rooms.filter((room) => !isPassage(room) && room.kind !== 'green' && room.kind !== 'future').map((room) => room.id))
+  const pressure: Record<string, number> = {}
+  result.agents
+    .filter((agent) => agent.role === 'patient' && agent.caseId === selectedCaseId)
+    .forEach((agent) => {
+      const visited = new Set<string>()
+      agent.route.forEach((stop) => {
+        if (serviceRoomIds.has(stop.roomId)) visited.add(stop.roomId)
+      })
+      visited.forEach((roomId) => {
+        pressure[roomId] = (pressure[roomId] ?? 0) + 1
+      })
+    })
+  return pressure
+}
+
+function bottleneckRows(plan: HospitalPlan, pressure: Record<string, number>) {
+  return Object.entries(pressure)
+    .map(([roomId, count]) => {
+      const room = plan.rooms.find((item) => item.id === roomId)
+      if (!room) return null
+      return {
+        room,
+        count,
+        score: count / Math.max(1, room.capacity),
+      }
+    })
+    .filter((row): row is { room: PlacedRoom; count: number; score: number } => row !== null)
+    .sort((a, b) => b.score - a.score)
+}
+
+function formatDemandRatio(score: number): string {
+  return `${Math.round(score * 100)}%`
 }
 
 function ServiceMatrix({ plan }: { plan: HospitalPlan }) {

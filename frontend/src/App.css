@@ -271,7 +271,7 @@ output {
   display: block;
   width: 100%;
   height: 100%;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 .simulation-loading {
@@ -937,6 +937,75 @@ th {
   gap: 0;
 }
 
+.saturation-panel {
+  height: 100%;
+  min-height: 560px;
+  overflow: auto;
+  border: 1px solid #c9d4ce;
+  border-radius: 8px;
+  background: #fbfcf8;
+}
+
+.saturation-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+  padding: 18px;
+  border-bottom: 1px solid #dfe6e1;
+  background: #ffffff;
+}
+
+.saturation-hero span,
+.saturation-block h3 {
+  color: #66736e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.saturation-hero h2 {
+  margin: 4px 0 6px;
+  color: #17201c;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.saturation-hero p {
+  max-width: 680px;
+  margin: 0;
+  color: #55645e;
+  line-height: 1.45;
+}
+
+.saturation-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.saturation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+  gap: 0;
+}
+
+.saturation-block {
+  min-width: 0;
+  padding: 16px;
+  border-right: 1px solid #dfe6e1;
+  border-bottom: 1px solid #dfe6e1;
+}
+
+.saturation-block.wide {
+  grid-row: span 2;
+}
+
+.saturation-block h3 {
+  margin: 0 0 10px;
+}
+
 .analysis-block {
   padding: 16px;
   border-right: 1px solid #dfe6e1;
@@ -1011,6 +1080,93 @@ th {
 .case-item.is-active {
   background: #e4f3ee;
   box-shadow: inset 0 0 0 1px rgba(42, 157, 143, 0.24);
+}
+
+.bottleneck-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.bottleneck-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.chart-list {
+  display: grid;
+  gap: 8px;
+}
+
+.chart-list h3 {
+  margin: 2px 0 0;
+  color: #66736e;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.chart-row {
+  display: grid;
+  gap: 6px;
+  padding: 8px 9px;
+  border: 1px solid #d9e2dc;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.chart-row.compact {
+  gap: 5px;
+}
+
+.chart-row-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.chart-row-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #17201c;
+  font-size: 12px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-row-head span,
+.chart-row small {
+  color: #66736e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bar-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2ee;
+}
+
+.bar-track.large {
+  height: 12px;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2a9d8f;
+}
+
+.bar-fill.warn {
+  background: #d9a441;
+}
+
+.bar-fill.danger {
+  background: #d65f50;
 }
 
 .rule-category {
@@ -1092,8 +1248,18 @@ th {
   .hospital-canvas,
   .simulation-stage,
   .table-panel,
+  .saturation-panel,
   .analysis-grid {
     height: 620px;
+  }
+
+  .saturation-hero,
+  .saturation-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .saturation-block.wide {
+    grid-row: auto;
   }
 
   .sim-controls {
