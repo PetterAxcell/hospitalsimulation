@@ -212,11 +212,11 @@ function drawDoors(
       const position = doorWorldPosition(room, door)
       const connected = doorConnectsToCorridor(allRooms, room, door)
       const horizontal = door.side === 'top' || door.side === 'bottom'
-      const length = 2.4 * scale
-      const thickness = Math.max(5, 0.42 * scale)
+      const length = Math.max(12, 3.2 * scale)
+      const thickness = Math.max(8, 0.9 * scale)
       ctx.save()
       ctx.translate(sx(position.x), sy(position.y))
-      ctx.fillStyle = connected ? '#ffffff' : '#fee2e2'
+      ctx.fillStyle = connected ? '#d8dec9' : '#fee2e2'
       ctx.strokeStyle = connected ? (room.id === selectedRoomId ? '#1d4ed8' : '#16685f') : '#dc2626'
       ctx.lineWidth = room.id === selectedRoomId ? 2.4 : 1.6
       if (horizontal) {

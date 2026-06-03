@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { KIND_COLORS } from '../data/catalog'
-import { connectedCorridorGroups, disconnectedPassages, doorWorldPosition } from '../engine/circulation'
+import { connectedCorridorGroups, disconnectedPassages, doorConnectsToCorridor, doorWorldPosition } from '../engine/circulation'
 import { positionAt, runHospitalSimulation, type PatientCaseDefinition, type SimulationSettings } from '../engine/simulation'
 import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationAgentLayer, SimulationResult } from '../types'
 
@@ -253,7 +253,7 @@ class HospitalGameScene extends Phaser.Scene {
       this.drawCorridorGroup(group, group.some((room) => disconnectedIds.has(room.id)))
     })
     rooms.filter((room) => room.kind !== 'circulation').forEach((room) => {
-      this.drawRoom(room, snapshot.result, disconnectedIds.has(room.id))
+      this.drawRoom(room, snapshot.result, disconnectedIds.has(room.id), snapshot.plan.rooms)
     })
   }
 
@@ -331,7 +331,7 @@ class HospitalGameScene extends Phaser.Scene {
     this.addPixelText('AMBULANCIAS', 84.8, 8.4, '#ffffff', '#47525c', this.layers.staticLayer, 10)
   }
 
-  private drawRoom(room: PlacedRoom, result: SimulationResult, disconnectedPassage: boolean) {
+  private drawRoom(room: PlacedRoom, result: SimulationResult, disconnectedPassage: boolean, allRooms: PlacedRoom[]) {
     if (!this.layers) return
     const g = this.add.graphics()
     this.layers.staticLayer.add(g)
@@ -342,7 +342,7 @@ class HospitalGameScene extends Phaser.Scene {
 
     drawTileRect(g, room.x, room.y, room.w, room.h, roomColor, wallColor)
     drawRoomPattern(g, room)
-    if (room.kind !== 'circulation') drawDoors(g, room)
+    if (room.kind !== 'circulation') drawDoors(g, room, allRooms)
 
     if (pressure > 0.18) {
       g.fillStyle(0xd62828, 0.08 + pressure * 0.26)
@@ -824,16 +824,21 @@ function drawRoomPattern(g: Phaser.GameObjects.Graphics, room: PlacedRoom) {
   }
 }
 
-function drawDoors(g: Phaser.GameObjects.Graphics, room: PlacedRoom) {
+function drawDoors(g: Phaser.GameObjects.Graphics, room: PlacedRoom, allRooms: PlacedRoom[]) {
   (room.doors ?? []).forEach((door) => {
     const position = doorWorldPosition(room, door)
+    const connected = doorConnectsToCorridor(allRooms, room, door)
     const horizontal = door.side === 'top' || door.side === 'bottom'
     const px = tileX(position.x)
     const py = tileY(position.y)
-    const length = Math.max(20, Math.min(44, (horizontal ? room.w : room.h) * TILE * 0.22))
-    const thickness = 6
-    g.fillStyle(toColor(room.simulationNode === 'emergency_stair' ? '#dc2626' : '#f8fafc'), 1)
-    g.lineStyle(1, toColor('#33413b'), 1)
+    const length = Math.max(30, Math.min(62, (horizontal ? room.w : room.h) * TILE * 0.32))
+    const thickness = 12
+    const fill = connected
+      ? (room.simulationNode === 'emergency_stair' ? '#e86464' : ROOM_FLOOR_COLORS.circulation)
+      : '#fee2e2'
+    const stroke = connected ? '#16685f' : '#dc2626'
+    g.fillStyle(toColor(fill), 1)
+    g.lineStyle(2, toColor(stroke), 1)
     if (horizontal) {
       g.fillRect(px - length / 2, py - thickness / 2, length, thickness)
       g.strokeRect(px - length / 2, py - thickness / 2, length, thickness)
