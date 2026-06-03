@@ -49,8 +49,8 @@ const WORLD_H = 70
 const TILE = 16
 const WORLD_PX_W = WORLD_W * TILE
 const WORLD_PX_H = WORLD_H * TILE
-const HORIZON_SECONDS_AT_1X = 600
-const MOTION_MINUTES_PER_SECOND_AT_1X = 12
+const HORIZON_SECONDS_AT_1X = 3600
+const MOTION_MINUTES_PER_SECOND_AT_1X = 1
 const SPEED_PRESETS = [1, 2, 10, 20]
 
 const CARE_ROOM_KINDS = new Set<RoomKind>([
@@ -189,7 +189,7 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
             setPlaying(false)
           }}
         />
-        <span>{formatHorizonTime(minute, settings.horizonYears)}</span>
+        <span>{formatHorizonTime(minute, motionMinute, settings.horizonYears)}</span>
         <div className="sim-speed-presets" aria-label="Velocidad de simulacion">
           {SPEED_PRESETS.map((speed) => (
             <button
@@ -1074,12 +1074,14 @@ function toColor(hex: string) {
   return Phaser.Display.Color.HexStringToColor(hex).color
 }
 
-function formatHorizonTime(minutes: number, horizonYears: number) {
+function formatHorizonTime(minutes: number, motionMinutes: number, horizonYears: number) {
   const totalDays = Math.max(1, horizonYears) * 365
   const dayIndex = Math.floor(minutes / (24 * 60)) % totalDays
   const year = Math.floor(dayIndex / 365) + 1
   const day = dayIndex % 365 + 1
-  return `Ano ${year} · dia ${day}`
+  const hour = Math.floor(motionMinutes / 60) % 24
+  const minute = Math.floor(motionMinutes % 60)
+  return `Ano ${year} · dia ${day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
 function wrapMinute(minute: number, duration: number) {

@@ -914,14 +914,6 @@ function movementPointForSegment(
   id: string,
   progress: number,
 ): MovementPoint {
-  if (isPassage(currentRoom) && isPassage(nextRoom)) {
-    const nextTarget = followingRoom ?? currentRoom
-    const start = travelPoint(currentRoom, nextRoom, id)
-    const end = travelPoint(nextRoom, nextTarget, id)
-    const joint = passageJointPoint(currentRoom, nextRoom)
-    if (!joint) return progress < 0.5 ? start : end
-  }
-
   const path = movementPathForSegment(currentRoom, nextRoom, followingRoom, id)
   const point = interpolatePath(path, smooth(progress))
   const passage = passageRoomForSegment(currentRoom, nextRoom, progress)
