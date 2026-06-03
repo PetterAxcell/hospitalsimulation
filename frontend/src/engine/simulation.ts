@@ -724,6 +724,7 @@ export interface SimulationSettings {
   seed: number
   arrivalsPerHour: number
   durationHours: number
+  horizonYears: number
   speed: number
 }
 
@@ -731,7 +732,8 @@ export const DEFAULT_SIMULATION_SETTINGS: SimulationSettings = {
   seed: 31,
   arrivalsPerHour: 9,
   durationHours: 24,
-  speed: 90,
+  horizonYears: 10,
+  speed: 10,
 }
 
 export function compileClinicalCases(source: string): ClinicalCaseCompileResult {
@@ -779,7 +781,8 @@ export function compileClinicalCases(source: string): ClinicalCaseCompileResult 
 export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSettings, patientCases: PatientCaseDefinition[] = DEFAULT_PATIENT_CASES): SimulationResult {
   const activeCases = patientCases.length > 0 ? patientCases : DEFAULT_PATIENT_CASES
   const rng = mulberry32(settings.seed)
-  const durationMinutes = settings.durationHours * 60
+  const motionCycleMinutes = settings.durationHours * 60
+  const durationMinutes = Math.max(1, settings.horizonYears) * 365 * 24 * 60
   const agents: SimAgent[] = []
   const totalArrivals = Math.max(40, Math.round(settings.arrivalsPerHour * settings.durationHours))
   const roomPressure: Record<string, number> = {}
@@ -794,7 +797,7 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
     const caseStat = caseStats.get(patientCase.id)
     if (caseStat) caseStat.attempted += 1
     const caseSteps = patientCase.build(rng)
-    const start = Math.floor((i / totalArrivals) * durationMinutes + rng() * 18)
+    const start = Math.floor((i / totalArrivals) * motionCycleMinutes + rng() * 18)
     const serviceStops = resolveCaseStops(plan.rooms, caseSteps)
     const serviceRooms = serviceStops.map((stop) => stop.room)
     if (serviceRooms.length < 2) {
@@ -832,7 +835,7 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
     })
   }
 
-  addStaffAgents(plan, agents, durationMinutes, rng)
+  addStaffAgents(plan, agents, motionCycleMinutes, rng)
   const staffStats = createStaffStats(agents)
 
   const hottest = Object.entries(roomPressure)
@@ -848,6 +851,7 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
   return {
     agents,
     durationMinutes,
+    motionCycleMinutes,
     roomPressure,
     caseStats: [...caseStats.values()],
     staffStats,
@@ -919,7 +923,9 @@ function movementPointForSegment(
   }
 
   const path = movementPathForSegment(currentRoom, nextRoom, followingRoom, id)
-  return interpolatePath(path, smooth(progress))
+  const point = interpolatePath(path, smooth(progress))
+  const passage = passageRoomForSegment(currentRoom, nextRoom, progress)
+  return passage ? addPassageWander(point, passage, id, progress) : point
 }
 
 function movementPathForSegment(
@@ -1515,11 +1521,65 @@ function travelPoint(room: PlacedRoom, targetRoom: PlacedRoom, id: string): Move
   const maxY = room.y + room.h - margin
   let x = clamp(target.x, minX, maxX)
   let y = clamp(target.y, minY, maxY)
+  const lane = stableLane(id, room.id)
+  const horizontalRoom = room.kind === 'circulation' && room.w > room.h * 1.4
+  const verticalRoom = room.kind === 'circulation' && room.h > room.w * 1.4
 
-  if (room.kind === 'circulation' && room.w > room.h * 1.4) y = room.y + room.h / 2
-  if (room.kind === 'circulation' && room.h > room.w * 1.4) x = room.x + room.w / 2
+  if (horizontalRoom) y = clamp(room.y + room.h / 2 + lane * Math.max(0, room.h / 2 - margin), minY, maxY)
+  if (verticalRoom) x = clamp(room.x + room.w / 2 + lane * Math.max(0, room.w / 2 - margin), minX, maxX)
+  if (!horizontalRoom && !verticalRoom && isPassage(room)) {
+    x = clamp(x + lane * Math.max(0, room.w / 5), minX, maxX)
+    y = clamp(y - lane * Math.max(0, room.h / 5), minY, maxY)
+  }
 
   return { x, y }
+}
+
+function passageRoomForSegment(currentRoom: PlacedRoom, nextRoom: PlacedRoom, progress: number): PlacedRoom | undefined {
+  if (isPassage(currentRoom) && isPassage(nextRoom)) return progress < 0.5 ? currentRoom : nextRoom
+  if (isPassage(currentRoom)) return currentRoom
+  if (isPassage(nextRoom)) return nextRoom
+  return undefined
+}
+
+function addPassageWander(point: MovementPoint, room: PlacedRoom, id: string, progress: number): MovementPoint {
+  const margin = 0.55
+  const phase = stableHash(`${id}:${room.id}:walk`) * Math.PI * 2
+  const wave = Math.sin(progress * Math.PI * 2 + phase)
+  const horizontalRoom = room.kind === 'circulation' && room.w > room.h * 1.4
+  const verticalRoom = room.kind === 'circulation' && room.h > room.w * 1.4
+  const lateralX = Math.max(0, room.w / 2 - margin)
+  const lateralY = Math.max(0, room.h / 2 - margin)
+
+  if (horizontalRoom) {
+    return {
+      x: clamp(point.x, room.x + margin, room.x + room.w - margin),
+      y: clamp(point.y + wave * lateralY * 0.28, room.y + margin, room.y + room.h - margin),
+    }
+  }
+  if (verticalRoom) {
+    return {
+      x: clamp(point.x + wave * lateralX * 0.28, room.x + margin, room.x + room.w - margin),
+      y: clamp(point.y, room.y + margin, room.y + room.h - margin),
+    }
+  }
+  return {
+    x: clamp(point.x + wave * lateralX * 0.18, room.x + margin, room.x + room.w - margin),
+    y: clamp(point.y - wave * lateralY * 0.18, room.y + margin, room.y + room.h - margin),
+  }
+}
+
+function stableLane(id: string, roomId: string): number {
+  return stableHash(`${id}:${roomId}`) * 2 - 1
+}
+
+function stableHash(value: string): number {
+  let hash = 2166136261
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return ((hash >>> 0) % 10000) / 10000
 }
 
 function passageJointPoint(a: PlacedRoom, b: PlacedRoom): MovementPoint | undefined {

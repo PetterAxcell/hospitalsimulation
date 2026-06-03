@@ -73,6 +73,7 @@ interface ArchitectureProposal {
 
 const INITIAL_PLAN = createTertiaryHospitalPlan()
 const DOOR_MAGNET_DISTANCE = 6
+const SIMULATION_SPEED_PRESETS = [1, 2, 10, 20]
 const SimulationCanvas = lazy(() =>
   import('./components/SimulationCanvas').then((module) => ({ default: module.SimulationCanvas })),
 )
@@ -448,6 +449,7 @@ function App() {
                 agentLayer={simulationAgentLayer}
                 onSelectCase={setSelectedCaseId}
                 onChangeAgentLayer={setSimulationAgentLayer}
+                onChangeSpeed={(speed) => setSimulationSettings((settings) => ({ ...settings, speed }))}
               />
             </Suspense>
           )}
@@ -1443,32 +1445,48 @@ function SimulationControls({
           <output>{settings.arrivalsPerHour}</output>
         </label>
         <label>
-          Duracion horas
+          Horizonte anos
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={settings.horizonYears}
+            onChange={(event) => onChange({ ...settings, horizonYears: Number(event.target.value) })}
+          />
+          <output>{settings.horizonYears}</output>
+        </label>
+        <label>
+          Ciclo visible
           <input
             type="range"
             min={8}
             max={72}
+            step={1}
             value={settings.durationHours}
             onChange={(event) => onChange({ ...settings, durationHours: Number(event.target.value) })}
           />
-          <output>{settings.durationHours}</output>
+          <output>{settings.durationHours}h</output>
         </label>
-        <label>
-          Velocidad
-          <input
-            type="range"
-            min={1}
-            max={360}
-            step={1}
-            value={settings.speed}
-            onChange={(event) => onChange({ ...settings, speed: Number(event.target.value) })}
-          />
-          <output>{settings.speed}x</output>
-        </label>
+        <div className="speed-control-group">
+          <span>Velocidad</span>
+          <div className="speed-preset-grid">
+            {SIMULATION_SPEED_PRESETS.map((speed) => (
+              <button
+                key={speed}
+                type="button"
+                className={settings.speed === speed ? 'is-active' : ''}
+                onClick={() => onChange({ ...settings, speed })}
+              >
+                x{speed}
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
 
       <section className="panel-section">
         <h2>Resultado</h2>
+        <Metric label="Horizonte" value={`${settings.horizonYears} anos`} />
         <Metric label="Pacientes" value={String(result?.kpis.completed ?? 0)} />
         <Metric label="Personal" value={String(result?.kpis.staffOnShift ?? 0)} />
         <Metric label="Personal movil" value={String(result?.kpis.staffInMotion ?? 0)} />

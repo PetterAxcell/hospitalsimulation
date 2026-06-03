@@ -283,7 +283,7 @@ output {
 
 .sim-controls {
   display: grid;
-  grid-template-columns: 86px minmax(120px, 1fr) 70px minmax(150px, 190px) minmax(150px, 220px);
+  grid-template-columns: 86px minmax(120px, 1fr) minmax(112px, auto) minmax(168px, auto) minmax(150px, 190px) minmax(150px, 220px);
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -299,6 +299,45 @@ output {
 
 .sim-controls select {
   min-width: 0;
+}
+
+.sim-speed-presets,
+.speed-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(34px, 1fr));
+  gap: 4px;
+}
+
+.sim-speed-presets button,
+.speed-preset-grid button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 7px;
+  border: 1px solid #c5d0ca;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #33413b;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.sim-speed-presets button.is-active,
+.speed-preset-grid button.is-active {
+  border-color: #2a9d8f;
+  background: #e4f3ee;
+  color: #174942;
+}
+
+.speed-control-group {
+  display: grid;
+  gap: 7px;
+}
+
+.speed-control-group > span {
+  color: #66736e;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .visually-hidden {
@@ -1627,6 +1666,14 @@ th {
   }
 
   .sim-controls input[type='range'] {
+    grid-column: 1 / -1;
+  }
+
+  .sim-speed-presets {
+    grid-column: 1 / -1;
+  }
+
+  .sim-controls select {
     grid-column: 1 / -1;
   }
 

@@ -177,6 +177,7 @@ export interface StaffStat {
 export interface SimulationResult {
   agents: SimAgent[]
   durationMinutes: number
+  motionCycleMinutes: number
   roomPressure: Record<string, number>
   caseStats: PatientCaseStat[]
   staffStats: StaffStat[]

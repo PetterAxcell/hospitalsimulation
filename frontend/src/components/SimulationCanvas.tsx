@@ -14,6 +14,7 @@ interface SimulationCanvasProps {
   agentLayer: SimulationAgentLayer
   onSelectCase: (caseId: PatientCaseFilter) => void
   onChangeAgentLayer: (layer: SimulationAgentLayer) => void
+  onChangeSpeed: (speed: number) => void
 }
 
 interface SimulationSnapshot {
@@ -21,6 +22,7 @@ interface SimulationSnapshot {
   selectedFloor: number
   result: SimulationResult
   minute: number
+  motionMinute: number
   selectedCaseId: PatientCaseFilter
   agentLayer: SimulationAgentLayer
 }
@@ -47,6 +49,9 @@ const WORLD_H = 70
 const TILE = 16
 const WORLD_PX_W = WORLD_W * TILE
 const WORLD_PX_H = WORLD_H * TILE
+const HORIZON_SECONDS_AT_1X = 600
+const MOTION_MINUTES_PER_SECOND_AT_1X = 12
+const SPEED_PRESETS = [1, 2, 10, 20]
 
 const CARE_ROOM_KINDS = new Set<RoomKind>([
   'emergency',
@@ -106,11 +111,12 @@ const ROOM_WALL_COLORS: Record<RoomKind, string> = {
   future: '#7b7f78',
 }
 
-export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, agentLayer, onSelectCase, onChangeAgentLayer }: SimulationCanvasProps) {
+export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, agentLayer, onSelectCase, onChangeAgentLayer, onChangeSpeed }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const sceneRef = useRef<HospitalGameScene | null>(null)
   const [minute, setMinute] = useState(0)
+  const [motionMinute, setMotionMinute] = useState(0)
   const [playing, setPlaying] = useState(true)
   const result = useMemo(() => runHospitalSimulation(plan, settings, patientCases), [patientCases, plan, settings])
 
@@ -121,13 +127,16 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
       const delta = now - previous
       previous = now
       if (playing) {
-        setMinute((value) => (value + (delta / 1000) * settings.speed) % result.durationMinutes)
+        const horizonStep = (delta / 1000) * (result.durationMinutes / HORIZON_SECONDS_AT_1X) * settings.speed
+        const motionStep = (delta / 1000) * MOTION_MINUTES_PER_SECOND_AT_1X * settings.speed
+        setMinute((value) => (value + horizonStep) % result.durationMinutes)
+        setMotionMinute((value) => (value + motionStep) % result.motionCycleMinutes)
       }
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [playing, result.durationMinutes, settings.speed])
+  }, [playing, result.durationMinutes, result.motionCycleMinutes, settings.speed])
 
   useEffect(() => {
     if (!hostRef.current || gameRef.current) return
@@ -161,8 +170,8 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   }, [])
 
   useEffect(() => {
-    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, selectedCaseId, agentLayer })
-  }, [agentLayer, minute, plan, result, selectedCaseId, selectedFloor])
+    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, motionMinute, selectedCaseId, agentLayer })
+  }, [agentLayer, minute, motionMinute, plan, result, selectedCaseId, selectedFloor])
 
   return (
     <div className="simulation-stage">
@@ -174,11 +183,26 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
           max={result.durationMinutes}
           value={minute}
           onChange={(event) => {
-            setMinute(Number(event.target.value))
+            const nextMinute = Number(event.target.value)
+            setMinute(nextMinute)
+            setMotionMinute((nextMinute / Math.max(1, result.durationMinutes)) * result.motionCycleMinutes)
             setPlaying(false)
           }}
         />
-        <span>{formatTime(minute)}</span>
+        <span>{formatHorizonTime(minute, settings.horizonYears)}</span>
+        <div className="sim-speed-presets" aria-label="Velocidad de simulacion">
+          {SPEED_PRESETS.map((speed) => (
+            <button
+              key={speed}
+              type="button"
+              className={settings.speed === speed ? 'is-active' : ''}
+              onClick={() => onChangeSpeed(speed)}
+              data-speed={speed}
+            >
+              x{speed}
+            </button>
+          ))}
+        </div>
         <select value={agentLayer} onChange={(event) => onChangeAgentLayer(event.target.value as SimulationAgentLayer)} aria-label="Agentes visibles">
           <option value="all">Pacientes + personal</option>
           <option value="patients">Solo casos</option>
@@ -427,18 +451,21 @@ class HospitalGameScene extends Phaser.Scene {
   private updateAgents(snapshot: SimulationSnapshot) {
     if (!this.layers) return
     const visibleAgents = visibleAgentsForSnapshot(snapshot)
-    const active: ActiveAgent[] = visibleAgents
-      .map((agent) => ({ agent, pos: positionAt(agent, snapshot.plan.rooms, snapshot.minute) }))
+    const motionMinute = wrapMinute(snapshot.motionMinute, snapshot.result.motionCycleMinutes)
+    const active = resolveAgentCollisions(visibleAgents
+      .map((agent) => ({ agent, pos: positionAt(agent, snapshot.plan.rooms, motionMinute) }))
       .filter((item): item is ActiveAgent => item.pos !== null && item.pos.room.floor === snapshot.selectedFloor)
+    )
 
     const activeIds = new Set<string>()
     active.forEach(({ agent, pos }) => {
       activeIds.add(agent.id)
       const sprite = this.agentSprites.get(agent.id) ?? this.createAgentSprite(agent)
-      const bob = pos.moving ? Math.sin((snapshot.minute + Number(agent.id.replace(/\D/g, ''))) * 0.6) * 2 : 0
+      const bob = pos.moving ? Math.sin((motionMinute + Number(agent.id.replace(/\D/g, ''))) * 0.8) * 2 : 0
       sprite.setPosition(tileX(pos.x), tileY(pos.y) + bob)
       sprite.setVisible(true)
       sprite.setDepth(pos.y * TILE)
+      this.updateAgentWalk(sprite, pos.moving, motionMinute, agent.id)
       const roleLabel = sprite.getData('roleLabel') as Phaser.GameObjects.Text | undefined
       if (roleLabel) roleLabel.setVisible(false)
     })
@@ -447,8 +474,20 @@ class HospitalGameScene extends Phaser.Scene {
       if (!activeIds.has(id)) sprite.setVisible(false)
     })
 
-    this.updateCareIndicators(active, snapshot.minute)
+    this.updateCareIndicators(active, motionMinute)
     this.updateOccupancy(snapshot, active)
+  }
+
+  private updateAgentWalk(sprite: Phaser.GameObjects.Container, moving: boolean, minute: number, id: string) {
+    const leftLeg = sprite.getData('leftLeg') as Phaser.GameObjects.Rectangle | undefined
+    const rightLeg = sprite.getData('rightLeg') as Phaser.GameObjects.Rectangle | undefined
+    const shadow = sprite.getData('shadow') as Phaser.GameObjects.Rectangle | undefined
+    const step = moving ? Math.sin(minute * 1.5 + Number(id.replace(/\D/g, '')) * 0.3) : 0
+    leftLeg?.setRotation(step * 0.28)
+    rightLeg?.setRotation(-step * 0.28)
+    leftLeg?.setX(-3 - Math.abs(step) * 0.9)
+    rightLeg?.setX(3 + Math.abs(step) * 0.9)
+    shadow?.setScale(moving ? 1.08 : 1, moving ? 0.9 : 1)
   }
 
   private updateCareIndicators(active: ActiveAgent[], minute: number) {
@@ -598,6 +637,9 @@ class HospitalGameScene extends Phaser.Scene {
     const leftLeg = this.add.rectangle(-3, 7, 3, 6, 0x293241)
     const rightLeg = this.add.rectangle(3, 7, 3, 6, 0x293241)
     container.add([shadow, leftLeg, rightLeg, body, head, hair])
+    container.setData('shadow', shadow)
+    container.setData('leftLeg', leftLeg)
+    container.setData('rightLeg', rightLeg)
 
     if (agent.role !== 'patient') {
       container.add(this.add.rectangle(0, 0, 3, 10, 0xf8f9fa, 0.9))
@@ -687,6 +729,49 @@ function visibleAgentsForSnapshot(snapshot: SimulationSnapshot): SimAgent[] {
   if (snapshot.agentLayer === 'patients') return patients
   if (snapshot.agentLayer === 'staff') return staff
   return [...patients, ...staff]
+}
+
+function resolveAgentCollisions(active: ActiveAgent[]): ActiveAgent[] {
+  const placed = active.map(({ agent, pos }) => ({ agent, pos: { ...pos } }))
+  const minDistance = 0.78
+
+  for (let iteration = 0; iteration < 4; iteration += 1) {
+    for (let i = 0; i < placed.length; i += 1) {
+      for (let j = i + 1; j < placed.length; j += 1) {
+        const a = placed[i]
+        const b = placed[j]
+        const dx = b.pos.x - a.pos.x
+        const dy = b.pos.y - a.pos.y
+        const distance = Math.hypot(dx, dy)
+        if (distance >= minDistance) continue
+
+        const fallbackAngle = stableAngle(`${a.agent.id}:${b.agent.id}`)
+        const nx = distance > 0.001 ? dx / distance : Math.cos(fallbackAngle)
+        const ny = distance > 0.001 ? dy / distance : Math.sin(fallbackAngle)
+        const push = (minDistance - Math.max(0.001, distance)) / 2
+
+        a.pos = clampAgentPosition(a.pos, a.pos.x - nx * push, a.pos.y - ny * push)
+        b.pos = clampAgentPosition(b.pos, b.pos.x + nx * push, b.pos.y + ny * push)
+      }
+    }
+  }
+
+  return placed
+}
+
+function clampAgentPosition(pos: AgentPosition, x: number, y: number): AgentPosition {
+  const margin = pos.room.kind === 'circulation' || pos.room.kind === 'vertical' ? 0.42 : 0.65
+  return {
+    ...pos,
+    x: clamp(x, pos.room.x + margin, pos.room.x + pos.room.w - margin),
+    y: clamp(y, pos.room.y + margin, pos.room.y + pos.room.h - margin),
+  }
+}
+
+function stableAngle(value: string): number {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) hash = Math.imul(hash ^ value.charCodeAt(i), 2654435761)
+  return ((hash >>> 0) / 4294967295) * Math.PI * 2
 }
 
 function carePairsForActiveAgents(active: ActiveAgent[]): CarePair[] {
@@ -989,8 +1074,20 @@ function toColor(hex: string) {
   return Phaser.Display.Color.HexStringToColor(hex).color
 }
 
-function formatTime(minutes: number) {
-  const hour = Math.floor(minutes / 60)
-  const minute = Math.floor(minutes % 60)
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+function formatHorizonTime(minutes: number, horizonYears: number) {
+  const totalDays = Math.max(1, horizonYears) * 365
+  const dayIndex = Math.floor(minutes / (24 * 60)) % totalDays
+  const year = Math.floor(dayIndex / 365) + 1
+  const day = dayIndex % 365 + 1
+  return `Ano ${year} · dia ${day}`
+}
+
+function wrapMinute(minute: number, duration: number) {
+  if (duration <= 0) return 0
+  return ((minute % duration) + duration) % duration
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (min > max) return (min + max) / 2
+  return Math.max(min, Math.min(max, value))
 }
