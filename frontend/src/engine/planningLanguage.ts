@@ -75,42 +75,66 @@ export const DEFAULT_PLANNING_SCRIPT = `plan:
   floors: [S1, PB, P1, P2, P3, P4, P5, P6, P7, P8]
 clear: true
 
-shared:
-  note: Pasillos, refugios y sectorizacion se repiten en todas las plantas.
-
-corridors:
-  - template: clinical
-    id: clinical
-    floors: all
-    at: [0, 31]
-    size: [100, 7]
-    name: Pasillo clinico principal
-  - template: public
-    id: public
-    floors: all
-    at: [47, 0]
-    size: [9, 70]
-    name: Pasillo publico vertical
-  - template: logistics
-    id: logistics
-    floors: all
-    at: [0, 58]
-    size: [100, 5]
-    name: Pasillo logistico
-
-rooms:
-  - template: refuge
-    id: refuge
-    floors: all
-    at: [56, 63]
-    size: [8, 5]
-    name: Refugio horizontal
-  - template: fire
-    id: pci
-    floors: all
-    at: [56, 1]
-    size: [8, 5]
-    name: Sector PCI
+generics:
+  note: Elementos repetidos o compartidos por varias plantas.
+  corridors:
+    - template: clinical
+      id: clinical
+      floors: all
+      at: [0, 31]
+      size: [100, 7]
+      name: Pasillo clinico principal
+    - template: public
+      id: public
+      floors: all
+      at: [47, 0]
+      size: [9, 70]
+      name: Pasillo publico vertical
+    - template: logistics
+      id: logistics
+      floors: all
+      at: [0, 58]
+      size: [100, 5]
+      name: Pasillo logistico
+  rooms:
+    - template: refuge
+      id: refuge
+      floors: all
+      at: [56, 63]
+      size: [8, 5]
+      name: Refugio horizontal
+    - template: fire
+      id: pci
+      floors: all
+      at: [56, 1]
+      size: [8, 5]
+      name: Sector PCI
+  verticals:
+    - template: core
+      floors: S1..P8
+      at: [56, 23]
+      size: [8, 8]
+      group: asc-core-central
+      name: Nucleo vertical central
+    - template: stair
+      floors: S1..P8
+      at: [4, 21]
+      size: [5, 10]
+      group: stair-emergency-west
+      name: Escalera emergencia oeste
+    - template: stair
+      floors: S1..P8
+      at: [94, 38]
+      size: [5, 10]
+      group: stair-emergency-east
+      name: Escalera emergencia este
+  connections:
+    - from: asc-core-central
+      to: clinical
+    - from: stair-emergency-west
+      to: clinical
+    - from: stair-emergency-east
+      to: clinical
 
 levels:
   S1:
@@ -302,33 +326,7 @@ levels:
         at: [66, 12]
         size: [22, 18]
 
-verticals:
-  - template: core
-    floors: S1..P8
-    at: [56, 23]
-    size: [8, 8]
-    group: asc-core-central
-    name: Nucleo vertical central
-  - template: stair
-    floors: S1..P8
-    at: [4, 21]
-    size: [5, 10]
-    group: stair-emergency-west
-    name: Escalera emergencia oeste
-  - template: stair
-    floors: S1..P8
-    at: [94, 38]
-    size: [5, 10]
-    group: stair-emergency-east
-    name: Escalera emergencia este
-
-connections:
-  - from: asc-core-central
-    to: clinical
-  - from: stair-emergency-west
-    to: clinical
-  - from: stair-emergency-east
-    to: clinical`
+`
 
 export function compilePlanningScript(source: string, basePlan: HospitalPlan): PlanningLanguageResult {
   if (!looksLikeYaml(source)) {
@@ -338,7 +336,7 @@ export function compilePlanningScript(source: string, basePlan: HospitalPlan): P
       diagnostics: [{
         level: 'error',
         line: 1,
-        message: 'El planificador solo acepta plantillas YAML con claves como plan, clear, rooms, corridors, verticals o connections.',
+        message: 'El planificador solo acepta plantillas YAML con claves como plan, clear, generics, levels, rooms, corridors, verticals o connections.',
       }],
       appliedLines: 0,
     }
@@ -389,6 +387,8 @@ function compileStructuredTemplate(source: string, basePlan: HospitalPlan): Plan
       state.appliedLines += 1
     }
 
+    applyGenericEntries(root.generics, state)
+
     for (const item of listFromValue(root.corridors)) {
       const rooms = roomsFromStructuredEntry(item, state, 'corridor')
       state.rooms.push(...rooms)
@@ -407,6 +407,11 @@ function compileStructuredTemplate(source: string, basePlan: HospitalPlan): Plan
     }
 
     applyLevelEntries(root.levels, state)
+
+    const generics = asRecord(root.generics)
+    for (const item of listFromValue(generics?.connections)) {
+      state.appliedLines += applyConnectionEntry(item, state)
+    }
 
     for (const item of listFromValue(root.connections)) {
       state.appliedLines += applyConnectionEntry(item, state)
@@ -472,6 +477,28 @@ function finishResult(state: ScriptState): PlanningLanguageResult {
     },
     diagnostics: state.diagnostics,
     appliedLines: state.appliedLines,
+  }
+}
+
+function applyGenericEntries(value: unknown, state: ScriptState) {
+  if (value === undefined || value === null) return
+  const generics = requireRecord(value, 'generics debe ser un objeto')
+
+  for (const item of listFromValue(generics.corridors)) {
+    const rooms = roomsFromStructuredEntry(item, state, 'corridor')
+    state.rooms.push(...rooms)
+    state.appliedLines += rooms.length
+  }
+
+  for (const item of listFromValue(generics.rooms)) {
+    const rooms = roomsFromStructuredEntry(item, state, 'room')
+    state.rooms.push(...rooms)
+    state.appliedLines += rooms.length
+  }
+
+  for (const item of listFromValue(generics.verticals)) {
+    state.rooms.push(...verticalsFromStructuredEntry(item, state))
+    state.appliedLines += 1
   }
 }
 
@@ -657,7 +684,7 @@ function addUnique(values: string[] | undefined, next: string): string[] {
 }
 
 function looksLikeYaml(source: string): boolean {
-  return /^\s*(plan|target|site|floors|clear|levels|rooms|corridors|verticals|connections)\s*:/m.test(source)
+  return /^\s*(plan|target|site|floors|clear|generics|levels|rooms|corridors|verticals|connections)\s*:/m.test(source)
 }
 
 function requireRecord(value: unknown, message: string): Record<string, unknown> {

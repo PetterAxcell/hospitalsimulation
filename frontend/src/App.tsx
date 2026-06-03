@@ -641,12 +641,36 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
             <ol>
               <li><strong>`plan`</strong> define nombre, m2 objetivo, parcela y plantas.</li>
               <li><strong>`clear`</strong> decide si el YAML reemplaza el plano actual.</li>
+              <li><strong>`generics`</strong> guarda pasillos, nucleos y piezas repetidas en varias plantas.</li>
               <li><strong>`levels`</strong> agrupa `rooms`, `corridors` y `connections` por planta.</li>
               <li><strong>`corridors`</strong> crea pasillos publicos, clinicos o logisticos.</li>
               <li><strong>`rooms`</strong> crea servicios hospitalarios desde el catalogo.</li>
               <li><strong>`verticals`</strong> replica nucleos por planta y los agrupa.</li>
               <li><strong>`connections`</strong> declara accesos logicos entre bloques.</li>
             </ol>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Genericos</h3>
+            <p>`generics` separa lo compartido del detalle por planta: pasillos que se repiten, ascensores, escaleras, refugios o sectores PCI.</p>
+            <pre>{`generics:
+  corridors:
+    - template: clinical
+      id: clinical
+      floors: all
+      at: [0, 31]
+      size: [100, 7]
+
+  verticals:
+    - template: core
+      group: asc-core-central
+      floors: S1..P8
+      at: [56, 23]
+      size: [8, 8]
+
+  connections:
+    - from: asc-core-central
+      to: clinical`}</pre>
           </section>
 
           <section className="script-info-card">
@@ -705,16 +729,17 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
             <div className="script-code-pair">
               <div>
                 <h4>YAML que escribes</h4>
-                <pre>{`corridors:
-  - template: clinical
-    id: clinical
-    floors: S1..P8
-    at: [0, 31]
-    size: [100, 7]
+                <pre>{`generics:
+  corridors:
+    - template: clinical
+      id: clinical
+      floors: S1..P8
+      at: [0, 31]
+      size: [100, 7]
 
-connections:
-  - from: asc-core-central
-    to: clinical`}</pre>
+  connections:
+    - from: asc-core-central
+      to: clinical`}</pre>
               </div>
               <div>
                 <h4>Como se ve conectado</h4>
@@ -740,12 +765,13 @@ connections:
             <div className="script-code-pair">
               <div>
                 <h4>YAML que escribes</h4>
-                <pre>{`verticals:
-  - template: core
-    group: asc-core-central
-    floors: S1..P2
-    at: [50, 20]
-    size: [8, 8]`}</pre>
+                <pre>{`generics:
+  verticals:
+    - template: core
+      group: asc-core-central
+      floors: S1..P2
+      at: [50, 20]
+      size: [8, 8]`}</pre>
               </div>
               <div>
                 <h4>Como se ve por plantas</h4>
@@ -772,7 +798,7 @@ connections:
               <li>Usa `floor: PB` para una planta o `floors: S1..P8` / `floors: all` para repetir una pieza.</li>
               <li>Usa `PB`, `P1`, `P2`, `S1` o numeros para plantas.</li>
               <li>Usa `at: [x, y]` y `size: [w, h]`; el lienzo es de 100 x 70 unidades.</li>
-              <li>Usa listas con guion en `rooms`, `corridors`, `verticals` y `connections`.</li>
+              <li>Usa listas con guion dentro de `generics` o dentro de cada planta en `levels`.</li>
               <li>Alias utiles: `hall`, `waiting`, `boxes`, `triage`, `icu`, `ward`, `public`, `clinical`, `logistics`, `core`, `stair`.</li>
             </ul>
           </section>

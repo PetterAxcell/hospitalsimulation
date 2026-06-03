@@ -661,7 +661,7 @@ class HospitalGameScene extends Phaser.Scene {
 
   private layoutCamera() {
     if (!this.cameras.main) return
-    const zoom = Math.max(this.scale.width / WORLD_PX_W, this.scale.height / WORLD_PX_H)
+    const zoom = Math.min(this.scale.width / WORLD_PX_W, this.scale.height / WORLD_PX_H) * 0.98
     this.cameras.main.setZoom(zoom)
     this.cameras.main.centerOn(WORLD_PX_W / 2, WORLD_PX_H / 2)
   }
