@@ -124,32 +124,93 @@ export function buildAccessiblePatientRoute(rooms: PlacedRoom[], serviceRooms: P
 }
 
 export function findPassagePath(rooms: PlacedRoom[], from: PlacedRoom, to: PlacedRoom): PlacedRoom[] | null {
+  if (from.floor !== to.floor) return findCrossFloorPassagePath(rooms, from, to)?.path ?? null
+  return findWeightedPassagePath(rooms, from, to, { allowVerticalTransitions: false })?.path ?? null
+}
+
+function findCrossFloorPassagePath(rooms: PlacedRoom[], from: PlacedRoom, to: PlacedRoom): WeightedPath | null {
   const passages = rooms.filter(isPassage)
-  const graph = buildPassageGraph(passages)
-  const byId = new Map(passages.map((room) => [room.id, room]))
-  const startPassages = accessPassages(passages, from)
-  const goalIds = new Set(accessPassages(passages, to).map((room) => room.id))
+  const fromVerticals = passages.filter((room) => room.kind === 'vertical' && room.floor === from.floor)
+  const toVerticals = passages.filter((room) => room.kind === 'vertical' && room.floor === to.floor)
+  let best: WeightedPath | null = null
 
-  if (startPassages.length === 0 || goalIds.size === 0) return null
+  for (const fromVertical of fromVerticals) {
+    const startPath = findWeightedPassagePath(rooms, from, fromVertical, { allowVerticalTransitions: false })
+    if (!startPath) continue
 
-  const queue = [...startPassages.map((room) => room.id)]
-  const visited = new Set(queue)
-  const parent = new Map<string, string | null>(queue.map((id) => [id, null]))
+    for (const toVertical of toVerticals) {
+      if (!verticalConnectorsMatch(fromVertical, toVertical)) continue
+      const endPath = findWeightedPassagePath(rooms, toVertical, to, { allowVerticalTransitions: false })
+      if (!endPath) continue
 
-  while (queue.length > 0) {
-    const current = queue.shift()
-    if (!current) break
-    if (goalIds.has(current)) return reconstructPath(current, parent, byId)
+      const path: PlacedRoom[] = []
+      startPath.path.forEach((room) => appendUnique(path, room))
+      appendUnique(path, toVertical)
+      endPath.path.forEach((room) => appendUnique(path, room))
 
-    for (const next of graph.get(current) ?? []) {
-      if (visited.has(next)) continue
-      visited.add(next)
-      parent.set(next, current)
-      queue.push(next)
+      const cost = startPath.cost + verticalTransferCost(fromVertical, toVertical) + endPath.cost
+      if (!best || cost < best.cost) best = { path, cost }
     }
   }
 
-  return null
+  return best
+}
+
+interface WeightedPath {
+  path: PlacedRoom[]
+  cost: number
+}
+
+function findWeightedPassagePath(
+  rooms: PlacedRoom[],
+  from: PlacedRoom,
+  to: PlacedRoom,
+  options: { allowVerticalTransitions: boolean },
+): WeightedPath | null {
+  const passages = rooms.filter(isPassage)
+  const graph = buildWeightedPassageGraph(passages, options)
+  const byId = new Map(passages.map((room) => [room.id, room]))
+  const startPassages = accessPassages(passages, from)
+  const goalPassages = accessPassages(passages, to)
+  const goalIds = new Set(goalPassages.map((room) => room.id))
+
+  if (startPassages.length === 0 || goalIds.size === 0) return null
+
+  const unsettled = new Set(passages.map((room) => room.id))
+  const distanceById = new Map<string, number>()
+  const parent = new Map<string, string | null>()
+  startPassages.forEach((room) => {
+    distanceById.set(room.id, accessCost(from, room))
+    parent.set(room.id, null)
+  })
+
+  while (unsettled.size > 0) {
+    const current = nearestUnsettled(unsettled, distanceById)
+    if (!current) break
+    unsettled.delete(current)
+
+    for (const edge of graph.get(current) ?? []) {
+      if (!unsettled.has(edge.id)) continue
+      const nextDistance = (distanceById.get(current) ?? Infinity) + edge.cost
+      if (nextDistance < (distanceById.get(edge.id) ?? Infinity)) {
+        distanceById.set(edge.id, nextDistance)
+        parent.set(edge.id, current)
+      }
+    }
+  }
+
+  const bestGoal = goalPassages
+    .map((room) => ({
+      room,
+      cost: (distanceById.get(room.id) ?? Infinity) + accessCost(to, room),
+    }))
+    .sort((a, b) => a.cost - b.cost)[0]
+  if (!bestGoal || !Number.isFinite(bestGoal.cost)) return null
+
+  return {
+    path: reconstructPath(bestGoal.room.id, parent, byId),
+    cost: bestGoal.cost,
+  }
 }
 
 function accessPassages(passages: PlacedRoom[], room: PlacedRoom): PlacedRoom[] {
@@ -213,6 +274,74 @@ function buildPassageGraph(passages: PlacedRoom[]): Map<string, string[]> {
   }
 
   return graph
+}
+
+function buildWeightedPassageGraph(
+  passages: PlacedRoom[],
+  options: { allowVerticalTransitions: boolean },
+): Map<string, Array<{ id: string; cost: number }>> {
+  const graph = new Map(passages.map((room) => [room.id, [] as Array<{ id: string; cost: number }>]))
+
+  for (let i = 0; i < passages.length; i += 1) {
+    for (let j = i + 1; j < passages.length; j += 1) {
+      const a = passages[i]
+      const b = passages[j]
+      if (!options.allowVerticalTransitions && a.floor !== b.floor) continue
+      if (!passagesConnect(a, b)) continue
+      const cost = passageEdgeCost(a, b)
+      graph.get(a.id)?.push({ id: b.id, cost })
+      graph.get(b.id)?.push({ id: a.id, cost })
+    }
+  }
+
+  return graph
+}
+
+function nearestUnsettled(unsettled: Set<string>, distanceById: Map<string, number>): string | undefined {
+  let bestId: string | undefined
+  let bestDistance = Infinity
+  unsettled.forEach((id) => {
+    const distance = distanceById.get(id) ?? Infinity
+    if (distance < bestDistance) {
+      bestId = id
+      bestDistance = distance
+    }
+  })
+  return bestId
+}
+
+function passageEdgeCost(a: PlacedRoom, b: PlacedRoom): number {
+  if (a.floor !== b.floor) return verticalTransferCost(a, b)
+  const aPoint = roomCenter(a)
+  const bPoint = roomCenter(b)
+  return Math.max(0.5, Math.hypot(aPoint.x - bPoint.x, aPoint.y - bPoint.y))
+}
+
+function verticalTransferCost(a: PlacedRoom, b: PlacedRoom): number {
+  const floorDelta = Math.max(1, Math.abs(a.floor - b.floor))
+  const usesEmergencyStair = a.simulationNode === 'emergency_stair' || b.simulationNode === 'emergency_stair'
+  return floorDelta * (usesEmergencyStair ? 10 : 7)
+}
+
+function accessCost(room: PlacedRoom, passage: PlacedRoom): number {
+  if (room.id === passage.id) return 0
+  const roomPoint = roomCenter(room)
+  const passagePoint = closestPointOnRoom(roomPoint, passage)
+  return Math.max(0.2, Math.hypot(roomPoint.x - passagePoint.x, roomPoint.y - passagePoint.y))
+}
+
+function roomCenter(room: PlacedRoom): DoorPoint {
+  return {
+    x: room.x + room.w / 2,
+    y: room.y + room.h / 2,
+  }
+}
+
+function closestPointOnRoom(point: DoorPoint, room: PlacedRoom): DoorPoint {
+  return {
+    x: clamp(point.x, room.x, room.x + room.w),
+    y: clamp(point.y, room.y, room.y + room.h),
+  }
 }
 
 function passagesConnect(a: PlacedRoom, b: PlacedRoom): boolean {

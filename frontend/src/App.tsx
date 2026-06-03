@@ -650,7 +650,7 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
 
           <section className="script-info-card">
             <h3>Una sala, paso a paso</h3>
-            <p>El parser toma cada entrada de `rooms`, resuelve el alias de `template`, convierte la planta a numero y calcula posicion, tamano y area.</p>
+            <p>El parser toma cada entrada de `rooms`, resuelve el alias de `template`, convierte `floor` o `floors` a plantas y calcula posicion, tamano y area.</p>
             <div className="script-code-pair">
               <div>
                 <h4>YAML que escribes</h4>
@@ -687,14 +687,14 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
                 <h4>YAML que escribes</h4>
                 <pre>{`corridors:
   - template: clinical
-    id: clinical-pb
-    floor: PB
+    id: clinical
+    floors: S1..P8
     at: [0, 31]
     size: [100, 7]
 
 connections:
-  - from: boxes-pb
-    to: clinical-pb`}</pre>
+  - from: asc-core-central
+    to: clinical`}</pre>
               </div>
               <div>
                 <h4>Como se ve conectado</h4>
@@ -708,7 +708,7 @@ connections:
                     <strong>clinical-pb</strong>
                     <span>Pasillo clinico</span>
                   </div>
-                  <small>La conexion crea acceso entre ambos bloques sin dibujar otro pasillo.</small>
+                  <small>La conexion enlaza bloques que ya estan en contacto fisico, sin dibujar otro pasillo.</small>
                 </div>
               </div>
             </div>
@@ -749,6 +749,7 @@ connections:
             <h3>Reglas para escribir sin perderse</h3>
             <ul>
               <li>Usa `id` estables si luego vas a conectar bloques.</li>
+              <li>Usa `floor: PB` para una planta o `floors: S1..P8` / `floors: all` para repetir una pieza.</li>
               <li>Usa `PB`, `P1`, `P2`, `S1` o numeros para plantas.</li>
               <li>Usa `at: [x, y]` y `size: [w, h]`; el lienzo es de 100 x 70 unidades.</li>
               <li>Usa listas con guion en `rooms`, `corridors`, `verticals` y `connections`.</li>
