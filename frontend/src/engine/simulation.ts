@@ -1,4 +1,4 @@
-import { parse as parseYaml } from 'yaml'
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { buildAccessiblePatientRoute, isPassage } from './circulation'
 import { distance, roomByNode } from './geometry'
 import type {
@@ -778,6 +778,43 @@ export function compileClinicalCases(source: string): ClinicalCaseCompileResult 
   }
 }
 
+export function clinicalCaseYamlFromSource(source: string, caseId: PatientCaseId, fallbackCases: PatientCaseDefinition[] = DEFAULT_PATIENT_CASES): string {
+  try {
+    const root = requireRecord(parseYaml(source), 'El YAML de casos debe ser un objeto con la clave cases.')
+    const entry = listFromValue(root.cases).find((item) => {
+      const record = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : undefined
+      return record?.id === caseId
+    })
+    if (entry) return stringifyClinicalCases([entry])
+  } catch {
+    // Fall back to the runtime case below.
+  }
+
+  const fallback = fallbackCases.find((item) => item.id === caseId)
+  if (!fallback) return stringifyClinicalCases([])
+  return stringifyClinicalCases([caseDefinitionToYamlEntry(fallback)])
+}
+
+export function replaceClinicalCaseInYaml(source: string, caseSource: string, targetCaseId: PatientCaseId): string {
+  const root = requireRecord(parseYaml(source), 'El YAML de casos debe ser un objeto con la clave cases.')
+  const cases = listFromValue(root.cases)
+  const replacementRoot = requireRecord(parseYaml(caseSource), 'El YAML del caso debe ser un objeto.')
+  const replacements = listFromValue(replacementRoot.cases ?? replacementRoot)
+  if (replacements.length !== 1) throw new Error('Edita un unico caso en este modal.')
+
+  const replacement = requireRecord(replacements[0], 'El caso debe ser un objeto.')
+  requiredString(replacement.id, 'case.id')
+  const index = cases.findIndex((item) => {
+    const record = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : undefined
+    return record?.id === targetCaseId
+  })
+  const nextCases = [...cases]
+  if (index >= 0) nextCases[index] = replacement
+  else nextCases.push(replacement)
+
+  return stringifyYaml({ ...root, cases: nextCases }, { lineWidth: 0 }).trimEnd()
+}
+
 export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSettings, patientCases: PatientCaseDefinition[] = DEFAULT_PATIENT_CASES): SimulationResult {
   const activeCases = patientCases.length > 0 ? patientCases : DEFAULT_PATIENT_CASES
   const rng = mulberry32(settings.seed)
@@ -1409,6 +1446,24 @@ function simulationNodeFromValue(value: unknown, path: string): SimulationNode {
 
 function titleFromNode(node: SimulationNode): string {
   return node.split('_').map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(' ')
+}
+
+function stringifyClinicalCases(cases: unknown[]): string {
+  return stringifyYaml({ cases }, { lineWidth: 0 }).trimEnd()
+}
+
+function caseDefinitionToYamlEntry(patientCase: PatientCaseDefinition): Record<string, unknown> {
+  const sample = patientCase.build(() => 0.5)
+  return {
+    id: patientCase.id,
+    label: patientCase.label,
+    code: patientCase.code,
+    stream: patientCase.stream,
+    severity: patientCase.severity,
+    color: patientCase.color,
+    weight: patientCase.weight,
+    steps: sample.map((step) => ({ node: step.node, phase: step.phase })),
+  }
 }
 
 function requireRecord(value: unknown, message: string): Record<string, unknown> {

@@ -30,7 +30,9 @@ import {
   DEFAULT_CLINICAL_CASES_YAML,
   DEFAULT_PATIENT_CASES,
   DEFAULT_SIMULATION_SETTINGS,
+  clinicalCaseYamlFromSource,
   compileClinicalCases,
+  replaceClinicalCaseInYaml,
   runHospitalSimulation,
   type ClinicalCaseCompileResult,
   type ClinicalCaseDiagnostic,
@@ -87,9 +89,11 @@ function App() {
   const [templateToAdd, setTemplateToAdd] = useState('edBoxes')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
   const [patientCases, setPatientCases] = useState<PatientCaseDefinition[]>(DEFAULT_PATIENT_CASES)
+  const [clinicalCaseLibrarySource, setClinicalCaseLibrarySource] = useState(DEFAULT_CLINICAL_CASES_YAML)
   const [clinicalCaseSource, setClinicalCaseSource] = useState(DEFAULT_CLINICAL_CASES_YAML)
   const [clinicalCaseResult, setClinicalCaseResult] = useState<ClinicalCaseCompileResult | null>(null)
   const [clinicalCaseFileName, setClinicalCaseFileName] = useState('casos-clinicos.yaml')
+  const [editingClinicalCaseId, setEditingClinicalCaseId] = useState<PatientCaseFilter>('all')
   const [selectedCaseId, setSelectedCaseId] = useState<PatientCaseFilter>('all')
   const [simulationAgentLayer, setSimulationAgentLayer] = useState<SimulationAgentLayer>('all')
   const [scriptSource, setScriptSource] = useState(DEFAULT_PLANNING_SCRIPT)
@@ -286,6 +290,7 @@ function App() {
 
   async function loadClinicalCaseTemplate(file: File | undefined) {
     if (!file) return
+    setEditingClinicalCaseId('all')
     setClinicalCaseFileName(file.name)
     if (!file.name.toLowerCase().endsWith('.yaml')) {
       setClinicalCaseResult({
@@ -306,20 +311,105 @@ function App() {
     setClinicalCaseModalOpen(true)
   }
 
-  function saveClinicalCases() {
-    const result = compileClinicalCases(clinicalCaseSource)
-    setClinicalCaseResult(result)
-    if (result.diagnostics.some((diagnostic) => diagnostic.level === 'error')) return
-    setPatientCases(result.cases)
-    setSelectedCaseId('all')
+  function openClinicalCaseLibrary() {
+    setEditingClinicalCaseId('all')
+    setClinicalCaseSource(clinicalCaseLibrarySource)
+    setClinicalCaseFileName('casos-clinicos.yaml')
+    setClinicalCaseResult(null)
+    setClinicalCaseModalOpen(true)
+  }
+
+  function openClinicalCaseEditor(caseId: PatientCaseFilter) {
+    if (caseId === 'all') {
+      openClinicalCaseLibrary()
+      return
+    }
+    setSelectedCaseId(caseId)
+    setEditingClinicalCaseId(caseId)
+    setClinicalCaseSource(clinicalCaseYamlFromSource(clinicalCaseLibrarySource, caseId, patientCases))
+    setClinicalCaseFileName(`${caseId}.yaml`)
+    setClinicalCaseResult(null)
+    setClinicalCaseModalOpen(true)
+  }
+
+  function closeClinicalCaseModal() {
     setClinicalCaseModalOpen(false)
+    if (editingClinicalCaseId !== 'all') {
+      setEditingClinicalCaseId('all')
+      setClinicalCaseSource(clinicalCaseLibrarySource)
+      setClinicalCaseFileName('casos-clinicos.yaml')
+      setClinicalCaseResult(null)
+    }
+  }
+
+  function resetClinicalCaseDraft() {
+    if (editingClinicalCaseId === 'all') {
+      setClinicalCaseSource(DEFAULT_CLINICAL_CASES_YAML)
+      setClinicalCaseFileName('casos-clinicos.yaml')
+      setClinicalCaseResult(null)
+      return
+    }
+    setClinicalCaseSource(clinicalCaseYamlFromSource(clinicalCaseLibrarySource, editingClinicalCaseId, patientCases))
+    setClinicalCaseFileName(`${editingClinicalCaseId}.yaml`)
+    setClinicalCaseResult(null)
+  }
+
+  function saveClinicalCases() {
+    if (editingClinicalCaseId === 'all') {
+      const result = compileClinicalCases(clinicalCaseSource)
+      setClinicalCaseResult(result)
+      if (result.diagnostics.some((diagnostic) => diagnostic.level === 'error')) return
+      setPatientCases(result.cases)
+      setClinicalCaseLibrarySource(clinicalCaseSource)
+      setSelectedCaseId('all')
+      setClinicalCaseModalOpen(false)
+      return
+    }
+
+    const singleResult = compileClinicalCases(clinicalCaseSource)
+    if (singleResult.diagnostics.some((diagnostic) => diagnostic.level === 'error') || singleResult.cases.length !== 1) {
+      setClinicalCaseResult({
+        ...singleResult,
+        diagnostics: singleResult.diagnostics.length > 0
+          ? singleResult.diagnostics
+          : [{ level: 'error', line: 1, message: 'Este editor debe guardar un unico caso clinico.' }],
+      })
+      return
+    }
+
+    try {
+      const nextLibrarySource = replaceClinicalCaseInYaml(clinicalCaseLibrarySource, clinicalCaseSource, editingClinicalCaseId)
+      const libraryResult = compileClinicalCases(nextLibrarySource)
+      setClinicalCaseResult(libraryResult)
+      if (libraryResult.diagnostics.some((diagnostic) => diagnostic.level === 'error')) return
+      const nextCaseId = singleResult.cases[0].id
+      setClinicalCaseLibrarySource(nextLibrarySource)
+      setClinicalCaseSource(nextLibrarySource)
+      setPatientCases(libraryResult.cases)
+      setSelectedCaseId(nextCaseId)
+      setEditingClinicalCaseId('all')
+      setClinicalCaseFileName('casos-clinicos.yaml')
+      setClinicalCaseModalOpen(false)
+    } catch (error) {
+      setClinicalCaseResult({
+        cases: patientCases,
+        diagnostics: [{
+          level: 'error',
+          line: 1,
+          message: error instanceof Error ? error.message : String(error),
+        }],
+        appliedCases: 0,
+      })
+    }
   }
 
   function resetClinicalCases() {
     setPatientCases(DEFAULT_PATIENT_CASES)
+    setClinicalCaseLibrarySource(DEFAULT_CLINICAL_CASES_YAML)
     setClinicalCaseSource(DEFAULT_CLINICAL_CASES_YAML)
     setClinicalCaseFileName('casos-clinicos.yaml')
     setClinicalCaseResult(null)
+    setEditingClinicalCaseId('all')
     setSelectedCaseId('all')
   }
 
@@ -386,7 +476,8 @@ function App() {
                 agentLayer={simulationAgentLayer}
                 fileName={clinicalCaseFileName}
                 diagnostics={clinicalCaseResult?.diagnostics ?? []}
-                onEditCases={() => setClinicalCaseModalOpen(true)}
+                onEditCases={openClinicalCaseLibrary}
+                onEditCase={openClinicalCaseEditor}
                 onUploadCases={loadClinicalCaseTemplate}
                 onResetCases={resetClinicalCases}
                 onSelectCase={setSelectedCaseId}
@@ -519,17 +610,14 @@ function App() {
           source={clinicalCaseSource}
           result={clinicalCaseResult}
           fileName={clinicalCaseFileName}
+          editingCaseId={editingClinicalCaseId}
           helpOpen={isClinicalCaseHelpOpen}
           onChange={setClinicalCaseSource}
           onSave={saveClinicalCases}
-          onReset={() => {
-            setClinicalCaseSource(DEFAULT_CLINICAL_CASES_YAML)
-            setClinicalCaseFileName('casos-clinicos.yaml')
-            setClinicalCaseResult(null)
-          }}
+          onReset={resetClinicalCaseDraft}
           onUpload={loadClinicalCaseTemplate}
           onToggleHelp={() => setClinicalCaseHelpOpen((current) => !current)}
-          onClose={() => setClinicalCaseModalOpen(false)}
+          onClose={closeClinicalCaseModal}
         />
       )}
     </main>
@@ -856,6 +944,7 @@ function ClinicalCasesModal({
   source,
   result,
   fileName,
+  editingCaseId,
   helpOpen,
   onChange,
   onSave,
@@ -867,6 +956,7 @@ function ClinicalCasesModal({
   source: string
   result: ClinicalCaseCompileResult | null
   fileName: string
+  editingCaseId: PatientCaseFilter
   helpOpen: boolean
   onChange: (value: string) => void
   onSave: () => void
@@ -876,14 +966,15 @@ function ClinicalCasesModal({
   onClose: () => void
 }) {
   const hasErrors = result?.diagnostics.some((diagnostic) => diagnostic.level === 'error') ?? false
+  const editingSingleCase = editingCaseId !== 'all'
 
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="script-modal" role="dialog" aria-modal="true" aria-labelledby="clinical-cases-modal-title">
         <header className="script-modal-header">
           <div>
-            <h2 id="clinical-cases-modal-title">Programar casos clinicos</h2>
-            <p>{fileName}</p>
+            <h2 id="clinical-cases-modal-title">{editingSingleCase ? 'Programar caso clinico' : 'Programar casos clinicos'}</h2>
+            <p>{editingSingleCase ? `${fileName} · recorrido editable` : fileName}</p>
           </div>
           <div className="script-modal-actions">
             <button type="button" className="info-action" onClick={onToggleHelp} aria-haspopup="dialog" aria-expanded={helpOpen}>Info</button>
@@ -892,18 +983,21 @@ function ClinicalCasesModal({
         </header>
 
         <div className="script-toolbar">
-          <label className="file-action">
-            Subir .yaml
-            <input
-              type="file"
-              accept=".yaml"
-              onChange={(event) => {
-                void onUpload(event.currentTarget.files?.[0])
-                event.currentTarget.value = ''
-              }}
-            />
-          </label>
+          {!editingSingleCase && (
+            <label className="file-action">
+              Subir .yaml
+              <input
+                type="file"
+                accept=".yaml"
+                onChange={(event) => {
+                  void onUpload(event.currentTarget.files?.[0])
+                  event.currentTarget.value = ''
+                }}
+              />
+            </label>
+          )}
           {result && <span>{hasErrors ? 'No aplicado' : `${result.appliedCases} casos aplicados`}</span>}
+          {editingSingleCase && <span>Edita `steps`, `chance` y `choose` para cambiar el recorrido.</span>}
         </div>
 
         <textarea
@@ -927,10 +1021,10 @@ function ClinicalCasesModal({
         </footer>
 
         <div className="script-modal-footer">
-          <button type="button" onClick={onReset}>Restaurar ejemplo</button>
+          <button type="button" onClick={onReset}>{editingSingleCase ? 'Restaurar caso' : 'Restaurar ejemplo'}</button>
           <div className="script-footer-actions">
             <button type="button" onClick={onClose}>Cancelar</button>
-            <button type="button" className="primary-action" onClick={onSave}>Guardar casos</button>
+            <button type="button" className="primary-action" onClick={onSave}>{editingSingleCase ? 'Guardar caso' : 'Guardar casos'}</button>
           </div>
         </div>
       </section>
@@ -1079,6 +1173,7 @@ function SimulationCaseSelector({
   fileName,
   diagnostics,
   onEditCases,
+  onEditCase,
   onUploadCases,
   onResetCases,
   onSelectCase,
@@ -1090,6 +1185,7 @@ function SimulationCaseSelector({
   fileName: string
   diagnostics: ClinicalCaseDiagnostic[]
   onEditCases: () => void
+  onEditCase: (caseId: PatientCaseFilter) => void
   onUploadCases: (file: File | undefined) => void
   onResetCases: () => void
   onSelectCase: (caseId: PatientCaseFilter) => void
@@ -1188,7 +1284,10 @@ function SimulationCaseSelector({
                 type="button"
                 className={`case-item ${selectedCaseId === stat.id ? 'is-active' : ''}`}
                 style={{ borderLeftColor: stat.color }}
-                onClick={() => onSelectCase(stat.id)}
+                onClick={() => {
+                  onSelectCase(stat.id)
+                  onEditCase(stat.id)
+                }}
               >
                 <strong>{stat.label}</strong>
                 <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
