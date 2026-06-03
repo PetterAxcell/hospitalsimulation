@@ -641,11 +641,31 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
             <ol>
               <li><strong>`plan`</strong> define nombre, m2 objetivo, parcela y plantas.</li>
               <li><strong>`clear`</strong> decide si el YAML reemplaza el plano actual.</li>
+              <li><strong>`levels`</strong> agrupa `rooms`, `corridors` y `connections` por planta.</li>
               <li><strong>`corridors`</strong> crea pasillos publicos, clinicos o logisticos.</li>
               <li><strong>`rooms`</strong> crea servicios hospitalarios desde el catalogo.</li>
               <li><strong>`verticals`</strong> replica nucleos por planta y los agrupa.</li>
               <li><strong>`connections`</strong> declara accesos logicos entre bloques.</li>
             </ol>
+          </section>
+
+          <section className="script-info-card">
+            <h3>Organizar por plantas</h3>
+            <p>`levels` permite que cada planta tenga su propio bloque. Si una sala esta dentro de `PB`, no hace falta escribir `floor: PB` en cada elemento.</p>
+            <pre>{`levels:
+  PB:
+    rooms:
+      - template: triage
+        id: triage-pb
+        at: [68, 16]
+        size: [11, 8]
+
+  P1:
+    rooms:
+      - template: or
+        id: or-p1
+        at: [64, 14]
+        size: [23, 17]`}</pre>
           </section>
 
           <section className="script-info-card">

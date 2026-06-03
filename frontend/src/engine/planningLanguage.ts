@@ -75,6 +75,9 @@ export const DEFAULT_PLANNING_SCRIPT = `plan:
   floors: [S1, PB, P1, P2, P3, P4, P5, P6, P7, P8]
 clear: true
 
+shared:
+  note: Pasillos, refugios y sectorizacion se repiten en todas las plantas.
+
 corridors:
   - template: clinical
     id: clinical
@@ -94,12 +97,6 @@ corridors:
     at: [0, 58]
     size: [100, 5]
     name: Pasillo logistico
-  - template: clinical
-    id: ambulance-flow-pb
-    floor: PB
-    at: [68, 24]
-    size: [22, 7]
-    name: Pasillo ambulancias-urgencias
 
 rooms:
   - template: refuge
@@ -114,195 +111,196 @@ rooms:
     at: [56, 1]
     size: [8, 5]
     name: Sector PCI
-  - template: logisticsDock
-    id: logistics-s1
-    floor: S1
-    at: [72, 18]
-    size: [19, 13]
-  - template: cssd
-    id: cssd-s1
-    floor: S1
-    at: [56, 8]
-    size: [14, 11]
-  - template: mep
-    id: mep-s1
-    floor: S1
-    at: [15, 17]
-    size: [21, 14]
-  - template: lab
-    id: lab-s1
-    floor: S1
-    at: [58, 46]
-    size: [18, 12]
-  - template: blood
-    id: blood-s1
-    floor: S1
-    at: [78, 48]
-    size: [10, 10]
-  - template: hall
-    id: hall-pb
-    floor: PB
-    at: [29, 17]
-    size: [18, 14]
-  - template: waiting
-    id: waiting-pb
-    floor: PB
-    at: [8, 38]
-    size: [22, 13]
-  - template: ambulances
-    id: ambulance-pb
-    floor: PB
-    at: [80, 14]
-    size: [15, 10]
-  - template: triage
-    id: triage-pb
-    floor: PB
-    at: [68, 16]
-    size: [11, 8]
-  - template: resus
-    id: resus-pb
-    floor: PB
-    at: [78, 38]
-    size: [14, 10]
-  - template: boxes
-    id: boxes-pb
-    floor: PB
-    at: [56, 39]
-    size: [22, 14]
-  - template: observation
-    id: observation-pb
-    floor: PB
-    at: [56, 53]
-    size: [22, 5]
-  - template: imaging
-    id: imaging-pb
-    floor: PB
-    at: [56, 7]
-    size: [16, 9]
-  - template: mental
-    id: mental-pb
-    floor: PB
-    at: [78, 52]
-    size: [12, 6]
-  - template: pharmacy
-    id: pharmacy-pb
-    floor: PB
-    at: [31, 38]
-    size: [11, 8]
-  - template: healingCourtyard
-    id: courtyard-pb
-    floor: PB
-    at: [15, 63]
-    size: [25, 6]
-  - template: or
-    id: or-p1
-    floor: P1
-    at: [64, 14]
-    size: [23, 17]
-  - template: hybridOr
-    id: hybrid-p1
-    floor: P1
-    at: [87, 21]
-    size: [10, 10]
-  - template: pacu
-    id: pacu-p1
-    floor: P1
-    at: [56, 38]
-    size: [22, 13]
-  - template: icu
-    id: icu-p1
-    floor: P1
-    at: [78, 38]
-    size: [16, 14]
-  - template: hemo
-    id: hemo-p1
-    floor: P1
-    at: [33, 19]
-    size: [14, 12]
-  - template: command
-    id: command-p1
-    floor: P1
-    at: [16, 21]
-    size: [14, 10]
-  - template: ward
-    id: ward-med-p2
-    floor: P2
-    at: [13, 8]
-    size: [34, 20]
-    name: Hospitalizacion medicina
-  - template: ward
-    id: ward-surg-p2
-    floor: P2
-    at: [64, 11]
-    size: [28, 20]
-    name: Hospitalizacion quirurgica
-  - template: icu
-    id: stepdown-p2
-    floor: P2
-    at: [58, 38]
-    size: [22, 13]
-    name: Step-down / intermedios
-    capacity: 48
-  - template: maternity
-    id: maternity-p3
-    floor: P3
-    at: [16, 12]
-    size: [28, 19]
-  - template: neonatal
-    id: neonatal-p3
-    floor: P3
-    at: [64, 14]
-    size: [24, 17]
-  - template: ward
-    id: peds-p3
-    floor: P3
-    at: [17, 40]
-    size: [30, 14]
-    name: Pediatria y mujer
-  - template: onco
-    id: oncology-p4
-    floor: P4
-    at: [15, 12]
-    size: [31, 19]
-  - template: car_t
-    id: cart-p4
-    floor: P4
-    at: [64, 18]
-    size: [20, 13]
-  - template: research
-    id: research-p4
-    floor: P4
-    at: [13, 43]
-    size: [34, 14]
-  - template: ward
-    id: ward-p5
-    floor: P5
-    at: [15, 13]
-    size: [32, 18]
-    name: Hospitalizacion alta complejidad
-  - template: ward
-    id: ward-p6
-    floor: P6
-    at: [15, 13]
-    size: [32, 18]
-    name: Hospitalizacion convencional
-  - template: ward
-    id: ward-p7
-    floor: P7
-    at: [15, 13]
-    size: [32, 18]
-    name: Hospitalizacion flexible
-  - template: research
-    id: simulation-p8
-    floor: P8
-    at: [18, 13]
-    size: [29, 18]
-    name: Docencia y simulacion clinica
-  - template: future
-    id: future-p8
-    floor: P8
-    at: [66, 12]
-    size: [22, 18]
+
+levels:
+  S1:
+    rooms:
+      - template: logisticsDock
+        id: logistics-s1
+        at: [72, 18]
+        size: [19, 13]
+      - template: cssd
+        id: cssd-s1
+        at: [56, 8]
+        size: [14, 11]
+      - template: mep
+        id: mep-s1
+        at: [15, 17]
+        size: [21, 14]
+      - template: lab
+        id: lab-s1
+        at: [58, 46]
+        size: [18, 12]
+      - template: blood
+        id: blood-s1
+        at: [78, 48]
+        size: [10, 10]
+
+  PB:
+    corridors:
+      - template: clinical
+        id: ambulance-flow-pb
+        at: [68, 24]
+        size: [22, 7]
+        name: Pasillo ambulancias-urgencias
+    rooms:
+      - template: hall
+        id: hall-pb
+        at: [29, 17]
+        size: [18, 14]
+      - template: waiting
+        id: waiting-pb
+        at: [8, 38]
+        size: [22, 13]
+      - template: ambulances
+        id: ambulance-pb
+        at: [80, 14]
+        size: [15, 10]
+      - template: triage
+        id: triage-pb
+        at: [68, 16]
+        size: [11, 8]
+      - template: resus
+        id: resus-pb
+        at: [78, 38]
+        size: [14, 10]
+      - template: boxes
+        id: boxes-pb
+        at: [56, 39]
+        size: [22, 14]
+      - template: observation
+        id: observation-pb
+        at: [56, 53]
+        size: [22, 5]
+      - template: imaging
+        id: imaging-pb
+        at: [56, 7]
+        size: [16, 9]
+      - template: mental
+        id: mental-pb
+        at: [78, 52]
+        size: [12, 6]
+      - template: pharmacy
+        id: pharmacy-pb
+        at: [31, 38]
+        size: [11, 8]
+      - template: healingCourtyard
+        id: courtyard-pb
+        at: [15, 63]
+        size: [25, 6]
+
+  P1:
+    rooms:
+      - template: or
+        id: or-p1
+        at: [64, 14]
+        size: [23, 17]
+      - template: hybridOr
+        id: hybrid-p1
+        at: [87, 21]
+        size: [10, 10]
+      - template: pacu
+        id: pacu-p1
+        at: [56, 38]
+        size: [22, 13]
+      - template: icu
+        id: icu-p1
+        at: [78, 38]
+        size: [16, 14]
+      - template: hemo
+        id: hemo-p1
+        at: [33, 19]
+        size: [14, 12]
+      - template: command
+        id: command-p1
+        at: [16, 21]
+        size: [14, 10]
+
+  P2:
+    rooms:
+      - template: ward
+        id: ward-med-p2
+        at: [13, 8]
+        size: [34, 20]
+        name: Hospitalizacion medicina
+      - template: ward
+        id: ward-surg-p2
+        at: [64, 11]
+        size: [28, 20]
+        name: Hospitalizacion quirurgica
+      - template: icu
+        id: stepdown-p2
+        at: [58, 38]
+        size: [22, 13]
+        name: Step-down / intermedios
+        capacity: 48
+
+  P3:
+    rooms:
+      - template: maternity
+        id: maternity-p3
+        at: [16, 12]
+        size: [28, 19]
+      - template: neonatal
+        id: neonatal-p3
+        at: [64, 14]
+        size: [24, 17]
+      - template: ward
+        id: peds-p3
+        at: [17, 40]
+        size: [30, 14]
+        name: Pediatria y mujer
+
+  P4:
+    rooms:
+      - template: onco
+        id: oncology-p4
+        at: [15, 12]
+        size: [31, 19]
+      - template: car_t
+        id: cart-p4
+        at: [64, 18]
+        size: [20, 13]
+      - template: research
+        id: research-p4
+        at: [13, 43]
+        size: [34, 14]
+
+  P5:
+    rooms:
+      - template: ward
+        id: ward-p5
+        at: [15, 13]
+        size: [32, 18]
+        name: Hospitalizacion alta complejidad
+
+  P6:
+    rooms:
+      - template: ward
+        id: ward-p6
+        at: [15, 13]
+        size: [32, 18]
+        name: Hospitalizacion convencional
+
+  P7:
+    rooms:
+      - template: ward
+        id: ward-p7
+        at: [15, 13]
+        size: [32, 18]
+        name: Hospitalizacion flexible
+
+  P8:
+    rooms:
+      - template: research
+        id: simulation-p8
+        at: [18, 13]
+        size: [29, 18]
+        name: Docencia y simulacion clinica
+      - template: future
+        id: future-p8
+        at: [66, 12]
+        size: [22, 18]
 
 verticals:
   - template: core
@@ -408,6 +406,8 @@ function compileStructuredTemplate(source: string, basePlan: HospitalPlan): Plan
       state.appliedLines += 1
     }
 
+    applyLevelEntries(root.levels, state)
+
     for (const item of listFromValue(root.connections)) {
       state.appliedLines += applyConnectionEntry(item, state)
     }
@@ -475,6 +475,31 @@ function finishResult(state: ScriptState): PlanningLanguageResult {
   }
 }
 
+function applyLevelEntries(value: unknown, state: ScriptState) {
+  if (value === undefined || value === null) return
+  const levels = requireRecord(value, 'levels debe ser un objeto por planta')
+  for (const [floorLabel, rawLevel] of Object.entries(levels)) {
+    const floor = parseFloor(floorLabel)
+    const level = requireRecord(rawLevel, `levels.${floorLabel} debe ser un objeto`)
+
+    for (const item of listFromValue(level.corridors)) {
+      const rooms = roomsFromStructuredEntry(item, state, 'corridor', floor)
+      state.rooms.push(...rooms)
+      state.appliedLines += rooms.length
+    }
+
+    for (const item of listFromValue(level.rooms)) {
+      const rooms = roomsFromStructuredEntry(item, state, 'room', floor)
+      state.rooms.push(...rooms)
+      state.appliedLines += rooms.length
+    }
+
+    for (const item of listFromValue(level.connections)) {
+      state.appliedLines += applyConnectionEntry(withDefaultFloor(item, floor), state)
+    }
+  }
+}
+
 function overlappingRoomPairs(rooms: PlacedRoom[]): string[] {
   const overlaps: string[] = []
   const activeRooms = rooms.filter((room) => room.kind !== 'future')
@@ -492,10 +517,10 @@ function overlappingRoomPairs(rooms: PlacedRoom[]): string[] {
   return overlaps
 }
 
-function roomsFromStructuredEntry(value: unknown, state: ScriptState, command: 'room' | 'corridor'): PlacedRoom[] {
+function roomsFromStructuredEntry(value: unknown, state: ScriptState, command: 'room' | 'corridor', defaultFloor?: number): PlacedRoom[] {
   const item = requireRecord(value, `${command} debe ser un objeto`)
   const template = resolveTemplate(requiredString(item.template, `${command}.template`), command)
-  const floors = parseFloorList(floorTokensFromValue(item.floors ?? item.floor), state.plan.floors)
+  const floors = parseFloorList(floorTokensFromValue(item.floors ?? item.floor ?? defaultFloor), state.plan.floors)
   if (floors.length === 0) throw new Error(`${command}.floor o ${command}.floors necesita al menos una planta`)
   const at = pairFromValue(item.at, `${command}.at`)
   const size = pairFromValue(item.size, `${command}.size`)
@@ -577,6 +602,12 @@ function applyConnectionEntry(value: unknown, state: ScriptState): number {
   return applied
 }
 
+function withDefaultFloor(value: unknown, floor: number): unknown {
+  const item = requireRecord(value, 'connection debe ser un objeto')
+  if (item.floor !== undefined || item.floors !== undefined) return item
+  return { ...item, floor: formatFloorLabel(floor) }
+}
+
 function resolveRoomReferences(value: unknown, state: ScriptState): PlacedRoom[] {
   const refs = listOrSingle(value).flatMap((item) => String(item).split(',')).map((item) => item.trim()).filter(Boolean)
   if (refs.length === 0) throw new Error('connection necesita from/to')
@@ -626,7 +657,7 @@ function addUnique(values: string[] | undefined, next: string): string[] {
 }
 
 function looksLikeYaml(source: string): boolean {
-  return /^\s*(plan|target|site|floors|clear|rooms|corridors|verticals|connections)\s*:/m.test(source)
+  return /^\s*(plan|target|site|floors|clear|levels|rooms|corridors|verticals|connections)\s*:/m.test(source)
 }
 
 function requireRecord(value: unknown, message: string): Record<string, unknown> {
