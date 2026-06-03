@@ -17,6 +17,8 @@ interface SimulationCanvasProps {
   onChangeSpeed: (speed: number) => void
 }
 
+type SimulationViewMode = 'topDown' | 'isometric'
+
 interface SimulationSnapshot {
   plan: HospitalPlan
   selectedFloor: number
@@ -25,6 +27,7 @@ interface SimulationSnapshot {
   motionMinute: number
   selectedCaseId: PatientCaseFilter
   agentLayer: SimulationAgentLayer
+  viewMode: SimulationViewMode
 }
 
 interface SceneLayers {
@@ -49,6 +52,11 @@ const WORLD_H = 70
 const TILE = 16
 const WORLD_PX_W = WORLD_W * TILE
 const WORLD_PX_H = WORLD_H * TILE
+const ISO_TILE_X = 14
+const ISO_TILE_Y = 7
+const ISO_FLOOR_Z = 48
+const ISO_ORIGIN_X = WORLD_H * ISO_TILE_X + 150
+const ISO_ORIGIN_Y = 330
 const HORIZON_SECONDS_AT_1X = 3600
 const MOTION_MINUTES_PER_SECOND_AT_1X = 1
 const SPEED_PRESETS = [1, 2, 10, 20]
@@ -118,6 +126,7 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   const [minute, setMinute] = useState(0)
   const [motionMinute, setMotionMinute] = useState(0)
   const [playing, setPlaying] = useState(true)
+  const [viewMode, setViewMode] = useState<SimulationViewMode>('topDown')
   const result = useMemo(() => runHospitalSimulation(plan, settings, patientCases), [patientCases, plan, settings])
 
   useEffect(() => {
@@ -170,8 +179,8 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   }, [])
 
   useEffect(() => {
-    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, motionMinute, selectedCaseId, agentLayer })
-  }, [agentLayer, minute, motionMinute, plan, result, selectedCaseId, selectedFloor])
+    sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, motionMinute, selectedCaseId, agentLayer, viewMode })
+  }, [agentLayer, minute, motionMinute, plan, result, selectedCaseId, selectedFloor, viewMode])
 
   return (
     <div className="simulation-stage">
@@ -190,6 +199,22 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
           }}
         />
         <span>{formatHorizonTime(minute, motionMinute, settings.horizonYears)}</span>
+        <div className="sim-view-toggle" aria-label="Vista de simulacion">
+          <button
+            type="button"
+            className={viewMode === 'topDown' ? 'is-active' : ''}
+            onClick={() => setViewMode('topDown')}
+          >
+            2D
+          </button>
+          <button
+            type="button"
+            className={viewMode === 'isometric' ? 'is-active' : ''}
+            onClick={() => setViewMode('isometric')}
+          >
+            3D
+          </button>
+        </div>
         <div className="sim-speed-presets" aria-label="Velocidad de simulacion">
           {SPEED_PRESETS.map((speed) => (
             <button
@@ -217,7 +242,12 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
           ))}
         </select>
       </div>
-      <div ref={hostRef} className="phaser-stage" role="img" aria-label="Simulacion top-down del hospital" />
+      <div
+        ref={hostRef}
+        className={`phaser-stage ${viewMode === 'isometric' ? 'is-isometric' : ''}`}
+        role="img"
+        aria-label={viewMode === 'isometric' ? 'Simulacion isometrica 3D del hospital completo' : 'Simulacion top-down del hospital'}
+      />
     </div>
   )
 }
@@ -268,6 +298,11 @@ class HospitalGameScene extends Phaser.Scene {
       careLayer: this.add.container(0, 0).setDepth(96),
     }
 
+    if (snapshot.viewMode === 'isometric') {
+      this.drawIsometricStatic(snapshot)
+      return
+    }
+
     this.drawBackground(snapshot)
     this.drawAmbulanceApron(snapshot)
 
@@ -279,6 +314,93 @@ class HospitalGameScene extends Phaser.Scene {
     rooms.filter((room) => room.kind !== 'circulation').forEach((room) => {
       this.drawRoom(room, snapshot.result, disconnectedIds.has(room.id), snapshot.plan.rooms)
     })
+  }
+
+  private drawIsometricStatic(snapshot: SimulationSnapshot) {
+    if (!this.layers) return
+    const floors = uniqueFloors(snapshot.plan.rooms)
+    const disconnectedIds = new Set(disconnectedPassages(snapshot.plan.rooms).map((room) => room.id))
+    const floorGraphics = this.add.graphics()
+    this.layers.staticLayer.add(floorGraphics)
+
+    floors.forEach((floor) => {
+      this.drawIsometricFloorPlate(floorGraphics, floor, floor === snapshot.selectedFloor)
+    })
+
+    floors.forEach((floor) => {
+      connectedCorridorGroups(snapshot.plan.rooms, floor).forEach((group) => {
+        this.drawIsometricCorridorGroup(group, group.some((room) => disconnectedIds.has(room.id)))
+      })
+    })
+
+    snapshot.plan.rooms
+      .filter((room) => room.kind !== 'circulation')
+      .sort((a, b) => a.floor - b.floor || a.x + a.y - (b.x + b.y))
+      .forEach((room) => {
+        this.drawIsometricRoom(room, snapshot, disconnectedIds.has(room.id))
+      })
+  }
+
+  private drawIsometricFloorPlate(g: Phaser.GameObjects.Graphics, floor: number, active: boolean) {
+    const a = isoPoint(0, 0, floor, 0)
+    const b = isoPoint(WORLD_W, 0, floor, 0)
+    const c = isoPoint(WORLD_W, WORLD_H, floor, 0)
+    const d = isoPoint(0, WORLD_H, floor, 0)
+    fillPolygon(g, [a, b, c, d], active ? '#edf5ed' : '#dfe7dd', active ? 0.28 : 0.14, active ? '#2a9d8f' : '#98a69d', active ? 0.65 : 0.28)
+
+    const label = this.add.text(d.x - 16, d.y - 12, floorName(floor), {
+      color: active ? '#174942' : '#66736e',
+      backgroundColor: active ? '#e4f3ee' : '#f8fafc',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '18px',
+      fontStyle: 'bold',
+      padding: { x: 7, y: 3 },
+    }).setResolution(2)
+    this.layers?.staticLayer.add(label)
+  }
+
+  private drawIsometricCorridorGroup(rooms: PlacedRoom[], disconnectedPassage: boolean) {
+    if (!this.layers || rooms.length === 0) return
+    const g = this.add.graphics()
+    this.layers.staticLayer.add(g)
+    rooms
+      .sort((a, b) => a.x + a.y - (b.x + b.y))
+      .forEach((room) => {
+        drawIsoPrism(g, room.x, room.y, room.w, room.h, room.floor, 4, ROOM_FLOOR_COLORS.circulation, disconnectedPassage ? '#dc2626' : '#8f9d8b', 0.96)
+      })
+  }
+
+  private drawIsometricRoom(room: PlacedRoom, snapshot: SimulationSnapshot, disconnectedPassage: boolean) {
+    if (!this.layers) return
+    const g = this.add.graphics()
+    this.layers.staticLayer.add(g)
+    const roomColor = ROOM_FLOOR_COLORS[room.kind] ?? KIND_COLORS[room.kind]
+    const wallColor = disconnectedPassage ? '#dc2626' : ROOM_WALL_COLORS[room.kind] ?? '#374151'
+    const height = isoBlockHeight(room)
+    const alpha = room.floor === snapshot.selectedFloor ? 1 : 0.72
+    drawIsoPrism(g, room.x, room.y, room.w, room.h, room.floor, height, roomColor, wallColor, alpha)
+
+    const pressure = Math.min(1, (snapshot.result.roomPressure[room.id] ?? 0) / Math.max(1, room.capacity * 1.6))
+    if (pressure > 0.25) {
+      const a = isoPoint(room.x, room.y, room.floor, height + 1)
+      const b = isoPoint(room.x + room.w, room.y, room.floor, height + 1)
+      const c = isoPoint(room.x + room.w, room.y + room.h, room.floor, height + 1)
+      const d = isoPoint(room.x, room.y + room.h, room.floor, height + 1)
+      fillPolygon(g, [a, b, c, d], '#d62828', 0.12 + pressure * 0.2)
+    }
+
+    if (room.floor !== snapshot.selectedFloor) return
+    if (room.w < 7 && room.h < 7) return
+    const labelPoint = isoPoint(room.x + room.w / 2, room.y + room.h / 2, room.floor, height + 8)
+    const label = this.add.text(labelPoint.x, labelPoint.y, truncateText(room.name, room.w >= 12 ? 22 : 14), {
+      color: '#17201c',
+      backgroundColor: '#ffffff',
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '13px',
+      fontStyle: 'bold',
+      padding: { x: 5, y: 2 },
+    }).setOrigin(0.5, 0.5).setResolution(2)
+    this.layers.staticLayer.add(label)
   }
 
   private drawCorridorGroup(rooms: PlacedRoom[], disconnectedPassage: boolean) {
@@ -454,7 +576,7 @@ class HospitalGameScene extends Phaser.Scene {
     const motionMinute = wrapMinute(snapshot.motionMinute, snapshot.result.motionCycleMinutes)
     const active = resolveAgentCollisions(visibleAgents
       .map((agent) => ({ agent, pos: positionAt(agent, snapshot.plan.rooms, motionMinute) }))
-      .filter((item): item is ActiveAgent => item.pos !== null && item.pos.room.floor === snapshot.selectedFloor)
+      .filter((item): item is ActiveAgent => item.pos !== null && (snapshot.viewMode === 'isometric' || item.pos.room.floor === snapshot.selectedFloor))
     )
 
     const activeIds = new Set<string>()
@@ -462,9 +584,17 @@ class HospitalGameScene extends Phaser.Scene {
       activeIds.add(agent.id)
       const sprite = this.agentSprites.get(agent.id) ?? this.createAgentSprite(agent)
       const bob = pos.moving ? Math.sin((motionMinute + Number(agent.id.replace(/\D/g, ''))) * 0.8) * 2 : 0
-      sprite.setPosition(tileX(pos.x), tileY(pos.y) + bob)
+      if (snapshot.viewMode === 'isometric') {
+        const projected = isoPoint(pos.x, pos.y, pos.room.floor, isoBlockHeight(pos.room) + 8)
+        sprite.setPosition(projected.x, projected.y + bob)
+        sprite.setScale(0.72)
+        sprite.setDepth(isoDepth(pos.x, pos.y, pos.room.floor) + 500)
+      } else {
+        sprite.setPosition(tileX(pos.x), tileY(pos.y) + bob)
+        sprite.setScale(1)
+        sprite.setDepth(pos.y * TILE)
+      }
       sprite.setVisible(true)
-      sprite.setDepth(pos.y * TILE)
       this.updateAgentWalk(sprite, pos.moving, motionMinute, agent.id)
       const roleLabel = sprite.getData('roleLabel') as Phaser.GameObjects.Text | undefined
       if (roleLabel) roleLabel.setVisible(false)
@@ -473,6 +603,12 @@ class HospitalGameScene extends Phaser.Scene {
     this.agentSprites.forEach((sprite, id) => {
       if (!activeIds.has(id)) sprite.setVisible(false)
     })
+
+    if (snapshot.viewMode === 'isometric') {
+      this.careIndicators.forEach((indicator) => indicator.setVisible(false))
+      this.occupancyBadges.forEach((badge) => badge.setVisible(false))
+      return
+    }
 
     this.updateCareIndicators(active, motionMinute)
     this.updateOccupancy(snapshot, active)
@@ -703,6 +839,14 @@ class HospitalGameScene extends Phaser.Scene {
 
   private layoutCamera() {
     if (!this.cameras.main) return
+    if (this.snapshot?.viewMode === 'isometric') {
+      const bounds = isometricSceneBounds(this.snapshot.plan.rooms)
+      const padding = 120
+      const zoom = Math.min(this.scale.width / (bounds.w + padding * 2), this.scale.height / (bounds.h + padding * 2)) * 0.98
+      this.cameras.main.setZoom(zoom)
+      this.cameras.main.centerOn(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2)
+      return
+    }
     const zoom = Math.min(this.scale.width / WORLD_PX_W, this.scale.height / WORLD_PX_H) * 0.98
     this.cameras.main.setZoom(zoom)
     this.cameras.main.centerOn(WORLD_PX_W / 2, WORLD_PX_H / 2)
@@ -711,14 +855,14 @@ class HospitalGameScene extends Phaser.Scene {
 
 function staticSceneKey(snapshot: SimulationSnapshot) {
   const rooms = snapshot.plan.rooms
-    .filter((room) => room.floor === snapshot.selectedFloor)
+    .filter((room) => snapshot.viewMode === 'isometric' || room.floor === snapshot.selectedFloor)
     .map((room) => {
       const doors = (room.doors ?? []).map((door) => `${door.id}:${door.side}:${door.offset}`).join(',')
       const connections = (room.connectionIds ?? []).join(',')
-      return `${room.id}:${room.x}:${room.y}:${room.w}:${room.h}:${room.kind}:${doors}:${connections}:${snapshot.result.roomPressure[room.id] ?? 0}`
+      return `${room.id}:${room.floor}:${room.x}:${room.y}:${room.w}:${room.h}:${room.kind}:${doors}:${connections}:${snapshot.result.roomPressure[room.id] ?? 0}`
     })
     .join('|')
-  return `${snapshot.selectedFloor}:${snapshot.result.kpis.completed}:${rooms}`
+  return `${snapshot.viewMode}:${snapshot.selectedFloor}:${snapshot.result.kpis.completed}:${rooms}`
 }
 
 function visibleAgentsForSnapshot(snapshot: SimulationSnapshot): SimAgent[] {
@@ -1018,6 +1162,114 @@ function pixelRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: numb
   g.fillRect(x, y, w, h)
   g.lineStyle(1, toColor(stroke), 1)
   g.strokeRect(x, y, w, h)
+}
+
+function drawIsoPrism(
+  g: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  floor: number,
+  height: number,
+  fill: string,
+  stroke: string,
+  alpha = 1,
+) {
+  const topA = isoPoint(x, y, floor, height)
+  const topB = isoPoint(x + w, y, floor, height)
+  const topC = isoPoint(x + w, y + h, floor, height)
+  const topD = isoPoint(x, y + h, floor, height)
+  const baseB = isoPoint(x + w, y, floor, 0)
+  const baseC = isoPoint(x + w, y + h, floor, 0)
+  const baseD = isoPoint(x, y + h, floor, 0)
+
+  fillPolygon(g, [topB, topC, baseC, baseB], shadeHex(fill, -30), alpha * 0.86, stroke, alpha * 0.65)
+  fillPolygon(g, [topD, topC, baseC, baseD], shadeHex(fill, -44), alpha * 0.82, stroke, alpha * 0.55)
+  fillPolygon(g, [topA, topB, topC, topD], fill, alpha, stroke, alpha)
+}
+
+function fillPolygon(
+  g: Phaser.GameObjects.Graphics,
+  points: Array<{ x: number; y: number }>,
+  fill: string,
+  alpha = 1,
+  stroke?: string,
+  strokeAlpha = 1,
+) {
+  if (points.length < 3) return
+  g.fillStyle(toColor(fill), alpha)
+  g.beginPath()
+  g.moveTo(points[0].x, points[0].y)
+  points.slice(1).forEach((point) => g.lineTo(point.x, point.y))
+  g.closePath()
+  g.fillPath()
+  if (!stroke) return
+  g.lineStyle(1, toColor(stroke), strokeAlpha)
+  g.beginPath()
+  g.moveTo(points[0].x, points[0].y)
+  points.slice(1).forEach((point) => g.lineTo(point.x, point.y))
+  g.closePath()
+  g.strokePath()
+}
+
+function isoPoint(x: number, y: number, floor: number, z = 0) {
+  return {
+    x: ISO_ORIGIN_X + (x - y) * ISO_TILE_X,
+    y: ISO_ORIGIN_Y + (x + y) * ISO_TILE_Y - floor * ISO_FLOOR_Z - z,
+  }
+}
+
+function isoDepth(x: number, y: number, floor: number) {
+  return floor * 10000 + (x + y) * 20
+}
+
+function isoBlockHeight(room: PlacedRoom) {
+  if (room.kind === 'green' || room.kind === 'future') return 2
+  if (room.kind === 'circulation') return 4
+  if (room.kind === 'vertical') return 32
+  if (room.kind === 'critical' || room.kind === 'surgery') return 27
+  return 18 + Math.min(12, Math.max(0, Math.floor(room.capacity / 30)))
+}
+
+function isometricSceneBounds(rooms: PlacedRoom[]) {
+  const points = rooms.flatMap((room) => {
+    const height = isoBlockHeight(room)
+    return [
+      isoPoint(room.x, room.y, room.floor, height),
+      isoPoint(room.x + room.w, room.y, room.floor, height),
+      isoPoint(room.x + room.w, room.y + room.h, room.floor, height),
+      isoPoint(room.x, room.y + room.h, room.floor, height),
+      isoPoint(room.x, room.y, room.floor, 0),
+      isoPoint(room.x + room.w, room.y + room.h, room.floor, 0),
+    ]
+  })
+  if (points.length === 0) return { x: 0, y: 0, w: WORLD_PX_W, h: WORLD_PX_H }
+  const minX = Math.min(...points.map((point) => point.x))
+  const minY = Math.min(...points.map((point) => point.y))
+  const maxX = Math.max(...points.map((point) => point.x))
+  const maxY = Math.max(...points.map((point) => point.y))
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+function shadeHex(hex: string, amount: number) {
+  const normalized = hex.replace('#', '')
+  const value = Number.parseInt(normalized.length === 3 ? normalized.split('').map((char) => char + char).join('') : normalized, 16)
+  if (Number.isNaN(value)) return hex
+  const r = clamp((value >> 16) + amount, 0, 255)
+  const g = clamp(((value >> 8) & 0xff) + amount, 0, 255)
+  const b = clamp((value & 0xff) + amount, 0, 255)
+  return `#${[r, g, b].map((component) => Math.round(component).toString(16).padStart(2, '0')).join('')}`
+}
+
+function uniqueFloors(rooms: PlacedRoom[]) {
+  return [...new Set(rooms.map((room) => room.floor))].sort((a, b) => a - b)
+}
+
+function floorName(floor: number) {
+  if (floor < 0) return `S${Math.abs(floor)}`
+  if (floor === 0) return 'PB'
+  return `P${floor}`
 }
 
 function roomLabelLayout(room: PlacedRoom): { width: number; height: number; fontSize: number; titleChars: number } | null {

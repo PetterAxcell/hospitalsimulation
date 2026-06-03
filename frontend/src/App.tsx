@@ -1278,32 +1278,35 @@ function SimulationCaseSelector({
               <span>{result?.kpis.completed ?? 0} pacientes completados</span>
               <small>Vista completa de la actividad simulada.</small>
             </button>
-            {caseStats.map((stat) => (
-              <article
-                key={stat.id}
-                className={`case-item case-item-with-action ${selectedCaseId === stat.id ? 'is-active' : ''}`}
-                style={{ borderLeftColor: stat.color }}
-              >
-                <button
-                  type="button"
-                  className="case-select-action"
-                  onClick={() => onSelectCase(stat.id)}
+            {caseStats.map((stat) => {
+              const route = stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'
+              return (
+                <article
+                  key={stat.id}
+                  className={`case-item case-item-with-action ${selectedCaseId === stat.id ? 'is-active' : ''}`}
+                  style={{ borderLeftColor: stat.color }}
                 >
-                  <strong>{stat.label}</strong>
-                  <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
-                  <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
-                </button>
-                <button
-                  type="button"
-                  className="case-edit-action"
-                  aria-label={`Editar YAML de ${stat.label}`}
-                  title="Editar YAML"
-                  onClick={() => onEditCase(stat.id)}
-                >
-                  <ToolIcon icon="edit" />
-                </button>
-              </article>
-            ))}
+                  <button
+                    type="button"
+                    className="case-select-action"
+                    title={route}
+                    onClick={() => onSelectCase(stat.id)}
+                  >
+                    <strong>{stat.label}</strong>
+                    <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="case-edit-action"
+                    aria-label={`Editar YAML de ${stat.label}`}
+                    title="Editar YAML"
+                    onClick={() => onEditCase(stat.id)}
+                  >
+                    <ToolIcon icon="edit" />
+                  </button>
+                </article>
+              )
+            })}
           </div>
         ) : (
           <p className="muted">Ejecutando mezcla clinica.</p>

@@ -283,7 +283,7 @@ output {
 
 .sim-controls {
   display: grid;
-  grid-template-columns: 86px minmax(120px, 1fr) minmax(112px, auto) minmax(168px, auto) minmax(150px, 190px) minmax(150px, 220px);
+  grid-template-columns: 86px minmax(120px, 1fr) minmax(112px, auto) minmax(78px, auto) minmax(168px, auto) minmax(150px, 190px) minmax(150px, 220px);
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -301,13 +301,23 @@ output {
   min-width: 0;
 }
 
+.sim-view-toggle,
 .sim-speed-presets,
 .speed-preset-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(34px, 1fr));
   gap: 4px;
 }
 
+.sim-view-toggle {
+  grid-template-columns: repeat(2, minmax(32px, 1fr));
+}
+
+.sim-speed-presets,
+.speed-preset-grid {
+  grid-template-columns: repeat(4, minmax(34px, 1fr));
+}
+
+.sim-view-toggle button,
 .sim-speed-presets button,
 .speed-preset-grid button {
   min-width: 0;
@@ -322,6 +332,7 @@ output {
   cursor: pointer;
 }
 
+.sim-view-toggle button.is-active,
 .sim-speed-presets button.is-active,
 .speed-preset-grid button.is-active {
   border-color: #2a9d8f;
@@ -1314,7 +1325,7 @@ th {
 }
 
 .simulation-hub-list {
-  max-height: clamp(280px, 52vh, 470px);
+  max-height: clamp(320px, 58vh, 560px);
   overflow: auto;
   padding-right: 2px;
 }
@@ -1435,7 +1446,7 @@ th {
 }
 
 .case-item-with-action {
-  min-height: 66px;
+  min-height: 48px;
   display: flex;
   gap: 0;
   align-items: stretch;
@@ -1447,9 +1458,9 @@ th {
   flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 2px;
   align-content: center;
-  padding: 8px 7px 8px 9px;
+  padding: 7px 7px 7px 9px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -1500,9 +1511,12 @@ th {
 .case-item span,
 .case-item small {
   min-width: 0;
+  overflow: hidden;
   color: #66736e;
   font-size: 11px;
   line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .case-item small {
