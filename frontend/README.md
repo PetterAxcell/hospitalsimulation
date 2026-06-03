@@ -47,3 +47,5 @@ src/engine/architectureRules.ts       Reglas arquitectonicas iniciales
 Los pasillos se crean desde el selector `Elemento`; los accesos rapidos de pasillos se eliminaron para mantener una unica ruta de creacion de bloques.
 
 Los paneles laterales son contextuales: planificacion y simulacion conservan sus controles, mientras que `Top`, `Servicios` y `Analisis` usan el espacio central sin panel izquierdo.
+
+Durante el arrastre o redimensionado de bloques en el planificador, el canvas usa una previsualizacion local y solo confirma el cambio en el `plan` al soltar. Esto evita recalcular reglas, simulacion y ranking en cada movimiento del puntero.

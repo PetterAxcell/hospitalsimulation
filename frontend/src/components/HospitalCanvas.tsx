@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { KIND_COLORS } from '../data/catalog'
 import { disconnectedPassages, doorConnectsToCorridor, doorWorldPosition, type DoorPoint } from '../engine/circulation'
 import { clampRoom } from '../engine/geometry'
@@ -38,21 +38,37 @@ export function HospitalCanvas({
   onMoveDoor,
 }: HospitalCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const dragPreviewRoomRef = useRef<PlacedRoom | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
   const floorRooms = useMemo(() => plan.rooms.filter((room) => room.floor === selectedFloor), [plan.rooms, selectedFloor])
 
-  useEffect(() => {
+  const drawCanvas = useCallback((previewRoom = dragPreviewRoomRef.current) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const ratio = window.devicePixelRatio || 1
     const rect = canvas.getBoundingClientRect()
-    canvas.width = Math.round(rect.width * ratio)
-    canvas.height = Math.round(rect.height * ratio)
+    const targetWidth = Math.round(rect.width * ratio)
+    const targetHeight = Math.round(rect.height * ratio)
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth
+      canvas.height = targetHeight
+    }
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-    drawHospital(ctx, rect.width, rect.height, floorRooms, selectedRoomId, plan.rooms)
+    const roomsForDraw = replacePreviewRoom(floorRooms, previewRoom)
+    const allRoomsForDraw = replacePreviewRoom(plan.rooms, previewRoom)
+    drawHospital(ctx, rect.width, rect.height, roomsForDraw, selectedRoomId, allRoomsForDraw)
   }, [floorRooms, plan.rooms, selectedRoomId])
+
+  useEffect(() => {
+    drawCanvas()
+  }, [drawCanvas])
+
+  useEffect(() => () => {
+    if (animationFrameRef.current) window.cancelAnimationFrame(animationFrameRef.current)
+  }, [])
 
   function worldFromEvent(event: React.PointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current
@@ -71,6 +87,7 @@ export function HospitalCanvas({
     const point = worldFromEvent(event)
     const doorHit = findDoorAtPoint(floorRooms, point)
     if (doorHit) {
+      dragPreviewRoomRef.current = null
       onSelectRoom(doorHit.room.id)
       setDrag({ kind: 'door', roomId: doorHit.room.id, doorId: doorHit.doorId })
       event.currentTarget.setPointerCapture(event.pointerId)
@@ -89,6 +106,7 @@ export function HospitalCanvas({
     const selectedRoom = floorRooms.find((item) => item.id === selectedRoomId)
     const resizeHandle = selectedRoom ? findResizeHandleAtPoint(selectedRoom, point) : undefined
     if (selectedRoom && resizeHandle) {
+      dragPreviewRoomRef.current = null
       onSelectRoom(selectedRoom.id)
       setDrag({ kind: 'resize', roomId: selectedRoom.id, handle: resizeHandle })
       event.currentTarget.setPointerCapture(event.pointerId)
@@ -97,6 +115,7 @@ export function HospitalCanvas({
 
     const room = [...floorRooms].reverse().find((item) => inside(point.x, point.y, item))
     if (!room) return
+    dragPreviewRoomRef.current = null
     onSelectRoom(room.id)
     setDrag({
       kind: 'room',
@@ -114,18 +133,52 @@ export function HospitalCanvas({
       onMoveDoor(drag.roomId, drag.doorId, point)
       return
     }
-    const room = plan.rooms.find((item) => item.id === drag.roomId)
+    const room = dragPreviewRoomRef.current?.id === drag.roomId
+      ? dragPreviewRoomRef.current
+      : plan.rooms.find((item) => item.id === drag.roomId)
     if (!room) return
     if (drag.kind === 'resize') {
-      onChangeRoom(resizeRoomFromHandle(room, drag.handle, point))
+      requestPreviewDraw(resizeRoomFromHandle(room, drag.handle, point))
       return
     }
-    onChangeRoom(clampRoom({ ...room, x: point.x - drag.offsetX, y: point.y - drag.offsetY }))
+    requestPreviewDraw(clampRoom({ ...room, x: point.x - drag.offsetX, y: point.y - drag.offsetY }))
   }
 
   function handlePointerUp(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (animationFrameRef.current) {
+      window.cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    if (drag?.kind !== 'door' && dragPreviewRoomRef.current) {
+      onChangeRoom(dragPreviewRoomRef.current)
+    }
+    dragPreviewRoomRef.current = null
     setDrag(null)
-    event.currentTarget.releasePointerCapture(event.pointerId)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  function cancelDrag(event?: React.PointerEvent<HTMLCanvasElement>) {
+    dragPreviewRoomRef.current = null
+    setDrag(null)
+    if (animationFrameRef.current) {
+      window.cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    if (event && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    drawCanvas(null)
+  }
+
+  function requestPreviewDraw(room: PlacedRoom) {
+    dragPreviewRoomRef.current = room
+    if (animationFrameRef.current) return
+    animationFrameRef.current = window.requestAnimationFrame(() => {
+      animationFrameRef.current = null
+      drawCanvas(dragPreviewRoomRef.current)
+    })
   }
 
   return (
@@ -135,11 +188,16 @@ export function HospitalCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={() => setDrag(null)}
+      onPointerCancel={cancelDrag}
       aria-label="Plano editable del hospital"
       style={{ cursor: doorToolRoomId ? 'crosshair' : undefined }}
     />
   )
+}
+
+function replacePreviewRoom(rooms: PlacedRoom[], previewRoom: PlacedRoom | null) {
+  if (!previewRoom) return rooms
+  return rooms.map((room) => (room.id === previewRoom.id ? previewRoom : room))
 }
 
 function drawHospital(
