@@ -1279,20 +1279,30 @@ function SimulationCaseSelector({
               <small>Vista completa de la actividad simulada.</small>
             </button>
             {caseStats.map((stat) => (
-              <button
+              <article
                 key={stat.id}
-                type="button"
-                className={`case-item ${selectedCaseId === stat.id ? 'is-active' : ''}`}
+                className={`case-item case-item-with-action ${selectedCaseId === stat.id ? 'is-active' : ''}`}
                 style={{ borderLeftColor: stat.color }}
-                onClick={() => {
-                  onSelectCase(stat.id)
-                  onEditCase(stat.id)
-                }}
               >
-                <strong>{stat.label}</strong>
-                <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
-                <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
-              </button>
+                <button
+                  type="button"
+                  className="case-select-action"
+                  onClick={() => onSelectCase(stat.id)}
+                >
+                  <strong>{stat.label}</strong>
+                  <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
+                  <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'}</small>
+                </button>
+                <button
+                  type="button"
+                  className="case-edit-action"
+                  aria-label={`Editar YAML de ${stat.label}`}
+                  title="Editar YAML"
+                  onClick={() => onEditCase(stat.id)}
+                >
+                  <ToolIcon icon="edit" />
+                </button>
+              </article>
             ))}
           </div>
         ) : (
