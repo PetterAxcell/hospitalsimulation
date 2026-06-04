@@ -2,7 +2,7 @@
 
 Herramienta abierta para disenar, simular y comparar arquitecturas de hospitales terciarios. La aplicacion principal esta migrada a React/TypeScript y usa Phaser 3 para la simulacion visual tipo videojuego 2D: plantas, habitaciones, equipamiento, accesos, ambulancias, halls, esperas, ascensores, escaleras, refugios y flujos de pacientes.
 
-La vision es crear una herramienta para redisenar hospitales complejos como Vall d'Hebron o Hospital Clinic, empezando por un programa de gran escala y evolucionando hacia simulacion de pacientes, medicos, enfermeria, celadores, tecnicos y recursos. La rama `codex/hospital-clinic-model` usa un primer modelo funcional del Nou Campus de Salut Clinic-UB de 300.000 m2, basado en fuentes oficiales, para trabajar programa preliminar, adyacencias y escenarios antes de generar alternativas automaticamente.
+La vision es crear una herramienta para redisenar hospitales complejos como Vall d'Hebron o Hospital Clinic, empezando por un programa de gran escala y evolucionando hacia simulacion de pacientes, medicos, enfermeria, celadores, tecnicos y recursos. La rama `feature/hospital-clinic-model` usa un primer modelo funcional del Nou Campus de Salut Clinic-UB de 300.000 m2, basado en fuentes oficiales, para trabajar programa preliminar, adyacencias y escenarios antes de generar alternativas automaticamente.
 
 ## Uso rapido
 
