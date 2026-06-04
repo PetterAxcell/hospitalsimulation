@@ -2,7 +2,7 @@
 
 Herramienta abierta para disenar, simular y comparar arquitecturas de hospitales terciarios. La aplicacion principal esta migrada a React/TypeScript y usa Phaser 3 para la simulacion visual tipo videojuego 2D: plantas, habitaciones, equipamiento, accesos, ambulancias, halls, esperas, ascensores, escaleras, refugios y flujos de pacientes.
 
-La vision es crear una herramienta para redisenar hospitales complejos como Vall d'Hebron o Hospital Clinic, empezando por un programa de 290.000 m2 y evolucionando hacia simulacion de pacientes, medicos, enfermeria, celadores, tecnicos y recursos.
+La vision es crear una herramienta para redisenar hospitales complejos como Vall d'Hebron o Hospital Clinic, empezando por un programa de gran escala y evolucionando hacia simulacion de pacientes, medicos, enfermeria, celadores, tecnicos y recursos. La rama `codex/hospital-clinic-model` usa un primer modelo funcional del Nou Campus de Salut Clinic-UB de 300.000 m2, basado en fuentes oficiales, para trabajar programa preliminar, adyacencias y escenarios antes de generar alternativas automaticamente.
 
 ## Uso rapido
 
@@ -54,6 +54,7 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Simulacion 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presion por estancia y capas de RPG, flujos y reglas.
 - Top de propuestas por autor: ranking local de arquitecturas, puntuado con KPIs de simulacion, reglas abiertas y desviacion de m2. Es la primera vista de la app para priorizar comparacion antes que edicion.
 - Catalogo de hospital terciario: urgencias, diagnostico, quirofanos, PACU, UCI, wards, maternidad, neonatal, oncologia, farmacia, laboratorio, logistica, investigacion y command center.
+- Preset Hospital Clinic: primera vision del Nou Campus Clinic-UB con asistencia, docencia, investigacion, infraestructuras, campus, sotanos tecnicos/logisticos, urgencias, quirofanos, UCI, institutos clinicos, consultas, hospital de dia y reservas de crecimiento.
 - Elementos de seguridad arquitectonica: ascensores, escaleras, montacargas, escaleras protegidas/emergencia, refugios de evacuacion horizontal, sectorizacion PCI, central MEP critica y reserva de expansion.
 - Circulacion editable: pasillos publicos, pasillos clinicos para camas y pasillos logisticos limpio/sucio se anaden desde el selector `Elemento`, igual que cualquier otro bloque. En la UI, `Asc/Mont` significa ascensores publicos, ascensores clinicos y montacargas; las escaleras son componentes independientes.
 - Dimensiones editables en metros: cada bloque tiene ancho y alto, y los m2 se recalculan automaticamente con una escala de 3 m por unidad de plano.
@@ -74,6 +75,7 @@ La documentacion tecnica vive en [docs/](docs/):
 - [Arquitectura de producto](docs/ARCHITECTURE.md)
 - [Backend propuesto](docs/BACKEND.md)
 - [Despliegue](docs/DEPLOYMENT.md)
+- [Modelo funcional Hospital Clinic](docs/HOSPITAL_CLINIC_MODEL.md)
 - [Requisitos arquitectonicos y seguridad](docs/SAFETY_REQUIREMENTS.md)
 
 ## Backend
@@ -110,7 +112,7 @@ Esto no es aun una certificacion normativa. Las distancias exactas, anchuras, oc
 
 ```text
 frontend/
-  src/data/        Catalogo de estancias, equipamiento y preset terciario
+  src/data/        Catalogo de estancias, equipamiento y presets hospitalarios
   src/engine/      Geometria, simulacion ligera y reglas arquitectonicas
   src/components/  Canvas editable y escena Phaser de simulacion
 hospital_sim/      Prototipo Python/SimPy inicial, mantenido como referencia

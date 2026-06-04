@@ -7,6 +7,7 @@ Aplicacion React/TypeScript para disenar y simular un hospital terciario multi-p
 - React para paneles, formularios, KPIs y estado de producto.
 - Phaser 3 para la vista de simulacion top-down tipo RPG/pixel-art.
 - Ranking `Top` como primera vista para comparar propuestas de arquitectura por autor usando KPIs de simulacion.
+- Preset Hospital Clinic para abrir la app con una primera propuesta funcional del Nou Campus Clinic-UB de 300.000 m2.
 - Vite para desarrollo y build.
 
 La simulacion se carga con `React.lazy`, de forma que Phaser solo entra en el bundle cuando se abre la pestana `Simulacion`.
@@ -39,7 +40,8 @@ El proyecto Pages esperado es `simlab`; el dominio custom es opcional.
 src/components/HospitalCanvas.tsx     Editor de Vision en canvas 2D con bloques, puertas, pasillos y conectores verticales
 src/components/SimulationCanvas.tsx   Escena Phaser top-down
 src/data/catalog.ts                   Catalogo de servicios y equipamiento
-src/data/presets.ts                   Preset hospital terciario 290.000 m2
+src/data/presets.ts                   Presets hospitalarios, incluido el modelo funcional Hospital Clinic
+src/data/hospitalClinicModel.ts       Fuentes, hechos y clusters del modelo Hospital Clinic
 src/engine/simulation.ts              Simulacion ligera de agentes y rutas
 src/engine/architectureRules.ts       Reglas arquitectonicas iniciales
 ```

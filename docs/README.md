@@ -7,12 +7,13 @@ Esta carpeta define la vision tecnica del producto. La aplicacion actual ya tien
 - [Arquitectura de producto](ARCHITECTURE.md): responsabilidades entre frontend, backend, motor de simulacion, reglas y datos.
 - [Backend](BACKEND.md): propuesta de API, jobs asincronos, persistencia, seguridad y entidades principales.
 - [Despliegue](DEPLOYMENT.md): publicacion del frontend en Cloudflare Pages siguiendo el patron de `ontour`.
+- [Modelo funcional Hospital Clinic](HOSPITAL_CLINIC_MODEL.md): fuentes, supuestos, clusters y programa preliminar para la rama centrada en Nou Campus de Salut Clinic-UB.
 - [Lenguaje de planificacion](PLANNING_LANGUAGE.md): comandos iniciales para generar planes desde scripts.
 - [Requisitos arquitectonicos y seguridad](SAFETY_REQUIREMENTS.md): checklist para un hospital terciario nuevo de 290.000 m2, con estado actual de cobertura en la app.
 
 ## Estado actual
 
-La app principal vive en `frontend/` y ejecuta simulacion visual en cliente con React + Phaser 3. Vision permite mover y redimensionar bloques, calcular m2 desde la geometria, colocar puertas y marcar en rojo puertas o pasillos que no conectan con la red de circulacion. El backend experimental vive en `hospital_sim/backend/` y expone FastAPI para catalogo, proyectos, versiones de planes, reglas y simulaciones. Sirve para iterar rapido sobre la experiencia de diseno y sobre las fronteras del sistema.
+La app principal vive en `frontend/` y ejecuta simulacion visual en cliente con React + Phaser 3. Vision permite mover y redimensionar bloques, calcular m2 desde la geometria, colocar puertas y marcar en rojo puertas o pasillos que no conectan con la red de circulacion. La rama `codex/hospital-clinic-model` arranca con un preset source-backed del Nou Campus Clinic-UB de 300.000 m2 para discutir programa funcional y simulacion antes de plantear generacion automatica. El backend experimental vive en `hospital_sim/backend/` y expone FastAPI para catalogo, proyectos, versiones de planes, reglas y simulaciones. Sirve para iterar rapido sobre la experiencia de diseno y sobre las fronteras del sistema.
 
 Para usarlo como herramienta real de proyecto hospitalario hacen falta tres piezas adicionales:
 

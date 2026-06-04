@@ -2,7 +2,7 @@ import { Suspense, lazy, useMemo, useState } from 'react'
 import './App.css'
 import { HospitalCanvas } from './components/HospitalCanvas'
 import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
-import { createTertiaryHospitalPlan } from './data/presets'
+import { createHospitalClinicCampusPlan } from './data/presets'
 import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
   defaultDoorForRoom,
@@ -73,7 +73,7 @@ interface ArchitectureProposal {
   source: 'demo' | 'submitted'
 }
 
-const INITIAL_PLAN = createTertiaryHospitalPlan()
+const INITIAL_PLAN = createHospitalClinicCampusPlan()
 const DOOR_MAGNET_DISTANCE = 6
 const SIMULATION_SPEED_PRESETS = [1, 2, 10, 20]
 const SimulationCanvas = lazy(() =>
