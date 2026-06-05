@@ -19,8 +19,10 @@ type DragState =
   | { kind: 'room'; roomId: string; offsetX: number; offsetY: number }
   | { kind: 'door'; roomId: string; doorId: string }
   | { kind: 'resize'; roomId: string; handle: ResizeHandle }
+  | { kind: 'pan'; startClientX: number; startClientY: number; startPanX: number; startPanY: number }
 
 type ResizeHandle = 'n' | 'e' | 's' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+type PanOffset = { x: number; y: number }
 
 const WORLD_W = 100
 const WORLD_H = 70
@@ -41,6 +43,7 @@ export function HospitalCanvas({
   const dragPreviewRoomRef = useRef<PlacedRoom | null>(null)
   const animationFrameRef = useRef<number | null>(null)
   const [drag, setDrag] = useState<DragState | null>(null)
+  const [panOffset, setPanOffset] = useState<PanOffset>({ x: 0, y: 0 })
   const floorRooms = useMemo(() => plan.rooms.filter((room) => room.floor === selectedFloor), [plan.rooms, selectedFloor])
 
   const drawCanvas = useCallback((previewRoom = dragPreviewRoomRef.current) => {
@@ -59,8 +62,8 @@ export function HospitalCanvas({
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
     const roomsForDraw = replacePreviewRoom(floorRooms, previewRoom)
     const allRoomsForDraw = replacePreviewRoom(plan.rooms, previewRoom)
-    drawHospital(ctx, rect.width, rect.height, roomsForDraw, selectedRoomId, allRoomsForDraw)
-  }, [floorRooms, plan.rooms, selectedRoomId])
+    drawHospital(ctx, rect.width, rect.height, roomsForDraw, selectedRoomId, allRoomsForDraw, panOffset)
+  }, [floorRooms, panOffset, plan.rooms, selectedRoomId])
 
   useEffect(() => {
     drawCanvas()
@@ -74,12 +77,10 @@ export function HospitalCanvas({
     const canvas = canvasRef.current
     if (!canvas) return { x: 0, y: 0 }
     const rect = canvas.getBoundingClientRect()
-    const scale = Math.min(rect.width / WORLD_W, rect.height / WORLD_H)
-    const ox = (rect.width - WORLD_W * scale) / 2
-    const oy = (rect.height - WORLD_H * scale) / 2
+    const view = plannerViewport(rect.width, rect.height, panOffset)
     return {
-      x: (event.clientX - rect.left - ox) / scale,
-      y: (event.clientY - rect.top - oy) / scale,
+      x: (event.clientX - rect.left - view.ox) / view.scale,
+      y: (event.clientY - rect.top - view.oy) / view.scale,
     }
   }
 
@@ -114,7 +115,21 @@ export function HospitalCanvas({
     }
 
     const room = [...floorRooms].reverse().find((item) => inside(point.x, point.y, item))
-    if (!room) return
+    if (!room) {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const view = plannerViewport(rect.width, rect.height, panOffset)
+      setDrag({
+        kind: 'pan',
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        startPanX: view.ox,
+        startPanY: view.oy,
+      })
+      event.currentTarget.setPointerCapture(event.pointerId)
+      return
+    }
     dragPreviewRoomRef.current = null
     onSelectRoom(room.id)
     setDrag({
@@ -128,6 +143,16 @@ export function HospitalCanvas({
 
   function handlePointerMove(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!drag) return
+    if (drag.kind === 'pan') {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      setPanOffset(clampPanOffset(rect.width, rect.height, {
+        x: drag.startPanX + event.clientX - drag.startClientX,
+        y: drag.startPanY + event.clientY - drag.startClientY,
+      }))
+      return
+    }
     const point = worldFromEvent(event)
     if (drag.kind === 'door') {
       onMoveDoor(drag.roomId, drag.doorId, point)
@@ -149,7 +174,7 @@ export function HospitalCanvas({
       window.cancelAnimationFrame(animationFrameRef.current)
       animationFrameRef.current = null
     }
-    if (drag?.kind !== 'door' && dragPreviewRoomRef.current) {
+    if (drag?.kind !== 'door' && drag?.kind !== 'pan' && dragPreviewRoomRef.current) {
       onChangeRoom(dragPreviewRoomRef.current)
     }
     dragPreviewRoomRef.current = null
@@ -190,7 +215,7 @@ export function HospitalCanvas({
       onPointerUp={handlePointerUp}
       onPointerCancel={cancelDrag}
       aria-label="Plano editable del hospital"
-      style={{ cursor: doorToolRoomId ? 'crosshair' : undefined }}
+      style={{ cursor: doorToolRoomId ? 'crosshair' : drag?.kind === 'pan' ? 'grabbing' : undefined }}
     />
   )
 }
@@ -200,6 +225,24 @@ function replacePreviewRoom(rooms: PlacedRoom[], previewRoom: PlacedRoom | null)
   return rooms.map((room) => (room.id === previewRoom.id ? previewRoom : room))
 }
 
+function plannerViewport(width: number, height: number, panOffset: PanOffset) {
+  const scale = width / WORLD_W
+  const worldWidth = WORLD_W * scale
+  const worldHeight = WORLD_H * scale
+  const ox = worldWidth <= width
+    ? (width - worldWidth) / 2
+    : clampValue(panOffset.x, width - worldWidth, 0)
+  const oy = worldHeight <= height
+    ? (height - worldHeight) / 2
+    : clampValue(panOffset.y, height - worldHeight, 0)
+  return { scale, ox, oy }
+}
+
+function clampPanOffset(width: number, height: number, panOffset: PanOffset): PanOffset {
+  const view = plannerViewport(width, height, panOffset)
+  return { x: view.ox, y: view.oy }
+}
+
 function drawHospital(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -207,10 +250,9 @@ function drawHospital(
   rooms: PlacedRoom[],
   selectedRoomId: string | undefined,
   allRooms: PlacedRoom[],
+  panOffset: PanOffset,
 ) {
-  const scale = Math.min(width / WORLD_W, height / WORLD_H)
-  const ox = (width - WORLD_W * scale) / 2
-  const oy = (height - WORLD_H * scale) / 2
+  const { scale, ox, oy } = plannerViewport(width, height, panOffset)
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = '#eef4ec'
   ctx.fillRect(0, 0, width, height)
@@ -254,6 +296,11 @@ function drawHospital(
   drawDoors(ctx, rooms, allRooms, selectedRoomId, sx, sy, scale)
   const selectedRoom = rooms.find((room) => room.id === selectedRoomId)
   if (selectedRoom) drawResizeHandles(ctx, selectedRoom, sx, sy, scale)
+}
+
+function clampValue(value: number, min: number, max: number) {
+  if (min > max) return (min + max) / 2
+  return Math.max(min, Math.min(max, value))
 }
 
 function drawDoors(

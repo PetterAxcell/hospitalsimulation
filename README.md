@@ -51,6 +51,7 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 
 - Frontend React con editor multi-planta.
 - Canvas de Vision para colocar, mover y redimensionar servicios, pasillos, ascensores, escaleras, montacargas y piezas de seguridad.
+- Navegacion del planificador: el plano encaja por ancho y permite arrastrar sobre zonas vacias para desplazarse verticalmente por plantas grandes.
 - Simulacion 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presion por estancia y capas de RPG, flujos y reglas.
 - Top de propuestas por autor: ranking local de arquitecturas, puntuado con KPIs de simulacion, reglas abiertas y desviacion de m2. Es la primera vista de la app para priorizar comparacion antes que edicion; ahora usa tarjetas compactas y modales de detalle para evitar paginas demasiado explicativas.
 - Analisis compacto: la vista muestra cuellos de botella, presion por estancia, casos bloqueados y estado en una pantalla sin paneles laterales; la lectura operativa vive en modal para no llenar la pagina con texto fijo.
