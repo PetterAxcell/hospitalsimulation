@@ -36,7 +36,9 @@ La interfaz de esta rama usa la paleta facilitada desde Marca Clinic Barcelona c
 - Amarillo: avisos, congestiones moderadas y puntos que requieren observacion.
 - Rojo: criticidad, bloqueo, errores de arquitectura y saturacion severa.
 
-La aplicacion visual actual mantiene una superficie blanca de trabajo, pero refuerza la lectura corporativa con cabecera azul, titulo principal en blanco, navegacion azul, logotipo generico Clinic Barcelona sobre fondo blanco y acentos verdes en pestañas activas, paneles, metricas y propuestas. Esta decision conserva densidad operativa para el planificador y evita convertir la herramienta en una pagina institucional.
+La aplicacion visual actual mantiene una superficie blanca de trabajo, pero la marca queda presente durante todo el flujo. La cabecera y navegacion usan azul Clinic; las acciones primarias, estados activos, metricas principales y primeras propuestas usan verde; los controles de simulacion, conexiones e informacion usan cian; y los paneles laterales incorporan lavados suaves azul/verde para que el producto se perciba corporativo sin perder densidad operativa.
+
+La regla practica es evitar bloques grandes de color sobre el lienzo de trabajo. El blanco sigue siendo la base para disenar y leer planos, mientras que azul y verde se aplican en estructura, jerarquia, foco y estados. Esto ayuda a que la pagina se sienta Clinic incluso cuando el usuario esta dentro de Vision, Simulacion, Saturacion o Top.
 
 El asset de cabecera debe usar el logotipo generico Clinic Barcelona, sin area, partner ni descriptor secundario. El SVG vive en `frontend/src/assets/clinic-barcelona-logo.svg` con `viewBox` recortado para que el logotipo se lea correctamente en una cabecera compacta.
 

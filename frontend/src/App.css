@@ -3,7 +3,7 @@
   display: grid;
   grid-template-rows: auto auto 1fr;
   background:
-    linear-gradient(180deg, rgba(74, 204, 211, 0.12) 0, rgba(74, 204, 211, 0) 260px),
+    linear-gradient(180deg, rgba(55, 81, 113, 0.14) 0, rgba(55, 81, 113, 0.04) 104px, rgba(133, 222, 118, 0.12) 104px, rgba(133, 222, 118, 0) 320px),
     var(--clinic-page);
   color: var(--clinic-text);
 }
@@ -16,7 +16,8 @@
   padding: 16px 22px 14px;
   border-top: 4px solid var(--clinic-green);
   border-bottom: 1px solid var(--clinic-border);
-  background: var(--clinic-blue);
+  background:
+    linear-gradient(135deg, var(--clinic-blue) 0%, var(--clinic-blue-1) 100%);
   box-shadow: 0 8px 24px var(--clinic-shadow);
 }
 
@@ -99,6 +100,9 @@
   min-height: 0;
   display: grid;
   grid-template-columns: 270px minmax(0, 1fr) 310px;
+  background:
+    linear-gradient(90deg, rgba(55, 81, 113, 0.06), rgba(55, 81, 113, 0) 30px),
+    var(--clinic-page);
 }
 
 .workbench.without-left-panel.has-right-panel {
@@ -117,7 +121,9 @@
 .right-panel {
   overflow: auto;
   border-right: 1px solid var(--clinic-border);
-  background: var(--clinic-surface-soft);
+  background:
+    linear-gradient(180deg, rgba(55, 81, 113, 0.07), rgba(133, 222, 118, 0.05) 180px, rgba(255, 255, 255, 0) 360px),
+    var(--clinic-surface-soft);
 }
 
 .right-panel {
@@ -130,11 +136,16 @@
   min-height: 0;
   padding: 14px;
   overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(74, 204, 211, 0.08), rgba(74, 204, 211, 0) 190px),
+    transparent;
 }
 
 .panel-section {
   padding: 14px;
   border-bottom: 1px solid var(--clinic-border);
+  background:
+    linear-gradient(90deg, rgba(133, 222, 118, 0.08), rgba(255, 255, 255, 0) 74%);
 }
 
 .panel-section h2,
@@ -151,15 +162,16 @@
   min-height: 54px;
   padding: 9px 10px;
   border: 1px solid var(--clinic-border);
-  border-top: 3px solid var(--clinic-green);
+  border-top: 3px solid var(--clinic-green-1);
   border-radius: 6px;
-  background: var(--clinic-surface);
+  background:
+    linear-gradient(180deg, var(--clinic-surface), #fbfffb);
   box-shadow: 0 8px 18px rgba(55, 81, 113, 0.08);
 }
 
 .metric span {
   display: block;
-  color: var(--clinic-muted);
+  color: var(--clinic-blue);
   font-size: 11px;
   line-height: 1.2;
 }
@@ -170,7 +182,7 @@
   font-size: 18px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  color: var(--clinic-text);
+  color: var(--clinic-blue);
 }
 
 .floor-grid {
@@ -196,7 +208,18 @@
 .floor-grid button.is-active,
 .primary-action {
   border-color: var(--clinic-green-1);
-  background: var(--clinic-success-bg);
+  background: var(--clinic-green-wash);
+  color: var(--clinic-blue);
+}
+
+.floor-grid button:hover,
+.floor-selector-grid button:hover,
+.floor-quick-actions button:hover,
+.button-row button:hover,
+.secondary-action:hover,
+.sim-controls button:hover {
+  border-color: var(--clinic-green-1);
+  background: var(--clinic-green-wash);
   color: var(--clinic-blue);
 }
 
@@ -221,6 +244,13 @@ select {
   font: inherit;
 }
 
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 3px solid rgba(74, 204, 211, 0.38);
+  outline-offset: 2px;
+}
+
 input[type='range'] {
   padding: 0;
   accent-color: var(--clinic-cyan-1);
@@ -239,11 +269,18 @@ output {
   box-shadow: inset 0 -3px 0 var(--clinic-green);
 }
 
+.primary-action:hover {
+  border-color: var(--clinic-green);
+  background: var(--clinic-blue-1);
+  color: var(--clinic-surface);
+}
+
 .secondary-action {
   width: 100%;
   margin-top: 8px;
-  background: var(--clinic-surface-soft);
-  color: var(--clinic-text-soft);
+  border-color: rgba(51, 181, 120, 0.48);
+  background: var(--clinic-green-wash);
+  color: var(--clinic-blue);
 }
 
 .secondary-action:disabled {
@@ -277,8 +314,10 @@ output {
   min-height: 620px;
   display: block;
   border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-green);
   border-radius: 8px;
   background: var(--clinic-info-bg);
+  box-shadow: 0 12px 28px rgba(55, 81, 113, 0.12);
   touch-action: none;
 }
 
@@ -332,8 +371,11 @@ output {
   align-items: center;
   padding: 10px;
   border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-green);
   border-radius: 8px;
-  background: var(--clinic-surface);
+  background:
+    linear-gradient(90deg, var(--clinic-blue-wash), var(--clinic-surface) 34%, var(--clinic-green-wash));
+  box-shadow: 0 8px 20px rgba(55, 81, 113, 0.1);
 }
 
 .sim-controls span {
@@ -379,8 +421,8 @@ output {
 .sim-view-toggle button.is-active,
 .sim-speed-presets button.is-active,
 .speed-preset-grid button.is-active {
-  border-color: var(--clinic-cyan-1);
-  background: var(--clinic-info-bg);
+  border-color: var(--clinic-green-1);
+  background: var(--clinic-green-wash);
   color: var(--clinic-blue);
 }
 
@@ -508,8 +550,10 @@ output {
   height: calc(100vh - 156px);
   overflow: auto;
   border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-green);
   border-radius: 8px;
   background: var(--clinic-surface);
+  box-shadow: 0 12px 28px rgba(55, 81, 113, 0.1);
 }
 
 table {
@@ -528,8 +572,8 @@ td {
 th {
   position: sticky;
   top: 0;
-  background: var(--clinic-surface-soft);
-  color: var(--clinic-muted);
+  background: var(--clinic-blue-wash);
+  color: var(--clinic-blue);
   text-transform: uppercase;
   font-size: 11px;
 }
@@ -566,6 +610,8 @@ th {
   align-items: start;
   padding: 12px 16px;
   border-bottom: 1px solid var(--clinic-border);
+  background:
+    linear-gradient(90deg, var(--clinic-blue-wash), var(--clinic-surface));
 }
 
 .script-modal-header h2 {
@@ -606,6 +652,7 @@ th {
   grid-row: 2;
   padding: 10px 16px;
   border-bottom: 1px solid var(--clinic-border);
+  background: var(--clinic-green-wash);
 }
 
 .script-toolbar span {
@@ -1006,7 +1053,8 @@ th {
   align-items: center;
   padding: 10px 16px;
   border-top: 1px solid var(--clinic-border);
-  background: var(--clinic-surface);
+  background:
+    linear-gradient(90deg, var(--clinic-surface), var(--clinic-blue-wash));
 }
 
 .script-modal-footer button {
@@ -1046,8 +1094,10 @@ th {
   min-height: 560px;
   overflow: auto;
   border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-cyan-1);
   border-radius: 8px;
   background: var(--clinic-surface-soft);
+  box-shadow: 0 12px 28px rgba(55, 81, 113, 0.1);
 }
 
 .top-panel {
@@ -1067,7 +1117,8 @@ th {
   align-items: start;
   padding: 18px;
   border-bottom: 1px solid var(--clinic-border);
-  background: var(--clinic-surface);
+  background:
+    linear-gradient(90deg, var(--clinic-blue-wash), var(--clinic-surface) 46%, var(--clinic-green-wash));
 }
 
 .top-hero {
@@ -1078,7 +1129,7 @@ th {
   padding: 18px;
   border-bottom: 1px solid var(--clinic-border);
   background:
-    linear-gradient(90deg, rgba(74, 204, 211, 0.16), rgba(255, 255, 255, 0) 46%),
+    linear-gradient(90deg, rgba(55, 81, 113, 0.12), rgba(74, 204, 211, 0.12) 42%, rgba(133, 222, 118, 0.16)),
     var(--clinic-surface);
 }
 
@@ -1098,7 +1149,7 @@ th {
   padding: 0 12px;
   border: 1px solid var(--clinic-border-strong);
   border-radius: 999px;
-  background: var(--clinic-surface);
+  background: var(--clinic-blue-wash);
   color: var(--clinic-blue);
   font-weight: 800;
   cursor: pointer;
@@ -1169,6 +1220,7 @@ th {
   padding: 16px;
   border-right: 1px solid var(--clinic-border);
   border-bottom: 1px solid var(--clinic-border);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .saturation-block.wide,
@@ -1198,6 +1250,13 @@ th {
   border-left: 4px solid var(--clinic-cyan);
   border-radius: 8px;
   background: var(--clinic-surface);
+}
+
+.leaderboard-row:first-child {
+  border-color: rgba(51, 181, 120, 0.52);
+  border-left-color: var(--clinic-green-1);
+  background:
+    linear-gradient(90deg, var(--clinic-green-wash), var(--clinic-surface) 58%);
 }
 
 .leaderboard-row > strong {
@@ -1242,6 +1301,12 @@ th {
   background: var(--clinic-surface);
 }
 
+.proposal-card:first-child {
+  border-color: rgba(51, 181, 120, 0.48);
+  background:
+    linear-gradient(90deg, var(--clinic-green-wash), var(--clinic-surface) 62%);
+}
+
 .proposal-card.is-compact {
   gap: 9px;
   padding: 11px;
@@ -1277,14 +1342,14 @@ th {
   height: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--clinic-surface-tint);
+  background: var(--clinic-blue-wash);
 }
 
 .score-track span {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--clinic-green);
+  background: linear-gradient(90deg, var(--clinic-green-1), var(--clinic-green));
 }
 
 .proposal-chips {
@@ -1830,7 +1895,7 @@ th {
   height: 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--clinic-surface-tint);
+  background: var(--clinic-blue-wash);
 }
 
 .bar-track.large {
@@ -1902,7 +1967,8 @@ th {
 @media (max-width: 1180px) {
   .app-header {
     grid-template-columns: 1fr;
-    background: var(--clinic-blue);
+    background:
+      linear-gradient(135deg, var(--clinic-blue) 0%, var(--clinic-blue-1) 100%);
   }
 
   .header-metrics {
@@ -1948,7 +2014,8 @@ th {
   }
 
   .app-header {
-    background: var(--clinic-blue);
+    background:
+      linear-gradient(135deg, var(--clinic-blue) 0%, var(--clinic-blue-1) 100%);
   }
 
   .brand-title {
