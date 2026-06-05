@@ -119,7 +119,7 @@ frontend/
   src/engine/      Geometria, circulacion, simulacion ligera, staff y reglas arquitectonicas
   src/components/  Canvas editable y escena Phaser de simulacion
   src/components/ui/ Primitivas compartidas como metricas y modales
-  src/features/    Funcionalidades de producto separadas, como ranking/top y saturacion
+  src/features/    Funcionalidades de producto separadas: top, saturacion y simulacion
 hospital_sim/      Prototipo Python/SimPy inicial, mantenido como referencia
 docs/              Arquitectura, backend y requisitos
 tests/             Pruebas de regresion del prototipo Python
