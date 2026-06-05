@@ -242,7 +242,7 @@ function drawHospital(
     const isSelected = room.id === selectedRoomId
     const isDisconnectedPassage = disconnectedIds.has(room.id)
     ctx.fillStyle = KIND_COLORS[room.kind]
-    ctx.strokeStyle = isDisconnectedPassage ? '#dc2626' : isSelected ? '#111827' : '#30473e'
+    ctx.strokeStyle = isDisconnectedPassage ? '#ed7369' : isSelected ? '#111827' : '#30473e'
     ctx.lineWidth = isDisconnectedPassage || isSelected ? 3 : 1.4
     roundRect(ctx, sx(room.x), sy(room.y), room.w * scale, room.h * scale, room.kind === 'circulation' ? 2 : 5)
     ctx.fill()
@@ -274,8 +274,8 @@ function drawDoors(
       const thickness = Math.max(8, 0.9 * scale)
       ctx.save()
       ctx.translate(sx(position.x), sy(position.y))
-      ctx.fillStyle = connected ? '#d8dec9' : '#fee2e2'
-      ctx.strokeStyle = connected ? (room.id === selectedRoomId ? '#1d4ed8' : '#16685f') : '#dc2626'
+      ctx.fillStyle = connected ? '#d8dec9' : '#fff0ed'
+      ctx.strokeStyle = connected ? (room.id === selectedRoomId ? '#1d4ed8' : '#375171') : '#ed7369'
       ctx.lineWidth = room.id === selectedRoomId ? 2.4 : 1.6
       if (horizontal) {
         ctx.fillRect(-length / 2, -thickness / 2, length, thickness)
@@ -306,7 +306,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, room: PlacedRoom, x: number, y
   if (current) lines.push(current)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.84)'
   ctx.fillRect(x - 3, y - 14, Math.min(roomWidth - 4, 150), Math.min(44, lines.length * 13 + 18))
-  ctx.fillStyle = '#17201c'
+  ctx.fillStyle = '#1d2f42'
   ctx.font = '700 11px Inter, sans-serif'
   lines.slice(0, 2).forEach((line, index) => ctx.fillText(line, x, y + index * 12))
   ctx.font = '10px Inter, sans-serif'
@@ -361,13 +361,13 @@ function drawEquipment(
 function drawEquipmentGlyph(ctx: CanvasRenderingContext2D, kind: EquipmentKind, x: number, y: number, scale: number) {
   const s = Math.max(5, scale * 1.2)
   ctx.save()
-  ctx.strokeStyle = '#41534b'
+  ctx.strokeStyle = '#375171'
   ctx.lineWidth = 1.2
-  ctx.fillStyle = '#f8fafc'
+  ctx.fillStyle = '#ffffff'
   if (kind === 'bed' || kind === 'stretcher') {
     ctx.fillRect(x, y, s * 2, s * 0.85)
     ctx.strokeRect(x, y, s * 2, s * 0.85)
-    ctx.fillStyle = '#9bc0d9'
+    ctx.fillStyle = '#8fb8de'
     ctx.fillRect(x, y, s * 0.42, s * 0.85)
   } else if (kind === 'chair') {
     ctx.fillStyle = '#b08968'
@@ -380,7 +380,7 @@ function drawEquipmentGlyph(ctx: CanvasRenderingContext2D, kind: EquipmentKind, 
   } else if (kind === 'monitor') {
     ctx.fillStyle = '#1f2937'
     ctx.fillRect(x, y, s, s * 0.75)
-    ctx.fillStyle = '#76e4b4'
+    ctx.fillStyle = '#85de76'
     ctx.fillRect(x + 2, y + 2, s - 4, s * 0.75 - 4)
   } else if (kind === 'sink') {
     ctx.beginPath()
@@ -388,21 +388,21 @@ function drawEquipmentGlyph(ctx: CanvasRenderingContext2D, kind: EquipmentKind, 
     ctx.fill()
     ctx.stroke()
   } else if (kind === 'labBench' || kind === 'shelves' || kind === 'cleanStorage' || kind === 'dirtyUtility') {
-    ctx.fillStyle = kind === 'dirtyUtility' ? '#9b5964' : '#8d99ae'
+    ctx.fillStyle = kind === 'dirtyUtility' ? '#9b5964' : '#8fb8de'
     ctx.fillRect(x, y, s * 1.7, s * 0.85)
     ctx.strokeRect(x, y, s * 1.7, s * 0.85)
   } else if (kind === 'imagingGantry') {
     ctx.beginPath()
     ctx.arc(x + s, y + s, s, 0, Math.PI * 2)
     ctx.stroke()
-    ctx.fillStyle = '#d9e4ea'
+    ctx.fillStyle = '#8fb8de'
     ctx.fillRect(x + s * 0.35, y + s * 0.8, s * 1.4, s * 0.35)
   } else if (kind === 'orTable' || kind === 'sterileTable') {
-    ctx.fillStyle = kind === 'orTable' ? '#dfe8ef' : '#d0f0de'
+    ctx.fillStyle = kind === 'orTable' ? '#8fb8de' : '#b8ebad'
     ctx.fillRect(x, y, s * 2.2, s * 0.8)
     ctx.strokeRect(x, y, s * 2.2, s * 0.8)
   } else if (kind === 'elevator') {
-    ctx.fillStyle = '#b8c4cc'
+    ctx.fillStyle = '#8fb8de'
     ctx.fillRect(x, y, s * 0.75, s * 1.45)
     ctx.fillRect(x + s, y, s * 0.75, s * 1.45)
     ctx.strokeRect(x, y, s * 1.75, s * 1.45)
@@ -416,7 +416,7 @@ function drawEquipmentGlyph(ctx: CanvasRenderingContext2D, kind: EquipmentKind, 
       ctx.stroke()
     }
   } else if (kind === 'emergencyStairs') {
-    ctx.strokeStyle = '#b91c1c'
+    ctx.strokeStyle = '#ed7369'
     ctx.lineWidth = 1.6
     ctx.strokeRect(x - s * 0.12, y - s * 0.12, s * 1.75, s * 1.35)
     for (let i = 0; i < 4; i += 1) {
@@ -427,19 +427,19 @@ function drawEquipmentGlyph(ctx: CanvasRenderingContext2D, kind: EquipmentKind, 
       ctx.stroke()
     }
   } else if (kind === 'fireDoor') {
-    ctx.fillStyle = '#ef4444'
+    ctx.fillStyle = '#f18e7f'
     ctx.fillRect(x, y, s * 0.42, s * 1.4)
     ctx.strokeRect(x, y, s * 0.42, s * 1.4)
     ctx.beginPath()
     ctx.arc(x + s * 0.42, y + s * 1.4, s * 0.9, -Math.PI / 2, 0)
     ctx.stroke()
   } else if (kind === 'smokeControl') {
-    ctx.fillStyle = '#dbeafe'
+    ctx.fillStyle = '#e8f9fb'
     ctx.beginPath()
     ctx.arc(x + s * 0.65, y + s * 0.65, s * 0.62, 0, Math.PI * 2)
     ctx.fill()
     ctx.stroke()
-    ctx.strokeStyle = '#2563eb'
+    ctx.strokeStyle = '#386ba6'
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath()
       ctx.moveTo(x + s * 0.65, y + s * 0.65)
@@ -447,36 +447,36 @@ function drawEquipmentGlyph(ctx: CanvasRenderingContext2D, kind: EquipmentKind, 
       ctx.stroke()
     }
   } else if (kind === 'refugeArea') {
-    ctx.fillStyle = '#ecfdf5'
+    ctx.fillStyle = '#e7fbe2'
     ctx.fillRect(x, y, s * 1.7, s)
     ctx.strokeRect(x, y, s * 1.7, s)
-    ctx.fillStyle = '#047857'
+    ctx.fillStyle = '#33b578'
     ctx.fillRect(x + s * 0.18, y + s * 0.18, s * 0.38, s * 0.62)
     ctx.fillRect(x + s * 0.7, y + s * 0.45, s * 0.7, s * 0.16)
   } else if (kind === 'sprinkler') {
-    ctx.strokeStyle = '#2563eb'
+    ctx.strokeStyle = '#386ba6'
     ctx.beginPath()
     ctx.moveTo(x + s * 0.65, y)
     ctx.lineTo(x + s * 0.65, y + s * 0.42)
     ctx.stroke()
-    ctx.fillStyle = '#38bdf8'
+    ctx.fillStyle = '#4accd3'
     for (let i = 0; i < 3; i += 1) {
       ctx.beginPath()
       ctx.arc(x + s * (0.25 + i * 0.4), y + s * 0.85, s * 0.1, 0, Math.PI * 2)
       ctx.fill()
     }
   } else if (kind === 'generator') {
-    ctx.fillStyle = '#facc15'
+    ctx.fillStyle = '#fbc344'
     ctx.fillRect(x, y, s * 1.7, s)
     ctx.strokeRect(x, y, s * 1.7, s)
-    ctx.fillStyle = '#374151'
+    ctx.fillStyle = '#375171'
     ctx.fillRect(x + s * 0.2, y + s * 0.25, s * 0.55, s * 0.45)
     ctx.fillRect(x + s * 0.95, y + s * 0.3, s * 0.5, s * 0.14)
   } else if (kind === 'ambulance') {
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(x, y, s * 2.2, s)
     ctx.strokeRect(x, y, s * 2.2, s)
-    ctx.fillStyle = '#d62828'
+    ctx.fillStyle = '#ed7369'
     ctx.fillRect(x + s * 0.92, y + s * 0.22, s * 0.18, s * 0.56)
     ctx.fillRect(x + s * 0.72, y + s * 0.42, s * 0.58, s * 0.18)
   } else if (kind === 'garden') {
@@ -494,7 +494,7 @@ function drawEquipmentGlyph(ctx: CanvasRenderingContext2D, kind: EquipmentKind, 
 function drawFloorPattern(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, kind: string) {
   ctx.save()
   ctx.globalAlpha = kind === 'circulation' ? 0.34 : 0.2
-  ctx.strokeStyle = kind === 'circulation' ? '#a7b3a4' : kind === 'critical' || kind === 'surgery' ? '#7a4c28' : '#4d665d'
+  ctx.strokeStyle = kind === 'circulation' ? '#afc6c3' : kind === 'critical' || kind === 'surgery' ? '#7a4c28' : '#4d665d'
   ctx.lineWidth = 1
   if (kind === 'circulation') {
     for (let ix = x + 10; ix < x + w; ix += 18) {

@@ -6,6 +6,7 @@ Esta carpeta define la vision tecnica del producto. La aplicacion actual ya tien
 
 - [Arquitectura de producto](ARCHITECTURE.md): responsabilidades entre frontend, backend, motor de simulacion, reglas y datos.
 - [Backend](BACKEND.md): propuesta de API, jobs asincronos, persistencia, seguridad y entidades principales.
+- [Paleta visual Clinic Barcelona](BRAND_COLORS.md): tokens de color, equivalencias RGB/hex y criterio de uso en la interfaz y simulacion.
 - [Despliegue](DEPLOYMENT.md): publicacion del frontend en Cloudflare Pages siguiendo el patron de `ontour`.
 - [Modelo funcional Hospital Clinic](HOSPITAL_CLINIC_MODEL.md): fuentes, supuestos, clusters y programa preliminar para la rama centrada en Nou Campus de Salut Clinic-UB.
 - [Lenguaje de planificacion](PLANNING_LANGUAGE.md): comandos iniciales para generar planes desde scripts.

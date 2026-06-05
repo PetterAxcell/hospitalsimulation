@@ -55,6 +55,7 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Top de propuestas por autor: ranking local de arquitecturas, puntuado con KPIs de simulacion, reglas abiertas y desviacion de m2. Es la primera vista de la app para priorizar comparacion antes que edicion.
 - Catalogo de hospital terciario: urgencias, diagnostico, quirofanos, PACU, UCI, wards, maternidad, neonatal, oncologia, farmacia, laboratorio, logistica, investigacion y command center.
 - Preset Hospital Clinic: primera vision del Nou Campus Clinic-UB con asistencia, docencia, investigacion, infraestructuras, campus, sotanos tecnicos/logisticos, urgencias, quirofanos, UCI, institutos clinicos, consultas, hospital de dia y reservas de crecimiento.
+- Identidad visual Clinic: paleta azul/verde/rojo/amarillo/cian aplicada a shell, controles, planificador, simulacion y estados de saturacion.
 - Elementos de seguridad arquitectonica: ascensores, escaleras, montacargas, escaleras protegidas/emergencia, refugios de evacuacion horizontal, sectorizacion PCI, central MEP critica y reserva de expansion.
 - Circulacion editable: pasillos publicos, pasillos clinicos para camas y pasillos logisticos limpio/sucio se anaden desde el selector `Elemento`, igual que cualquier otro bloque. En la UI, `Asc/Mont` significa ascensores publicos, ascensores clinicos y montacargas; las escaleras son componentes independientes.
 - Dimensiones editables en metros: cada bloque tiene ancho y alto, y los m2 se recalculan automaticamente con una escala de 3 m por unidad de plano.
@@ -76,6 +77,7 @@ La documentacion tecnica vive en [docs/](docs/):
 - [Backend propuesto](docs/BACKEND.md)
 - [Despliegue](docs/DEPLOYMENT.md)
 - [Modelo funcional Hospital Clinic](docs/HOSPITAL_CLINIC_MODEL.md)
+- [Paleta visual Clinic Barcelona](docs/BRAND_COLORS.md)
 - [Requisitos arquitectonicos y seguridad](docs/SAFETY_REQUIREMENTS.md)
 
 ## Backend

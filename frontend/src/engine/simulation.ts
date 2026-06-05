@@ -68,7 +68,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'TRA',
     stream: 'ed_ambulance',
     severity: 'critical',
-    color: '#d62828',
+    color: '#ed7369',
     weight: 9,
     build: (rng) => {
       const surgical = rng() < 0.62
@@ -88,7 +88,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'ICT',
     stream: 'ed_ambulance',
     severity: 'high',
-    color: '#7c3aed',
+    color: '#4730c4',
     weight: 7,
     build: (rng) => {
       const needsResus = rng() < 0.34
@@ -108,7 +108,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'DT',
     stream: 'ed_walkin',
     severity: 'high',
-    color: '#ef4444',
+    color: '#f18e7f',
     weight: 11,
     build: (rng) => {
       const needsImaging = rng() < 0.42
@@ -129,7 +129,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'UL',
     stream: 'ed_walkin',
     severity: 'low',
-    color: '#f4a261',
+    color: '#fbc344',
     weight: 24,
     build: (rng) => [
       caseStep('registration', 'Admision'),
@@ -144,7 +144,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'OBS',
     stream: 'ed_walkin',
     severity: 'medium',
-    color: '#2a9d8f',
+    color: '#01b7c1',
     weight: 17,
     build: (rng) => {
       const needsLab = rng() < 0.64
@@ -167,7 +167,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'CEX',
     stream: 'outpatient',
     severity: 'medium',
-    color: '#2563eb',
+    color: '#386ba6',
     weight: 22,
     build: (rng) => {
       const needsLab = rng() < 0.36
@@ -187,7 +187,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'QX',
     stream: 'elective',
     severity: 'medium',
-    color: '#7c6bb0',
+    color: '#8fb8de',
     weight: 9,
     build: (rng) => {
       const needsIcu = rng() < 0.18
@@ -205,7 +205,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'SEP',
     stream: 'ed_walkin',
     severity: 'critical',
-    color: '#b45309',
+    color: '#f5ab38',
     weight: 8,
     build: (rng) => {
       const directIcu = rng() < 0.62
@@ -225,7 +225,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'CAD',
     stream: 'ed_walkin',
     severity: 'high',
-    color: '#a855f7',
+    color: '#4730c4',
     weight: 7,
     build: (rng) => [
       caseStep(rng() < 0.45 ? 'arrival_ambulance' : 'registration', 'Llegada fragilidad'),
@@ -243,7 +243,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'MAT',
     stream: 'elective',
     severity: 'medium',
-    color: '#db2777',
+    color: '#f18e7f',
     weight: 6,
     build: (rng) => {
       const neonatalSupport = rng() < 0.16
@@ -261,7 +261,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'NEO',
     stream: 'ed_ambulance',
     severity: 'critical',
-    color: '#c026d3',
+    color: '#4730c4',
     weight: 3,
     build: () => [
       caseStep('arrival_ambulance', 'Traslado neonatal'),
@@ -276,7 +276,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'PSQ',
     stream: 'ed_walkin',
     severity: 'medium',
-    color: '#0f766e',
+    color: '#33b578',
     weight: 6,
     build: (rng) => {
       const admission = rng() < 0.38
@@ -295,7 +295,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'ONC',
     stream: 'outpatient',
     severity: 'medium',
-    color: '#be185d',
+    color: '#ed7369',
     weight: 9,
     build: (rng) => [
       caseStep('registration', 'Check-in oncologia'),
@@ -311,7 +311,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     code: 'DXC',
     stream: 'outpatient',
     severity: 'medium',
-    color: '#0891b2',
+    color: '#4accd3',
     weight: 10,
     build: (rng) => [
       caseStep('registration', 'Check-in pruebas'),
@@ -382,7 +382,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: TRA
     stream: ed_ambulance
     severity: critical
-    color: "#d62828"
+    color: "#ed7369"
     weight: 9
     steps:
       - node: arrival_ambulance
@@ -410,7 +410,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: ICT
     stream: ed_ambulance
     severity: high
-    color: "#7c3aed"
+    color: "#4730c4"
     weight: 7
     steps:
       - node: arrival_ambulance
@@ -435,7 +435,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: DT
     stream: ed_walkin
     severity: high
-    color: "#ef4444"
+    color: "#f18e7f"
     weight: 11
     steps:
       - node: registration
@@ -462,7 +462,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: UL
     stream: ed_walkin
     severity: low
-    color: "#f4a261"
+    color: "#fbc344"
     weight: 24
     steps:
       - node: registration
@@ -484,7 +484,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: OBS
     stream: ed_walkin
     severity: medium
-    color: "#2a9d8f"
+    color: "#01b7c1"
     weight: 17
     steps:
       - node: registration
@@ -514,7 +514,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: CEX
     stream: outpatient
     severity: medium
-    color: "#2563eb"
+    color: "#386ba6"
     weight: 22
     steps:
       - node: registration
@@ -535,7 +535,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: QX
     stream: elective
     severity: medium
-    color: "#7c6bb0"
+    color: "#8fb8de"
     weight: 9
     steps:
       - node: registration
@@ -557,7 +557,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: SEP
     stream: ed_walkin
     severity: critical
-    color: "#b45309"
+    color: "#f5ab38"
     weight: 8
     steps:
       - node: registration
@@ -584,7 +584,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: CAD
     stream: ed_walkin
     severity: high
-    color: "#a855f7"
+    color: "#4730c4"
     weight: 7
     steps:
       - choose:
@@ -612,7 +612,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: MAT
     stream: elective
     severity: medium
-    color: "#db2777"
+    color: "#f18e7f"
     weight: 6
     steps:
       - node: registration
@@ -635,7 +635,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: NEO
     stream: ed_ambulance
     severity: critical
-    color: "#c026d3"
+    color: "#4730c4"
     weight: 3
     steps:
       - node: arrival_ambulance
@@ -652,7 +652,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: PSQ
     stream: ed_walkin
     severity: medium
-    color: "#0f766e"
+    color: "#33b578"
     weight: 6
     steps:
       - node: registration
@@ -676,7 +676,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: ONC
     stream: outpatient
     severity: medium
-    color: "#be185d"
+    color: "#ed7369"
     weight: 9
     steps:
       - node: registration
@@ -701,7 +701,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     code: DXC
     stream: outpatient
     severity: medium
-    color: "#0891b2"
+    color: "#4accd3"
     weight: 10
     steps:
       - node: registration
@@ -1080,10 +1080,10 @@ const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
 }
 
 const STAFF_ROLE_COLORS: Record<StaffRole, string> = {
-  doctor: '#f8f9fa',
-  nurse: '#4f83cc',
-  porter: '#7c6bb0',
-  technician: '#6c757d',
+  doctor: '#ffffff',
+  nurse: '#386ba6',
+  porter: '#8fb8de',
+  technician: '#5d7186',
 }
 
 const STAFF_ROLE_ORDER: StaffRole[] = ['doctor', 'nurse', 'porter', 'technician']
@@ -1329,7 +1329,7 @@ function caseFromYamlEntry(value: unknown): PatientCaseDefinition {
   const code = optionalString(item.code) ?? id.slice(0, 3).toUpperCase()
   const stream = streamFromValue(item.stream ?? 'ed_walkin', id)
   const severity = severityFromValue(item.severity ?? 'medium', id)
-  const color = optionalString(item.color) ?? '#2a9d8f'
+  const color = optionalString(item.color) ?? '#01b7c1'
   const weight = optionalNumber(item.weight) ?? 1
   const specs = specsFromValue(item.steps, `case ${id}.steps`)
   if (specs.length < 2) throw new Error(`case ${id}.steps necesita al menos 2 pasos.`)

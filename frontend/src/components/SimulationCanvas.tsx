@@ -74,49 +74,49 @@ const CARE_ROOM_KINDS = new Set<RoomKind>([
 ])
 
 const ROOM_FLOOR_COLORS: Record<RoomKind, string> = {
-  public: '#b9e3ef',
-  waiting: '#e6f0f7',
-  emergency: '#f0b06f',
-  diagnostic: '#b8dfc6',
-  surgery: '#e8cc74',
-  critical: '#df765d',
-  inpatient: '#93d2b7',
-  ambulatory: '#c6e7cf',
-  maternalChild: '#f2bfd8',
-  oncology: '#c98fa5',
-  pharmacy: '#cfbfeb',
-  laboratory: '#b9d8eb',
-  logistics: '#a1acbd',
-  research: '#c5b4dd',
-  staff: '#d1dec6',
-  technical: '#c4ccd3',
-  vertical: '#dce4ea',
-  circulation: '#d8dec9',
-  green: '#8bcf7f',
-  future: '#d4d6d0',
+  public: '#7cdadf',
+  waiting: '#e8f9fb',
+  emergency: '#f18e7f',
+  diagnostic: '#b8ebad',
+  surgery: '#fad67d',
+  critical: '#ed7369',
+  inpatient: '#85de76',
+  ambulatory: '#b8ebad',
+  maternalChild: '#f5bdb0',
+  oncology: '#f5bdb0',
+  pharmacy: '#8fb8de',
+  laboratory: '#4accd3',
+  logistics: '#8fb8de',
+  research: '#8fb8de',
+  staff: '#e8f9fb',
+  technical: '#d5e3e1',
+  vertical: '#8fb8de',
+  circulation: '#eef8f1',
+  green: '#85de76',
+  future: '#fad67d',
 }
 
 const ROOM_WALL_COLORS: Record<RoomKind, string> = {
-  public: '#587f8a',
-  waiting: '#6b8795',
-  emergency: '#8e5f35',
-  diagnostic: '#5e846b',
-  surgery: '#80692d',
-  critical: '#8c3c2f',
-  inpatient: '#4c8068',
-  ambulatory: '#698f72',
-  maternalChild: '#925d78',
-  oncology: '#7b4d5f',
-  pharmacy: '#76639d',
-  laboratory: '#5f7d92',
-  logistics: '#4c5565',
-  research: '#725d8b',
-  staff: '#687b5f',
-  technical: '#636d76',
-  vertical: '#59646d',
-  circulation: '#a6b09f',
-  green: '#3d8e42',
-  future: '#7b7f78',
+  public: '#01b7c1',
+  waiting: '#7cdadf',
+  emergency: '#ed7369',
+  diagnostic: '#33b578',
+  surgery: '#f5ab38',
+  critical: '#ed7369',
+  inpatient: '#33b578',
+  ambulatory: '#33b578',
+  maternalChild: '#f18e7f',
+  oncology: '#ed7369',
+  pharmacy: '#386ba6',
+  laboratory: '#01b7c1',
+  logistics: '#375171',
+  research: '#4730c4',
+  staff: '#386ba6',
+  technical: '#5d7186',
+  vertical: '#375171',
+  circulation: '#afc6c3',
+  green: '#33b578',
+  future: '#f5ab38',
 }
 
 export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, agentLayer, onSelectCase, onChangeAgentLayer, onChangeSpeed }: SimulationCanvasProps) {
@@ -155,7 +155,7 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
     gameRef.current = new Phaser.Game({
       type: Phaser.AUTO,
       parent: hostRef.current,
-      backgroundColor: '#17201c',
+      backgroundColor: '#1d2f42',
       pixelArt: false,
       roundPixels: false,
       scale: {
@@ -346,11 +346,11 @@ class HospitalGameScene extends Phaser.Scene {
     const b = isoPoint(WORLD_W, 0, floor, 0)
     const c = isoPoint(WORLD_W, WORLD_H, floor, 0)
     const d = isoPoint(0, WORLD_H, floor, 0)
-    fillPolygon(g, [a, b, c, d], active ? '#edf5ed' : '#dfe7dd', active ? 0.28 : 0.14, active ? '#2a9d8f' : '#98a69d', active ? 0.65 : 0.28)
+    fillPolygon(g, [a, b, c, d], active ? '#eef8f1' : '#eef8f1', active ? 0.28 : 0.14, active ? '#01b7c1' : '#afc6c3', active ? 0.65 : 0.28)
 
     const label = this.add.text(d.x - 16, d.y - 12, floorName(floor), {
-      color: active ? '#174942' : '#66736e',
-      backgroundColor: active ? '#e4f3ee' : '#f8fafc',
+      color: active ? '#174942' : '#5d7186',
+      backgroundColor: active ? '#e8f9fb' : '#ffffff',
       fontFamily: 'Arial, sans-serif',
       fontSize: '18px',
       fontStyle: 'bold',
@@ -366,7 +366,7 @@ class HospitalGameScene extends Phaser.Scene {
     rooms
       .sort((a, b) => a.x + a.y - (b.x + b.y))
       .forEach((room) => {
-        drawIsoPrism(g, room.x, room.y, room.w, room.h, room.floor, 4, ROOM_FLOOR_COLORS.circulation, disconnectedPassage ? '#dc2626' : '#8f9d8b', 0.96)
+        drawIsoPrism(g, room.x, room.y, room.w, room.h, room.floor, 4, ROOM_FLOOR_COLORS.circulation, disconnectedPassage ? '#ed7369' : '#8f9d8b', 0.96)
       })
   }
 
@@ -375,7 +375,7 @@ class HospitalGameScene extends Phaser.Scene {
     const g = this.add.graphics()
     this.layers.staticLayer.add(g)
     const roomColor = ROOM_FLOOR_COLORS[room.kind] ?? KIND_COLORS[room.kind]
-    const wallColor = disconnectedPassage ? '#dc2626' : ROOM_WALL_COLORS[room.kind] ?? '#374151'
+    const wallColor = disconnectedPassage ? '#ed7369' : ROOM_WALL_COLORS[room.kind] ?? '#375171'
     const height = isoBlockHeight(room)
     const alpha = room.floor === snapshot.selectedFloor ? 1 : 0.72
     drawIsoPrism(g, room.x, room.y, room.w, room.h, room.floor, height, roomColor, wallColor, alpha)
@@ -386,14 +386,14 @@ class HospitalGameScene extends Phaser.Scene {
       const b = isoPoint(room.x + room.w, room.y, room.floor, height + 1)
       const c = isoPoint(room.x + room.w, room.y + room.h, room.floor, height + 1)
       const d = isoPoint(room.x, room.y + room.h, room.floor, height + 1)
-      fillPolygon(g, [a, b, c, d], '#d62828', 0.12 + pressure * 0.2)
+      fillPolygon(g, [a, b, c, d], '#ed7369', 0.12 + pressure * 0.2)
     }
 
     if (room.floor !== snapshot.selectedFloor) return
     if (room.w < 7 && room.h < 7) return
     const labelPoint = isoPoint(room.x + room.w / 2, room.y + room.h / 2, room.floor, height + 8)
     const label = this.add.text(labelPoint.x, labelPoint.y, truncateText(room.name, room.w >= 12 ? 22 : 14), {
-      color: '#17201c',
+      color: '#1d2f42',
       backgroundColor: '#ffffff',
       fontFamily: 'Arial, sans-serif',
       fontSize: '13px',
@@ -409,7 +409,7 @@ class HospitalGameScene extends Phaser.Scene {
     this.layers.staticLayer.add(g)
 
     const fill = ROOM_FLOOR_COLORS.circulation
-    const stroke = disconnectedPassage ? '#dc2626' : ROOM_WALL_COLORS.circulation
+    const stroke = disconnectedPassage ? '#ed7369' : ROOM_WALL_COLORS.circulation
     const cells = corridorCells(rooms)
     g.fillStyle(toColor(fill), 1)
     cells.forEach((cell) => {
@@ -426,7 +426,7 @@ class HospitalGameScene extends Phaser.Scene {
       if (!cells.has(cellKey(x - 1, y))) g.lineBetween(tileX(x), tileY(y), tileX(x), tileY(y + 1))
     })
 
-    g.lineStyle(1, toColor('#a7b3a4'), 0.3)
+    g.lineStyle(1, toColor('#afc6c3'), 0.3)
     const bounds = boundsForRooms(rooms)
     for (let x = Math.ceil(bounds.x); x < bounds.x + bounds.w + bounds.h; x += 2) {
       g.lineBetween(tileX(x), tileY(bounds.y), tileX(x - bounds.h), tileY(bounds.y + bounds.h))
@@ -434,7 +434,7 @@ class HospitalGameScene extends Phaser.Scene {
 
     if (bounds.w >= 12 || bounds.h >= 12) {
       const label = rooms.length === 1 ? rooms[0].name : `Red pasillos (${rooms.length})`
-      this.addPixelText(label.slice(0, 26), bounds.x + 0.7, bounds.y + 0.7, '#33413b', '#f7faf7', this.layers.staticLayer, 10)
+      this.addPixelText(label.slice(0, 26), bounds.x + 0.7, bounds.y + 0.7, '#375171', '#f7faf7', this.layers.staticLayer, 10)
     }
   }
 
@@ -442,8 +442,8 @@ class HospitalGameScene extends Phaser.Scene {
     if (!this.layers) return
     const g = this.add.graphics()
     this.layers.staticLayer.add(g)
-    const base = snapshot.selectedFloor === 0 ? '#73d85a' : '#d6dbca'
-    const speck = snapshot.selectedFloor === 0 ? '#56b747' : '#c5cbb8'
+    const base = snapshot.selectedFloor === 0 ? '#85de76' : '#eef8f1'
+    const speck = snapshot.selectedFloor === 0 ? '#33b578' : '#afc6c3'
     g.fillStyle(toColor(base), 1)
     g.fillRect(0, 0, WORLD_PX_W, WORLD_PX_H)
 
@@ -471,10 +471,10 @@ class HospitalGameScene extends Phaser.Scene {
     if (snapshot.selectedFloor !== 0) return
     const g = this.add.graphics()
     this.layers.staticLayer.add(g)
-    drawTileRect(g, 84, 8, 16, 7, '#68727a', '#374151')
+    drawTileRect(g, 84, 8, 16, 7, '#5d7186', '#375171')
     g.fillStyle(0xffffff, 1)
     g.fillRect(87 * TILE, 11 * TILE, 9 * TILE, 5)
-    this.addPixelText('AMBULANCIAS', 84.8, 8.4, '#ffffff', '#47525c', this.layers.staticLayer, 10)
+    this.addPixelText('AMBULANCIAS', 84.8, 8.4, '#ffffff', '#375171', this.layers.staticLayer, 10)
   }
 
   private drawRoom(room: PlacedRoom, result: SimulationResult, disconnectedPassage: boolean, allRooms: PlacedRoom[]) {
@@ -483,7 +483,7 @@ class HospitalGameScene extends Phaser.Scene {
     this.layers.staticLayer.add(g)
 
     const roomColor = ROOM_FLOOR_COLORS[room.kind] ?? KIND_COLORS[room.kind]
-    const wallColor = disconnectedPassage ? '#dc2626' : ROOM_WALL_COLORS[room.kind] ?? '#374151'
+    const wallColor = disconnectedPassage ? '#ed7369' : ROOM_WALL_COLORS[room.kind] ?? '#375171'
     const pressure = Math.min(1, (result.roomPressure[room.id] ?? 0) / Math.max(1, room.capacity * 1.6))
 
     drawTileRect(g, room.x, room.y, room.w, room.h, roomColor, wallColor)
@@ -560,7 +560,7 @@ class HospitalGameScene extends Phaser.Scene {
       tileY(room.y + 0.62),
       `${truncateText(room.name, layout.titleChars)}\nDem ${pressure} | Cap ${room.capacity}`,
       {
-      color: '#17201c',
+      color: '#1d2f42',
       fontFamily: 'Arial, sans-serif',
       fontSize: `${layout.fontSize}px`,
       fontStyle: 'bold',
@@ -728,7 +728,7 @@ class HospitalGameScene extends Phaser.Scene {
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0x66736e, 0.9)
     const text = this.add.text(7, 4, '', {
-      color: '#17201c',
+      color: '#1d2f42',
       fontFamily: 'Arial, sans-serif',
       fontSize: '13px',
       fontStyle: 'bold',
@@ -752,8 +752,8 @@ class HospitalGameScene extends Phaser.Scene {
     const width = Math.max(64, Math.min(room.w * TILE - 8, text.width + 14))
     const height = hasStaff ? 39 : 27
     const ratio = room.capacity > 0 ? count.total / room.capacity : count.total > 0 ? 1 : 0
-    const fill = ratio > 0.85 ? '#fee2e2' : ratio > 0.45 ? '#fff3c4' : count.total > 0 ? '#e4f3ee' : '#ffffff'
-    const stroke = ratio > 0.85 ? '#dc2626' : ratio > 0.45 ? '#d9a441' : '#6aa89b'
+    const fill = ratio > 0.85 ? '#fff0ed' : ratio > 0.45 ? '#fff3d1' : count.total > 0 ? '#e8f9fb' : '#ffffff'
+    const stroke = ratio > 0.85 ? '#ed7369' : ratio > 0.45 ? '#f5ab38' : '#33b578'
     bg.setSize(width, height)
     bg.setFillStyle(toColor(fill), count.total > 0 ? 0.96 : 0.72)
     bg.setStrokeStyle(1, toColor(stroke), count.total > 0 ? 1 : 0.5)
@@ -783,7 +783,7 @@ class HospitalGameScene extends Phaser.Scene {
     }
 
     const roleLabel = this.add.text(8, -18, shortAgentLabel(agent), {
-      color: '#17201c',
+      color: '#1d2f42',
       backgroundColor: '#ffffff',
       fontFamily: 'Arial, sans-serif',
       fontSize: '11px',
@@ -1037,7 +1037,7 @@ function drawTileRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: n
 
 function drawRoomPattern(g: Phaser.GameObjects.Graphics, room: PlacedRoom) {
   if (room.kind === 'circulation') {
-    g.lineStyle(1, toColor('#a7b3a4'), 0.34)
+    g.lineStyle(1, toColor('#afc6c3'), 0.34)
     for (let x = Math.ceil(room.x); x < room.x + room.w + room.h; x += 2) {
       g.lineBetween(tileX(x), tileY(room.y), tileX(x - room.h), tileY(room.y + room.h))
     }
@@ -1064,8 +1064,8 @@ function drawDoors(g: Phaser.GameObjects.Graphics, room: PlacedRoom, allRooms: P
     const thickness = 12
     const fill = connected
       ? (room.simulationNode === 'emergency_stair' ? '#e86464' : ROOM_FLOOR_COLORS.circulation)
-      : '#fee2e2'
-    const stroke = connected ? '#16685f' : '#dc2626'
+      : '#fff0ed'
+    const stroke = connected ? '#375171' : '#ed7369'
     g.fillStyle(toColor(fill), 1)
     g.lineStyle(2, toColor(stroke), 1)
     if (horizontal) {
@@ -1082,33 +1082,33 @@ function drawEquipment(g: Phaser.GameObjects.Graphics, kind: EquipmentKind, x: n
   const px = tileX(x)
   const py = tileY(y)
   if (kind === 'bed' || kind === 'stretcher') {
-    pixelRect(g, px, py, 31, 13, '#f8fafc', '#41534b')
-    pixelRect(g, px, py, 7, 13, '#9bc0d9', '#41534b')
+    pixelRect(g, px, py, 31, 13, '#ffffff', '#375171')
+    pixelRect(g, px, py, 7, 13, '#8fb8de', '#375171')
   } else if (kind === 'chair') {
-    pixelRect(g, px, py, 12, 12, '#b08968', '#41534b')
+    pixelRect(g, px, py, 12, 12, '#b08968', '#375171')
   } else if (kind === 'desk' || kind === 'nurseStation') {
-    pixelRect(g, px, py, 30, 12, '#9c6b3f', '#41534b')
+    pixelRect(g, px, py, 30, 12, '#9c6b3f', '#375171')
   } else if (kind === 'monitor') {
-    pixelRect(g, px, py, 16, 12, '#1f2937', '#41534b')
+    pixelRect(g, px, py, 16, 12, '#1f2937', '#375171')
     g.fillStyle(0x76e4b4, 1)
     g.fillRect(px + 3, py + 3, 10, 6)
   } else if (kind === 'sink') {
-    pixelRect(g, px, py, 13, 13, '#f8fafc', '#41534b')
+    pixelRect(g, px, py, 13, 13, '#ffffff', '#375171')
     g.fillStyle(0xbfe5f2, 1)
     g.fillRect(px + 3, py + 4, 7, 5)
   } else if (kind === 'labBench' || kind === 'shelves' || kind === 'cleanStorage' || kind === 'dirtyUtility') {
-    pixelRect(g, px, py, 28, 13, kind === 'dirtyUtility' ? '#9b5964' : '#8d99ae', '#41534b')
+    pixelRect(g, px, py, 28, 13, kind === 'dirtyUtility' ? '#9b5964' : '#8fb8de', '#375171')
   } else if (kind === 'imagingGantry') {
     g.lineStyle(3, 0x41534b, 1)
     g.strokeCircle(px + 15, py + 14, 13)
-    pixelRect(g, px + 5, py + 13, 22, 6, '#d9e4ea', '#41534b')
+    pixelRect(g, px + 5, py + 13, 22, 6, '#8fb8de', '#375171')
   } else if (kind === 'orTable' || kind === 'sterileTable') {
-    pixelRect(g, px, py, 34, 13, kind === 'orTable' ? '#dfe8ef' : '#d0f0de', '#41534b')
+    pixelRect(g, px, py, 34, 13, kind === 'orTable' ? '#8fb8de' : '#b8ebad', '#375171')
   } else if (kind === 'elevator') {
-    pixelRect(g, px, py, 13, 23, '#b8c4cc', '#41534b')
-    pixelRect(g, px + 16, py, 13, 23, '#b8c4cc', '#41534b')
+    pixelRect(g, px, py, 13, 23, '#8fb8de', '#375171')
+    pixelRect(g, px + 16, py, 13, 23, '#8fb8de', '#375171')
   } else if (kind === 'stairs' || kind === 'emergencyStairs') {
-    const color = kind === 'emergencyStairs' ? '#b91c1c' : '#334155'
+    const color = kind === 'emergencyStairs' ? '#ed7369' : '#334155'
     g.lineStyle(2, toColor(color), 1)
     if (kind === 'emergencyStairs') g.strokeRect(px - 2, py - 2, 30, 24)
     for (let i = 0; i < 4; i += 1) {
@@ -1116,7 +1116,7 @@ function drawEquipment(g: Phaser.GameObjects.Graphics, kind: EquipmentKind, x: n
       g.lineBetween(px + i * 6, py + i * 4, px + (i + 1) * 6, py + i * 4)
     }
   } else if (kind === 'fireDoor') {
-    pixelRect(g, px, py, 7, 22, '#ef4444', '#7f1d1d')
+    pixelRect(g, px, py, 7, 22, '#f18e7f', '#ed7369')
     g.lineStyle(1, 0x7f1d1d, 1)
     g.strokeCircle(px + 7, py + 22, 12)
   } else if (kind === 'smokeControl') {
@@ -1127,9 +1127,9 @@ function drawEquipment(g: Phaser.GameObjects.Graphics, kind: EquipmentKind, x: n
     g.lineBetween(px + 10, py + 10, px + 6, py + 17)
     g.lineBetween(px + 10, py + 10, px + 6, py + 3)
   } else if (kind === 'refugeArea') {
-    pixelRect(g, px, py, 28, 16, '#ecfdf5', '#047857')
-    pixelRect(g, px + 4, py + 4, 7, 8, '#047857', '#047857')
-    pixelRect(g, px + 14, py + 7, 10, 3, '#047857', '#047857')
+    pixelRect(g, px, py, 28, 16, '#e7fbe2', '#33b578')
+    pixelRect(g, px + 4, py + 4, 7, 8, '#33b578', '#33b578')
+    pixelRect(g, px + 14, py + 7, 10, 3, '#33b578', '#33b578')
   } else if (kind === 'sprinkler') {
     g.lineStyle(2, 0x2563eb, 1)
     g.lineBetween(px + 10, py, px + 10, py + 7)
@@ -1138,13 +1138,13 @@ function drawEquipment(g: Phaser.GameObjects.Graphics, kind: EquipmentKind, x: n
     g.fillRect(px + 10, py + 14, 3, 3)
     g.fillRect(px + 17, py + 12, 3, 3)
   } else if (kind === 'generator') {
-    pixelRect(g, px, py, 28, 16, '#facc15', '#374151')
-    pixelRect(g, px + 4, py + 5, 9, 7, '#374151', '#374151')
-    pixelRect(g, px + 17, py + 6, 8, 3, '#374151', '#374151')
+    pixelRect(g, px, py, 28, 16, '#fbc344', '#375171')
+    pixelRect(g, px + 4, py + 5, 9, 7, '#375171', '#375171')
+    pixelRect(g, px + 17, py + 6, 8, 3, '#375171', '#375171')
   } else if (kind === 'ambulance') {
-    pixelRect(g, px, py, 37, 17, '#ffffff', '#41534b')
-    pixelRect(g, px + 15, py + 4, 4, 9, '#d62828', '#d62828')
-    pixelRect(g, px + 10, py + 7, 14, 4, '#d62828', '#d62828')
+    pixelRect(g, px, py, 37, 17, '#ffffff', '#375171')
+    pixelRect(g, px + 15, py + 4, 4, 9, '#ed7369', '#ed7369')
+    pixelRect(g, px + 10, py + 7, 14, 4, '#ed7369', '#ed7369')
     g.fillStyle(0x111827, 1)
     g.fillRect(px + 6, py + 16, 5, 5)
     g.fillRect(px + 27, py + 16, 5, 5)
@@ -1153,7 +1153,7 @@ function drawEquipment(g: Phaser.GameObjects.Graphics, kind: EquipmentKind, x: n
     g.fillRect(px, py + 7, 18, 8)
     g.fillRect(px + 4, py, 10, 16)
   } else {
-    pixelRect(g, px, py, 16, 16, '#f8fafc', '#41534b')
+    pixelRect(g, px, py, 16, 16, '#ffffff', '#375171')
   }
 }
 

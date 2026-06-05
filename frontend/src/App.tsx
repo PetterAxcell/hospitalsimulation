@@ -1,5 +1,6 @@
 import { Suspense, lazy, useMemo, useState } from 'react'
 import './App.css'
+import clinicLogoUrl from './assets/clinic-barcelona-logo.svg'
 import { HospitalCanvas } from './components/HospitalCanvas'
 import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
 import { createHospitalClinicCampusPlan } from './data/presets'
@@ -429,9 +430,12 @@ function App() {
   return (
     <main className="app-shell">
       <header className="app-header">
-        <div>
-          <h1>{plan.name}</h1>
-          <p>Editor y simulador espacial para hospital terciario de alta complejidad</p>
+        <div className="brand-title">
+          <img src={clinicLogoUrl} alt="Clinic Barcelona" className="brand-logo" />
+          <div>
+            <h1>{plan.name}</h1>
+            <p>Editor y simulador espacial para hospital terciario de alta complejidad</p>
+          </div>
         </div>
         <div className="header-metrics">
           <Metric label="m2 objetivo" value={formatNumber(plan.targetAreaSqm)} />
@@ -1271,7 +1275,7 @@ function SimulationCaseSelector({
             <button
               type="button"
               className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
-              style={{ borderLeftColor: '#66736e' }}
+              style={{ borderLeftColor: '#375171' }}
               onClick={() => onSelectCase('all')}
             >
               <strong>Todos los casos</strong>
