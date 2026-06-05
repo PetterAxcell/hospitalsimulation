@@ -118,25 +118,6 @@ const ROOM_WALL_COLORS: Record<RoomKind, string> = {
   future: '#f5ab38',
 }
 
-const TOP_DOWN_CAMERA_FOCUS_KINDS = new Set<RoomKind>([
-  'public',
-  'waiting',
-  'emergency',
-  'diagnostic',
-  'surgery',
-  'critical',
-  'inpatient',
-  'ambulatory',
-  'maternalChild',
-  'oncology',
-  'pharmacy',
-  'laboratory',
-  'logistics',
-  'research',
-  'staff',
-  'technical',
-])
-
 export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, agentLayer, onSelectCase, onChangeAgentLayer, onChangeSpeed }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
@@ -425,7 +406,7 @@ class HospitalGameScene extends Phaser.Scene {
     const base = snapshot.selectedFloor === 0 ? '#85de76' : '#eef8f1'
     const speck = snapshot.selectedFloor === 0 ? '#33b578' : '#afc6c3'
     g.fillStyle(toColor(base), 1)
-    g.fillRect(0, 0, WORLD_PX_W, WORLD_PX_H)
+    g.fillRect(-WORLD_PX_W, -WORLD_PX_H, WORLD_PX_W * 3, WORLD_PX_H * 3)
 
     for (let y = 0; y < WORLD_H; y += 1) {
       for (let x = 0; x < WORLD_W; x += 1) {
@@ -828,7 +809,7 @@ class HospitalGameScene extends Phaser.Scene {
       return
     }
     const bounds = topDownSceneBounds(this.snapshot?.plan.rooms ?? [], this.snapshot?.selectedFloor ?? 0)
-    const zoom = Math.min(this.scale.width / bounds.w, this.scale.height / bounds.h) * 1.02
+    const zoom = Math.max(this.scale.width / bounds.w, this.scale.height / bounds.h) * 1.01
     this.cameras.main.setZoom(zoom)
     this.cameras.main.centerOn(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2)
   }
@@ -1006,13 +987,11 @@ function boundsForRooms(rooms: PlacedRoom[]): { x: number; y: number; w: number;
 }
 
 function topDownSceneBounds(rooms: PlacedRoom[], floor: number): { x: number; y: number; w: number; h: number } {
-  const floorRooms = rooms.filter((room) => room.floor === floor)
-  const focusRooms = floorRooms.filter((room) => TOP_DOWN_CAMERA_FOCUS_KINDS.has(room.kind))
-  const sourceRooms = focusRooms.length > 0 ? focusRooms : floorRooms
+  const sourceRooms = rooms.filter((room) => room.floor === floor)
   if (sourceRooms.length === 0) return { x: 0, y: 0, w: WORLD_PX_W, h: WORLD_PX_H }
 
   const bounds = boundsForRooms(sourceRooms)
-  const paddingTiles = 2.5
+  const paddingTiles = 1
   const minX = clamp(bounds.x - paddingTiles, 0, WORLD_W)
   const minY = clamp(bounds.y - paddingTiles, 0, WORLD_H)
   const maxX = clamp(bounds.x + bounds.w + paddingTiles, minX + 8, WORLD_W)

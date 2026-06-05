@@ -108,7 +108,7 @@ El `Top` es la vista inicial del producto porque orienta el trabajo hacia compar
 
 El planificador mantiene el arrastre de bloques dentro del canvas hasta que el usuario suelta el puntero. Mientras se arrastra se pinta una previsualizacion local; al finalizar se actualiza el `HospitalPlan`. Esta separacion evita que los calculos globales de reglas, simulacion y ranking se ejecuten decenas de veces por segundo.
 
-La vista `Simulacion` usa columnas laterales mas estrechas que el planificador, padding reducido y un canvas ajustado al alto disponible del viewport. El encuadre 2D de Phaser se calcula sobre el area funcional de la planta seleccionada, no sobre todo el mundo logico ni sobre pasillos extensos, para evitar bandas laterales o campus sin actividad dominando el mapa.
+La vista `Simulacion` usa columnas laterales mas estrechas que el planificador, padding reducido y un canvas ajustado al alto disponible del viewport. El encuadre 2D de Phaser usa una camara tipo cover sobre la huella de la planta y un fondo extendido fuera del mundo logico para que el mapa ocupe todo el canvas sin bandas oscuras en viewports panoramicos.
 
 ## Modularizacion actual del frontend
 
