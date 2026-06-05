@@ -6,7 +6,7 @@ import { WorkspaceTabs, type WorkspaceTab } from './components/WorkspaceTabs'
 import { Metric } from './components/ui/Metric'
 import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
 import { createHospitalClinicCampusPlan } from './data/presets'
-import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
+import { evaluateArchitectureRules } from './engine/architectureRules'
 import {
   defaultDoorForRoom,
   disconnectedPassages,
@@ -20,9 +20,7 @@ import {
 import {
   areaSqmForDimensions,
   clampRoom,
-  distance,
   overlapScore,
-  roomByNode,
 } from './engine/geometry'
 import { compilePlanningScript, DEFAULT_PLANNING_SCRIPT, type PlanningLanguageResult } from './engine/planningLanguage'
 import {
@@ -47,7 +45,7 @@ import {
   scoreArchitecture,
 } from './features/top/scoring'
 import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
-import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
+import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer } from './types'
 import { floorLabel, formatNumber } from './utils/format'
 
 const INITIAL_PLAN = createHospitalClinicCampusPlan()
@@ -81,6 +79,8 @@ function App() {
   const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
   const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
   const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
+  const [isLeftPanelHidden, setLeftPanelHidden] = useState(false)
+  const [isRightPanelHidden, setRightPanelHidden] = useState(false)
 
   const selectedRoom = plan.rooms.find((room) => room.id === selectedRoomId)
   const activeFloorRooms = plan.rooms.filter((room) => room.floor === selectedFloor)
@@ -96,9 +96,10 @@ function App() {
     [plan, rules, simulationResult, submittedProposals, totalArea],
   )
   const currentScore = useMemo(() => scoreArchitecture(plan, simulationResult, rules, totalArea), [plan, rules, simulationResult, totalArea])
-  const simulationWorkspace = activeTab === 'simulation' || activeTab === 'saturation'
-  const showLeftPanel = activeTab === 'plan' || simulationWorkspace
-  const showRightPanel = activeTab === 'plan' || simulationWorkspace || activeTab === 'top'
+  const panelToggleAvailable = activeTab === 'plan' || activeTab === 'simulation'
+  const simulationWorkspace = activeTab === 'simulation'
+  const showLeftPanel = panelToggleAvailable && !isLeftPanelHidden
+  const showRightPanel = activeTab === 'top' || (panelToggleAvailable && !isRightPanelHidden)
 
   function updateRoom(nextRoom: PlacedRoom) {
     setPlan((current) => ({
@@ -412,7 +413,18 @@ function App() {
         roomCount={plan.rooms.length}
       />
 
-      <WorkspaceTabs active={activeTab} onChange={setActiveTab} />
+      <WorkspaceTabs
+        active={activeTab}
+        onChange={setActiveTab}
+        actions={panelToggleAvailable ? (
+          <PanelVisibilityControls
+            leftVisible={showLeftPanel}
+            rightVisible={showRightPanel}
+            onToggleLeft={() => setLeftPanelHidden((current) => !current)}
+            onToggleRight={() => setRightPanelHidden((current) => !current)}
+          />
+        ) : undefined}
+      />
 
       <section className={`workbench ${activeTab === 'simulation' ? 'is-simulation-workspace' : ''} ${showLeftPanel ? 'has-left-panel' : 'without-left-panel'} ${showRightPanel ? 'has-right-panel' : 'without-right-panel'}`}>
         {showLeftPanel && (
@@ -511,8 +523,7 @@ function App() {
 
           {activeTab === 'top' && <TopPanel proposals={topProposals} />}
           {activeTab === 'services' && <ServiceMatrix plan={plan} />}
-          {activeTab === 'saturation' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId={selectedCaseId} />}
-          {activeTab === 'analysis' && <AnalysisPanel plan={plan} result={simulationResult} rules={rules} />}
+          {activeTab === 'analysis' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" />}
         </section>
 
         {showRightPanel && (
@@ -585,6 +596,29 @@ function App() {
         />
       )}
     </main>
+  )
+}
+
+function PanelVisibilityControls({
+  leftVisible,
+  rightVisible,
+  onToggleLeft,
+  onToggleRight,
+}: {
+  leftVisible: boolean
+  rightVisible: boolean
+  onToggleLeft: () => void
+  onToggleRight: () => void
+}) {
+  return (
+    <div className="panel-visibility-controls" aria-label="Paneles laterales">
+      <button type="button" aria-pressed={leftVisible} onClick={onToggleLeft}>
+        {leftVisible ? 'Ocultar izq.' : 'Mostrar izq.'}
+      </button>
+      <button type="button" aria-pressed={rightVisible} onClick={onToggleRight}>
+        {rightVisible ? 'Ocultar der.' : 'Mostrar der.'}
+      </button>
+    </div>
   )
 }
 
@@ -1097,65 +1131,6 @@ function ServiceMatrix({ plan }: { plan: HospitalPlan }) {
           ))}
         </tbody>
       </table>
-    </div>
-  )
-}
-
-function AnalysisPanel({
-  plan,
-  result,
-  rules,
-}: {
-  plan: HospitalPlan
-  result: SimulationResult | null
-  rules: ArchitectureRuleResult[]
-}) {
-  const ed = roomByNode(plan.rooms, 'ed_bay')
-  const imaging = roomByNode(plan.rooms, 'imaging')
-  const or = roomByNode(plan.rooms, 'or')
-  const icu = roomByNode(plan.rooms, 'icu')
-  const ward = roomByNode(plan.rooms, 'ward')
-  const routes = [
-    ['ED a imagen', ed, imaging],
-    ['ED a quirofano', ed, or],
-    ['Quirofano a UCI', or, icu],
-    ['PACU a ward', roomByNode(plan.rooms, 'pacu'), ward],
-  ] as const
-  const groupedRules = rules.reduce<Record<string, ArchitectureRuleResult[]>>((acc, rule) => {
-    acc[rule.category] ??= []
-    acc[rule.category].push(rule)
-    return acc
-  }, {})
-
-  return (
-    <div className="analysis-grid">
-      <section className="analysis-block">
-        <h2>Recorridos criticos</h2>
-        {routes.map(([label, a, b]) => (
-          <Metric key={label} label={label} value={a && b ? `${Math.round(distance(a, b))}` : '-'} />
-        ))}
-      </section>
-      <section className="analysis-block">
-        <h2>Seguridad funcional</h2>
-        <div className="rule-list">
-          {Object.entries(groupedRules).map(([category, categoryRules]) => (
-            <div key={category} className="rule-category">
-              <h3>{category}</h3>
-              {categoryRules.map((rule) => (
-                <article key={rule.id} className={`rule-item ${rule.status}`}>
-                  <strong>{rule.label}</strong>
-                  <span>{rule.evidence}</span>
-                </article>
-              ))}
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="analysis-block">
-        <h2>Simulacion</h2>
-        <Metric label="Zona mas cargada" value={result?.kpis.hottestRoomName ?? '-'} />
-        <Metric label="Avisos" value={String(rules.filter((rule) => rule.status !== 'ok').length)} />
-      </section>
     </div>
   )
 }

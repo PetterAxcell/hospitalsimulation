@@ -53,7 +53,8 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Canvas de Vision para colocar, mover y redimensionar servicios, pasillos, ascensores, escaleras, montacargas y piezas de seguridad.
 - Simulacion 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presion por estancia y capas de RPG, flujos y reglas.
 - Top de propuestas por autor: ranking local de arquitecturas, puntuado con KPIs de simulacion, reglas abiertas y desviacion de m2. Es la primera vista de la app para priorizar comparacion antes que edicion; ahora usa tarjetas compactas y modales de detalle para evitar paginas demasiado explicativas.
-- Saturacion compacta: la vista muestra presion, casos y estado en una pantalla escaneable; la lectura operativa vive en modal para no llenar la pagina con texto fijo.
+- Analisis compacto: la vista muestra cuellos de botella, presion por estancia, casos bloqueados y estado en una pantalla sin paneles laterales; la lectura operativa vive en modal para no llenar la pagina con texto fijo.
+- Paneles laterales contextuales: Planificador y Simulacion permiten ocultar/mostrar panel izquierdo y derecho desde la barra superior para trabajar a pantalla mas limpia.
 - Simulacion compacta: el panel lateral muestra parametros y cuatro KPIs; el detalle de personal, traslados, plantas y reglas abiertas queda en modal. El layout usa paneles laterales mas estrechos, controles compactos y encuadre 2D tipo videojuego que cubre todo el canvas sin bandas oscuras alrededor del mapa.
 - Catalogo de hospital terciario: urgencias, diagnostico, quirofanos, PACU, UCI, wards, maternidad, neonatal, oncologia, farmacia, laboratorio, logistica, investigacion y command center.
 - Preset Hospital Clinic: primera vision del Nou Campus Clinic-UB con asistencia, docencia, investigacion, infraestructuras, campus, sotanos tecnicos/logisticos, urgencias, quirofanos, UCI, institutos clinicos, consultas, hospital de dia y reservas de crecimiento.

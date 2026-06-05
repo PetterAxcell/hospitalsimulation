@@ -96,6 +96,35 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.workspace-tab-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+}
+
+.panel-visibility-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.workspace-tabs .workspace-tab-actions button {
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+}
+
+.workspace-tabs .workspace-tab-actions button[aria-pressed="true"] {
+  border-color: rgba(133, 222, 118, 0.72);
+  background: rgba(133, 222, 118, 0.14);
+  color: var(--clinic-surface);
+}
+
 .workbench {
   min-height: 0;
   display: grid;
@@ -108,6 +137,14 @@
 
 .workbench.is-simulation-workspace {
   grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(246px, 284px);
+}
+
+.workbench.is-simulation-workspace.without-left-panel.has-right-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(246px, 284px);
+}
+
+.workbench.is-simulation-workspace.has-left-panel.without-right-panel {
+  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr);
 }
 
 .workbench.without-left-panel.has-right-panel {
@@ -158,8 +195,7 @@
     linear-gradient(90deg, rgba(133, 222, 118, 0.08), rgba(255, 255, 255, 0) 74%);
 }
 
-.panel-section h2,
-.analysis-block h2 {
+.panel-section h2 {
   margin: 0 0 12px;
   padding-left: 9px;
   border-left: 4px solid var(--clinic-green);
@@ -596,8 +632,7 @@ output {
   font-size: 13px;
 }
 
-.table-panel,
-.analysis-grid {
+.table-panel {
   height: calc(100vh - 156px);
   overflow: auto;
   border: 1px solid var(--clinic-border);
@@ -1134,12 +1169,6 @@ th {
   color: var(--clinic-blue);
 }
 
-.analysis-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-}
-
 .saturation-panel {
   height: 100%;
   min-height: 560px;
@@ -1560,33 +1589,6 @@ th {
 
 .modal-rule-list {
   padding: 16px;
-}
-
-.analysis-block {
-  padding: 16px;
-  border-right: 1px solid var(--clinic-border);
-}
-
-.analysis-block:last-child {
-  border-right: 0;
-}
-
-.analysis-block .metric {
-  margin-bottom: 8px;
-}
-
-.analysis-block p {
-  margin: 0 0 10px;
-  padding: 9px 10px;
-  border-radius: 6px;
-  background: var(--clinic-warning-bg);
-  color: var(--clinic-blue);
-  font-size: 13px;
-}
-
-.analysis-block p.ok {
-  background: var(--clinic-success-bg);
-  color: var(--clinic-blue);
 }
 
 .rule-list {
@@ -2091,8 +2093,7 @@ th {
   .simulation-stage,
   .table-panel,
   .saturation-panel,
-  .top-panel,
-  .analysis-grid {
+  .top-panel {
     height: 620px;
   }
 
@@ -2200,7 +2201,4 @@ th {
     flex: 1 1 auto;
   }
 
-  .analysis-grid {
-    grid-template-columns: 1fr;
-  }
 }

@@ -25,7 +25,7 @@ export function SaturationPanel({
   if (!result) {
     return (
       <div className="saturation-panel">
-        <p className="muted">Ejecutando simulacion.</p>
+        <p className="muted">Ejecutando analisis.</p>
       </div>
     )
   }
@@ -45,7 +45,7 @@ export function SaturationPanel({
     <div className="saturation-panel">
       <section className="saturation-hero">
         <div className="saturation-hero-main">
-          <span>Saturacion por bloque</span>
+          <span>Analisis de cuellos de botella</span>
           <h2>{selectedCase ? selectedCase.label : 'Todos los casos clinicos'}</h2>
           <div className="top-hero-actions">
             <button type="button" className="ghost-action" onClick={() => setReadingOpen(true)}>Lectura operativa</button>
@@ -61,7 +61,7 @@ export function SaturationPanel({
 
       <div className="saturation-grid saturation-grid-compact">
         <section className="saturation-block wide">
-          <h3>Presion</h3>
+          <h3>Presion por estancia</h3>
           <div className="chart-list">
             {bottlenecks.length > 0 ? (
               bottlenecks.map((row) => (
@@ -90,7 +90,7 @@ export function SaturationPanel({
         </section>
 
         <section className="saturation-block">
-          <h3>Casos</h3>
+          <h3>Casos bloqueados</h3>
           <div className="chart-list">
             {activeCases.map((stat) => (
               <article key={stat.id} className="chart-row compact">
@@ -110,7 +110,7 @@ export function SaturationPanel({
         </section>
 
         <section className="saturation-block saturation-summary">
-          <h3>Estado</h3>
+          <h3>Estado operativo</h3>
           <Metric label="Mayor presion" value={bottlenecks[0] ? formatDemandRatio(bottlenecks[0].score) : '-'} />
           <Metric label="Caso activo" value={selectedCase?.id ?? 'Todos'} />
           <button type="button" className="secondary-action" onClick={() => setReadingOpen(true)}>Abrir lectura</button>
@@ -129,7 +129,7 @@ function SaturationReadingModal({ bottlenecks, onClose }: { bottlenecks: Bottlen
     <Modal
       titleId="saturation-reading-title"
       title="Lectura operativa"
-      subtitle="Bloques donde la demanda simulada tensiona capacidad, rutas o reglas de flujo."
+      subtitle="Estancias donde la demanda simulada tensiona capacidad, rutas o reglas de flujo."
       onClose={onClose}
     >
       <div className="rule-list modal-rule-list">
