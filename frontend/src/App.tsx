@@ -31,15 +31,13 @@ import { compilePlanningScript, DEFAULT_PLANNING_SCRIPT, type PlanningLanguageRe
 import {
   DEFAULT_CLINICAL_CASES_YAML,
   DEFAULT_PATIENT_CASES,
-  DEFAULT_SIMULATION_SETTINGS,
   clinicalCaseYamlFromSource,
   compileClinicalCases,
   replaceClinicalCaseInYaml,
-  runHospitalSimulation,
   type ClinicalCaseCompileResult,
   type PatientCaseDefinition,
-  type SimulationSettings,
-} from './engine/simulation'
+} from './engine/clinicalCases'
+import { DEFAULT_SIMULATION_SETTINGS, runHospitalSimulation, type SimulationSettings } from './engine/simulation'
 import { TopControls, TopPanel } from './features/top/TopDashboard'
 import { SaturationPanel } from './features/saturation/SaturationPanel'
 import { SimulationCaseSelector } from './features/simulation/SimulationCaseSelector'

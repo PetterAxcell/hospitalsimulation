@@ -116,7 +116,7 @@ Esto no es aun una certificacion normativa. Las distancias exactas, anchuras, oc
 ```text
 frontend/
   src/data/        Catalogo de estancias, equipamiento y presets hospitalarios
-  src/engine/      Geometria, circulacion, simulacion ligera, staff y reglas arquitectonicas
+  src/engine/      Geometria, circulacion, casos clinicos, simulacion, staff y reglas
   src/components/  Canvas editable y escena Phaser de simulacion
   src/components/ui/ Primitivas compartidas como metricas y modales
   src/features/    Funcionalidades de producto separadas: top, saturacion y simulacion

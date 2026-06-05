@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Metric } from '../../components/ui/Metric'
-import type { ClinicalCaseDiagnostic } from '../../engine/simulation'
+import type { ClinicalCaseDiagnostic } from '../../engine/clinicalCases'
 import type { PatientCaseFilter, SimulationAgentLayer, SimulationResult } from '../../types'
 
 type SimulationPanelTab = 'cases' | 'staff'
