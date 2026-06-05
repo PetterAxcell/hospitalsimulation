@@ -306,6 +306,47 @@ output {
   font-size: 14px;
 }
 
+.compact-section-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.compact-section-header h2 {
+  margin-bottom: 0;
+}
+
+.simulation-kpi-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.simulation-kpi-grid,
+.simulation-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.simulation-kpi-grid .metric {
+  min-height: 48px;
+}
+
+.simulation-kpi-grid .metric strong {
+  font-size: 15px;
+}
+
+.simulation-detail-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 16px;
+}
+
+.simulation-detail-modal .modal-rule-list {
+  padding: 0;
+}
+
 .hospital-canvas {
   width: 100%;
   height: calc(100vh - 156px);
@@ -2056,7 +2097,8 @@ th {
   }
 
   .top-modal-grid,
-  .score-penalty-list {
+  .score-penalty-list,
+  .simulation-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

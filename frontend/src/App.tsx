@@ -39,6 +39,7 @@ import { TopControls, TopPanel } from './features/top/TopDashboard'
 import { RoomInspector } from './features/planning/RoomInspector'
 import { SaturationPanel } from './features/saturation/SaturationPanel'
 import { SimulationCaseSelector } from './features/simulation/SimulationCaseSelector'
+import { SimulationControlsPanel } from './features/simulation/SimulationControlsPanel'
 import {
   architectureProposalFromCurrentPlan,
   demoArchitectureProposals,
@@ -51,7 +52,6 @@ import { floorLabel, formatNumber } from './utils/format'
 
 const INITIAL_PLAN = createHospitalClinicCampusPlan()
 const DOOR_MAGNET_DISTANCE = 6
-const SIMULATION_SPEED_PRESETS = [1, 2, 10, 20]
 const SimulationCanvas = lazy(() =>
   import('./components/SimulationCanvas').then((module) => ({ default: module.SimulationCanvas })),
 )
@@ -518,7 +518,7 @@ function App() {
         {showRightPanel && (
           <aside className="right-panel">
             {simulationWorkspace ? (
-              <SimulationControls
+              <SimulationControlsPanel
                 settings={simulationSettings}
                 onChange={setSimulationSettings}
                 result={simulationResult}
@@ -1060,104 +1060,6 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
         </div>
       </section>
     </div>
-  )
-}
-
-function SimulationControls({
-  settings,
-  result,
-  rules,
-  onChange,
-}: {
-  settings: SimulationSettings
-  result: SimulationResult | null
-  rules: ArchitectureRuleResult[]
-  onChange: (settings: SimulationSettings) => void
-}) {
-  const failingRules = rules.filter((rule) => rule.status !== 'ok')
-
-  return (
-    <>
-      <section className="panel-section">
-        <h2>Parametros</h2>
-        <label>
-          Llegadas/hora
-          <input
-            type="range"
-            min={3}
-            max={24}
-            value={settings.arrivalsPerHour}
-            onChange={(event) => onChange({ ...settings, arrivalsPerHour: Number(event.target.value) })}
-          />
-          <output>{settings.arrivalsPerHour}</output>
-        </label>
-        <label>
-          Horizonte anos
-          <input
-            type="range"
-            min={1}
-            max={10}
-            value={settings.horizonYears}
-            onChange={(event) => onChange({ ...settings, horizonYears: Number(event.target.value) })}
-          />
-          <output>{settings.horizonYears}</output>
-        </label>
-        <label>
-          Ciclo visible
-          <input
-            type="range"
-            min={8}
-            max={72}
-            step={1}
-            value={settings.durationHours}
-            onChange={(event) => onChange({ ...settings, durationHours: Number(event.target.value) })}
-          />
-          <output>{settings.durationHours}h</output>
-        </label>
-        <div className="speed-control-group">
-          <span>Velocidad</span>
-          <div className="speed-preset-grid">
-            {SIMULATION_SPEED_PRESETS.map((speed) => (
-              <button
-                key={speed}
-                type="button"
-                className={settings.speed === speed ? 'is-active' : ''}
-                onClick={() => onChange({ ...settings, speed })}
-              >
-                x{speed}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="panel-section">
-        <h2>Resultado</h2>
-        <Metric label="Horizonte" value={`${settings.horizonYears} anos`} />
-        <Metric label="Pacientes" value={String(result?.kpis.completed ?? 0)} />
-        <Metric label="Personal" value={String(result?.kpis.staffOnShift ?? 0)} />
-        <Metric label="Personal movil" value={String(result?.kpis.staffInMotion ?? 0)} />
-        <Metric label="ED P90" value={`${result?.kpis.edP90Minutes ?? 0} min`} />
-        <Metric label="Traslado medio" value={`${result?.kpis.averageTravelMinutes ?? 0} min`} />
-        <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
-        <Metric label="Bloqueados" value={String(result?.kpis.blockedPatients ?? 0)} />
-      </section>
-
-      <section className="panel-section">
-        <h2>Reglas arquitectura</h2>
-        <Metric label="Correctas" value={String(rules.filter((rule) => rule.status === 'ok').length)} />
-        <Metric label="Avisos" value={String(rules.filter((rule) => rule.status === 'warn').length)} />
-        <Metric label="Criticas" value={String(rules.filter((rule) => rule.status === 'fail').length)} />
-        <div className="rule-list compact">
-          {failingRules.slice(0, 6).map((rule) => (
-            <article key={rule.id} className={`rule-item ${rule.status}`}>
-              <strong>{rule.label}</strong>
-              <span>{rule.evidence}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-    </>
   )
 }
 
