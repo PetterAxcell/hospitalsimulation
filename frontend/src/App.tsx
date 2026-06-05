@@ -414,7 +414,7 @@ function App() {
 
       <WorkspaceTabs active={activeTab} onChange={setActiveTab} />
 
-      <section className={`workbench ${showLeftPanel ? 'has-left-panel' : 'without-left-panel'} ${showRightPanel ? 'has-right-panel' : 'without-right-panel'}`}>
+      <section className={`workbench ${activeTab === 'simulation' ? 'is-simulation-workspace' : ''} ${showLeftPanel ? 'has-left-panel' : 'without-left-panel'} ${showRightPanel ? 'has-right-panel' : 'without-right-panel'}`}>
         {showLeftPanel && (
           <aside className="left-panel">
             <section className="panel-section">
@@ -479,7 +479,7 @@ function App() {
           </aside>
         )}
 
-        <section className="main-panel">
+        <section className={`main-panel ${activeTab === 'simulation' ? 'is-simulation-main' : ''}`}>
           {activeTab === 'plan' && (
             <HospitalCanvas
               plan={plan}

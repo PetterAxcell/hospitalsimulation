@@ -118,6 +118,25 @@ const ROOM_WALL_COLORS: Record<RoomKind, string> = {
   future: '#f5ab38',
 }
 
+const TOP_DOWN_CAMERA_FOCUS_KINDS = new Set<RoomKind>([
+  'public',
+  'waiting',
+  'emergency',
+  'diagnostic',
+  'surgery',
+  'critical',
+  'inpatient',
+  'ambulatory',
+  'maternalChild',
+  'oncology',
+  'pharmacy',
+  'laboratory',
+  'logistics',
+  'research',
+  'staff',
+  'technical',
+])
+
 export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, selectedCaseId, agentLayer, onSelectCase, onChangeAgentLayer, onChangeSpeed }: SimulationCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
@@ -808,9 +827,10 @@ class HospitalGameScene extends Phaser.Scene {
       this.cameras.main.centerOn(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2)
       return
     }
-    const zoom = Math.min(this.scale.width / WORLD_PX_W, this.scale.height / WORLD_PX_H) * 0.98
+    const bounds = topDownSceneBounds(this.snapshot?.plan.rooms ?? [], this.snapshot?.selectedFloor ?? 0)
+    const zoom = Math.min(this.scale.width / bounds.w, this.scale.height / bounds.h) * 1.02
     this.cameras.main.setZoom(zoom)
-    this.cameras.main.centerOn(WORLD_PX_W / 2, WORLD_PX_H / 2)
+    this.cameras.main.centerOn(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2)
   }
 }
 
@@ -983,6 +1003,27 @@ function boundsForRooms(rooms: PlacedRoom[]): { x: number; y: number; w: number;
   const maxX = Math.max(...rooms.map((room) => room.x + room.w))
   const maxY = Math.max(...rooms.map((room) => room.y + room.h))
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+function topDownSceneBounds(rooms: PlacedRoom[], floor: number): { x: number; y: number; w: number; h: number } {
+  const floorRooms = rooms.filter((room) => room.floor === floor)
+  const focusRooms = floorRooms.filter((room) => TOP_DOWN_CAMERA_FOCUS_KINDS.has(room.kind))
+  const sourceRooms = focusRooms.length > 0 ? focusRooms : floorRooms
+  if (sourceRooms.length === 0) return { x: 0, y: 0, w: WORLD_PX_W, h: WORLD_PX_H }
+
+  const bounds = boundsForRooms(sourceRooms)
+  const paddingTiles = 2.5
+  const minX = clamp(bounds.x - paddingTiles, 0, WORLD_W)
+  const minY = clamp(bounds.y - paddingTiles, 0, WORLD_H)
+  const maxX = clamp(bounds.x + bounds.w + paddingTiles, minX + 8, WORLD_W)
+  const maxY = clamp(bounds.y + bounds.h + paddingTiles, minY + 8, WORLD_H)
+
+  return {
+    x: tileX(minX),
+    y: tileY(minY),
+    w: (maxX - minX) * TILE,
+    h: (maxY - minY) * TILE,
+  }
 }
 
 function drawTileRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, fill: string, stroke: string) {
