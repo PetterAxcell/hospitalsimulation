@@ -5,6 +5,7 @@ import { connectedCorridorGroups, disconnectedPassages, doorConnectsToCorridor, 
 import type { PatientCaseDefinition } from '../engine/clinicalCases'
 import { positionAt, runHospitalSimulation, type SimulationSettings } from '../engine/simulation'
 import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationAgentLayer, SimulationResult } from '../types'
+import { SimulationControlsBar, type SimulationViewMode } from './SimulationControlsBar'
 
 interface SimulationCanvasProps {
   plan: HospitalPlan
@@ -17,8 +18,6 @@ interface SimulationCanvasProps {
   onChangeAgentLayer: (layer: SimulationAgentLayer) => void
   onChangeSpeed: (speed: number) => void
 }
-
-type SimulationViewMode = 'topDown' | 'isometric'
 
 interface SimulationSnapshot {
   plan: HospitalPlan
@@ -60,7 +59,6 @@ const ISO_ORIGIN_X = WORLD_H * ISO_TILE_X + 150
 const ISO_ORIGIN_Y = 330
 const HORIZON_SECONDS_AT_1X = 3600
 const MOTION_MINUTES_PER_SECOND_AT_1X = 1
-const SPEED_PRESETS = [1, 2, 10, 20]
 
 const CARE_ROOM_KINDS = new Set<RoomKind>([
   'emergency',
@@ -185,64 +183,26 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
 
   return (
     <div className="simulation-stage">
-      <div className="sim-controls">
-        <button type="button" onClick={() => setPlaying((value) => !value)}>{playing ? 'Pausa' : 'Play'}</button>
-        <input
-          type="range"
-          min={0}
-          max={result.durationMinutes}
-          value={minute}
-          onChange={(event) => {
-            const nextMinute = Number(event.target.value)
-            setMinute(nextMinute)
-            setMotionMinute((nextMinute / Math.max(1, result.durationMinutes)) * result.motionCycleMinutes)
-            setPlaying(false)
-          }}
-        />
-        <span>{formatHorizonTime(minute, motionMinute, settings.horizonYears)}</span>
-        <div className="sim-view-toggle" aria-label="Vista de simulacion">
-          <button
-            type="button"
-            className={viewMode === 'topDown' ? 'is-active' : ''}
-            onClick={() => setViewMode('topDown')}
-          >
-            2D
-          </button>
-          <button
-            type="button"
-            className={viewMode === 'isometric' ? 'is-active' : ''}
-            onClick={() => setViewMode('isometric')}
-          >
-            3D
-          </button>
-        </div>
-        <div className="sim-speed-presets" aria-label="Velocidad de simulacion">
-          {SPEED_PRESETS.map((speed) => (
-            <button
-              key={speed}
-              type="button"
-              className={settings.speed === speed ? 'is-active' : ''}
-              onClick={() => onChangeSpeed(speed)}
-              data-speed={speed}
-            >
-              x{speed}
-            </button>
-          ))}
-        </div>
-        <select value={agentLayer} onChange={(event) => onChangeAgentLayer(event.target.value as SimulationAgentLayer)} aria-label="Agentes visibles">
-          <option value="all">Pacientes + personal</option>
-          <option value="patients">Solo casos</option>
-          <option value="staff">Solo personal</option>
-        </select>
-        <select value={selectedCaseId} onChange={(event) => onSelectCase(event.target.value as PatientCaseFilter)} aria-label="Caso clinico visible">
-          <option value="all">Todos los casos</option>
-          {result.caseStats.map((stat) => (
-            <option key={stat.id} value={stat.id}>
-              {stat.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <SimulationControlsBar
+        result={result}
+        settings={settings}
+        minute={minute}
+        motionMinute={motionMinute}
+        selectedCaseId={selectedCaseId}
+        agentLayer={agentLayer}
+        viewMode={viewMode}
+        playing={playing}
+        onTogglePlaying={() => setPlaying((value) => !value)}
+        onChangeMinute={(nextMinute, nextMotionMinute) => {
+          setMinute(nextMinute)
+          setMotionMinute(nextMotionMinute)
+          setPlaying(false)
+        }}
+        onChangeViewMode={setViewMode}
+        onChangeSpeed={onChangeSpeed}
+        onChangeAgentLayer={onChangeAgentLayer}
+        onSelectCase={onSelectCase}
+      />
       <div
         ref={hostRef}
         className={`phaser-stage ${viewMode === 'isometric' ? 'is-isometric' : ''}`}
@@ -1325,16 +1285,6 @@ function tileY(value: number) {
 
 function toColor(hex: string) {
   return Phaser.Display.Color.HexStringToColor(hex).color
-}
-
-function formatHorizonTime(minutes: number, motionMinutes: number, horizonYears: number) {
-  const totalDays = Math.max(1, horizonYears) * 365
-  const dayIndex = Math.floor(minutes / (24 * 60)) % totalDays
-  const year = Math.floor(dayIndex / 365) + 1
-  const day = dayIndex % 365 + 1
-  const hour = Math.floor(motionMinutes / 60) % 24
-  const minute = Math.floor(motionMinutes % 60)
-  return `Ano ${year} · dia ${day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
 function wrapMinute(minute: number, duration: number) {

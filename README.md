@@ -117,7 +117,7 @@ Esto no es aun una certificacion normativa. Las distancias exactas, anchuras, oc
 frontend/
   src/data/        Catalogo de estancias, equipamiento y presets hospitalarios
   src/engine/      Geometria, circulacion, casos clinicos, simulacion, staff y reglas
-  src/components/  Canvas editable y escena Phaser de simulacion
+  src/components/  Canvas editable, escena Phaser y controles de replay
   src/components/ui/ Primitivas compartidas como metricas y modales
   src/features/    Funcionalidades de producto separadas: top, saturacion y simulacion
 hospital_sim/      Prototipo Python/SimPy inicial, mantenido como referencia
