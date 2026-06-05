@@ -33,8 +33,10 @@ flowchart LR
 frontend/
   src/
     components/       Canvas, paneles y controles
+    components/ui/    Primitivas reutilizables como metricas y acciones
     data/             Catalogo inicial editable desde backend en el futuro
     engine/           Simulacion ligera para preview
+    features/         Flujos de producto separados por dominio de UI
 backend/
   app/
     api/              Endpoints REST/JSON
@@ -102,6 +104,6 @@ La pestana `Top` compara propuestas por autor con un score de 0 a 100 calculado 
 
 La fase productiva debe mover este ranking al backend para evitar manipulacion de resultados, comparar solo simulaciones con la misma version de parametros y guardar historico por usuario/proyecto.
 
-El `Top` es la vista inicial del producto porque orienta el trabajo hacia comparacion de alternativas antes que edicion de detalle. Los paneles laterales son contextuales: el panel izquierdo aparece en planificacion y simulacion/saturacion, donde sirve para plantas, construccion o casos clinicos; se oculta en `Top`, `Servicios` y `Analisis` para no introducir controles irrelevantes.
+El `Top` es la vista inicial del producto porque orienta el trabajo hacia comparacion de alternativas antes que edicion de detalle. Su UI debe ser compacta: ranking, KPIs y acciones primarias visibles; formula, penalizaciones y datos completos en modales de detalle. Los paneles laterales son contextuales: el panel izquierdo aparece en planificacion y simulacion/saturacion, donde sirve para plantas, construccion o casos clinicos; se oculta en `Top`, `Servicios` y `Analisis` para no introducir controles irrelevantes.
 
 El planificador mantiene el arrastre de bloques dentro del canvas hasta que el usuario suelta el puntero. Mientras se arrastra se pinta una previsualizacion local; al finalizar se actualiza el `HospitalPlan`. Esta separacion evita que los calculos globales de reglas, simulacion y ranking se ejecuten decenas de veces por segundo.
