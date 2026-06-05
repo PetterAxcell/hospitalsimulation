@@ -1,12 +1,13 @@
-import { Suspense, lazy, useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState, type ReactNode } from 'react'
 import './App.css'
 import { AppHeader } from './components/AppHeader'
 import { HospitalCanvas } from './components/HospitalCanvas'
 import { WorkspaceTabs, type WorkspaceTab } from './components/WorkspaceTabs'
 import { Metric } from './components/ui/Metric'
+import { Modal } from './components/ui/Modal'
 import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
 import { createHospitalClinicCampusPlan } from './data/presets'
-import { evaluateArchitectureRules } from './engine/architectureRules'
+import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
   defaultDoorForRoom,
   disconnectedPassages,
@@ -41,11 +42,12 @@ import { SimulationControlsPanel } from './features/simulation/SimulationControl
 import {
   architectureProposalFromCurrentPlan,
   demoArchitectureProposals,
+  formatScore,
   rankArchitectureProposals,
   scoreArchitecture,
 } from './features/top/scoring'
 import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
-import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer } from './types'
+import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
 import { floorLabel, formatNumber } from './utils/format'
 
 const INITIAL_PLAN = createHospitalClinicCampusPlan()
@@ -81,6 +83,7 @@ function App() {
   const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
   const [isLeftPanelHidden, setLeftPanelHidden] = useState(false)
   const [isRightPanelHidden, setRightPanelHidden] = useState(false)
+  const [sectionModalTab, setSectionModalTab] = useState<WorkspaceTab | null>(null)
 
   const selectedRoom = plan.rooms.find((room) => room.id === selectedRoomId)
   const activeFloorRooms = plan.rooms.filter((room) => room.floor === selectedFloor)
@@ -99,7 +102,7 @@ function App() {
   const panelToggleAvailable = activeTab === 'plan' || activeTab === 'simulation'
   const simulationWorkspace = activeTab === 'simulation'
   const showLeftPanel = panelToggleAvailable && !isLeftPanelHidden
-  const showRightPanel = activeTab === 'top' || (panelToggleAvailable && !isRightPanelHidden)
+  const showRightPanel = panelToggleAvailable && !isRightPanelHidden
 
   function updateRoom(nextRoom: PlacedRoom) {
     setPlan((current) => ({
@@ -403,6 +406,173 @@ function App() {
     setActiveTab('top')
   }
 
+  function renderFloorPicker() {
+    return (
+      <section className="panel-section">
+        <h2>Plantas</h2>
+        <div className="floor-grid">
+          {plan.floors.map((floor) => (
+            <button
+              key={floor}
+              type="button"
+              className={floor === selectedFloor ? 'is-active' : ''}
+              onClick={() => setSelectedFloor(floor)}
+            >
+              {floorLabel(floor)}
+            </button>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  function renderPlannerTools() {
+    return (
+      <section className="panel-section">
+        <h2>Construir</h2>
+        <label>
+          Elemento
+          <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
+            {ROOM_TEMPLATES.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.shortName} · {KIND_LABELS[template.kind]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
+        <button type="button" className="secondary-action" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
+        <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
+      </section>
+    )
+  }
+
+  function renderPlanSummary() {
+    return (
+      <section className="panel-section">
+        <h2>Planta activa</h2>
+        <Metric label="m2 planta" value={formatNumber(floorArea)} />
+        <Metric label="Bloques" value={String(activeFloorRooms.length)} />
+        <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
+      </section>
+    )
+  }
+
+  function renderPlannerInspector() {
+    return (
+      <RoomInspector
+        room={selectedRoom}
+        allRooms={plan.rooms}
+        floors={plan.floors}
+        onChange={updateRoom}
+        onDuplicate={duplicateSelected}
+        onRemove={removeSelected}
+        doorToolActive={doorToolRoomId === selectedRoom?.id}
+        onStartDoorTool={() => selectedRoom && setDoorToolRoomId(doorToolRoomId === selectedRoom.id ? undefined : selectedRoom.id)}
+        onRemoveDoor={removeDoor}
+        onAutoConnect={autoConnectSelectedToCorridor}
+      />
+    )
+  }
+
+  function renderSimulationCases() {
+    return (
+      <SimulationCaseSelector
+        result={simulationResult}
+        selectedCaseId={selectedCaseId}
+        agentLayer={simulationAgentLayer}
+        fileName={clinicalCaseFileName}
+        diagnostics={clinicalCaseResult?.diagnostics ?? []}
+        onEditCases={openClinicalCaseLibrary}
+        onEditCase={openClinicalCaseEditor}
+        onUploadCases={loadClinicalCaseTemplate}
+        onResetCases={resetClinicalCases}
+        onSelectCase={setSelectedCaseId}
+        onChangeAgentLayer={setSimulationAgentLayer}
+      />
+    )
+  }
+
+  function renderSimulationParameters() {
+    return (
+      <SimulationControlsPanel
+        settings={simulationSettings}
+        onChange={setSimulationSettings}
+        result={simulationResult}
+        rules={rules}
+      />
+    )
+  }
+
+  function renderTopTools() {
+    return (
+      <TopControls
+        owner={proposalOwner}
+        proposals={topProposals}
+        currentScore={currentScore}
+        onChangeOwner={setProposalOwner}
+        onSubmit={submitCurrentArchitecture}
+      />
+    )
+  }
+
+  function renderSectionModalContent(tab: WorkspaceTab): ReactNode {
+    if (tab === 'top') {
+      return (
+        <div className="section-modal-grid">
+          <div className="section-modal-stack">
+            {renderTopTools()}
+          </div>
+          <section className="section-modal-card">
+            <h3>Score actual</h3>
+            <div className="section-metric-grid">
+              <Metric label="Score" value={formatScore(currentScore.value)} />
+              <Metric label="Bloqueos" value={`-${formatScore(currentScore.blockedPenalty)}`} />
+              <Metric label="Espera ED" value={`-${formatScore(currentScore.waitPenalty)}`} />
+              <Metric label="Reglas" value={`-${formatScore(currentScore.rulePenalty)}`} />
+            </div>
+          </section>
+        </div>
+      )
+    }
+
+    if (tab === 'plan') {
+      return (
+        <div className="section-modal-grid section-modal-grid-wide">
+          <div className="section-modal-stack">
+            {renderFloorPicker()}
+            {renderPlannerTools()}
+            {renderPlanSummary()}
+            <AccessAlerts plan={plan} selectedFloor={selectedFloor} />
+          </div>
+          <div className="section-modal-stack">
+            {renderPlannerInspector()}
+          </div>
+        </div>
+      )
+    }
+
+    if (tab === 'simulation') {
+      return (
+        <div className="section-modal-grid section-modal-grid-wide">
+          <div className="section-modal-stack">
+            {renderFloorPicker()}
+            {renderSimulationCases()}
+          </div>
+          <div className="section-modal-stack">
+            {renderSimulationParameters()}
+          </div>
+        </div>
+      )
+    }
+
+    if (tab === 'analysis') {
+      return <AnalysisModalContent result={simulationResult} rules={rules} />
+    }
+
+    return <ServicesModalContent plan={plan} />
+  }
+
   return (
     <main className="app-shell">
       <AppHeader
@@ -416,75 +586,30 @@ function App() {
       <WorkspaceTabs
         active={activeTab}
         onChange={setActiveTab}
-        actions={panelToggleAvailable ? (
-          <PanelVisibilityControls
+        actions={(
+          <WorkspaceSectionActions
+            activeTab={activeTab}
+            panelToggleAvailable={panelToggleAvailable}
             leftVisible={showLeftPanel}
             rightVisible={showRightPanel}
+            onOpenSection={() => setSectionModalTab(activeTab)}
             onToggleLeft={() => setLeftPanelHidden((current) => !current)}
             onToggleRight={() => setRightPanelHidden((current) => !current)}
           />
-        ) : undefined}
+        )}
       />
 
       <section className={`workbench ${activeTab === 'simulation' ? 'is-simulation-workspace' : ''} ${showLeftPanel ? 'has-left-panel' : 'without-left-panel'} ${showRightPanel ? 'has-right-panel' : 'without-right-panel'}`}>
         {showLeftPanel && (
           <aside className="left-panel">
-            <section className="panel-section">
-              <h2>Plantas</h2>
-              <div className="floor-grid">
-                {plan.floors.map((floor) => (
-                  <button
-                    key={floor}
-                    type="button"
-                    className={floor === selectedFloor ? 'is-active' : ''}
-                    onClick={() => setSelectedFloor(floor)}
-                  >
-                    {floorLabel(floor)}
-                  </button>
-                ))}
-              </div>
-            </section>
+            {renderFloorPicker()}
 
             {simulationWorkspace ? (
-              <SimulationCaseSelector
-                result={simulationResult}
-                selectedCaseId={selectedCaseId}
-                agentLayer={simulationAgentLayer}
-                fileName={clinicalCaseFileName}
-                diagnostics={clinicalCaseResult?.diagnostics ?? []}
-                onEditCases={openClinicalCaseLibrary}
-                onEditCase={openClinicalCaseEditor}
-                onUploadCases={loadClinicalCaseTemplate}
-                onResetCases={resetClinicalCases}
-                onSelectCase={setSelectedCaseId}
-                onChangeAgentLayer={setSimulationAgentLayer}
-              />
+              renderSimulationCases()
             ) : (
               <>
-                <section className="panel-section">
-                  <h2>Construir</h2>
-                  <label>
-                    Elemento
-                    <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
-                      {ROOM_TEMPLATES.map((template) => (
-                        <option key={template.id} value={template.id}>
-                          {template.shortName} · {KIND_LABELS[template.kind]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
-                  <button type="button" className="secondary-action" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
-                  <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
-                </section>
-
-                <section className="panel-section">
-                  <h2>Planta activa</h2>
-                  <Metric label="m2 planta" value={formatNumber(floorArea)} />
-                  <Metric label="Bloques" value={String(activeFloorRooms.length)} />
-                  <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
-                </section>
-
+                {renderPlannerTools()}
+                {renderPlanSummary()}
                 <AccessAlerts plan={plan} selectedFloor={selectedFloor} />
               </>
             )}
@@ -529,37 +654,27 @@ function App() {
         {showRightPanel && (
           <aside className="right-panel">
             {simulationWorkspace ? (
-              <SimulationControlsPanel
-                settings={simulationSettings}
-                onChange={setSimulationSettings}
-                result={simulationResult}
-                rules={rules}
-              />
-            ) : activeTab === 'top' ? (
-              <TopControls
-                owner={proposalOwner}
-                proposals={topProposals}
-                currentScore={currentScore}
-                onChangeOwner={setProposalOwner}
-                onSubmit={submitCurrentArchitecture}
-              />
+              renderSimulationParameters()
             ) : (
-              <RoomInspector
-                room={selectedRoom}
-                allRooms={plan.rooms}
-                floors={plan.floors}
-                onChange={updateRoom}
-                onDuplicate={duplicateSelected}
-                onRemove={removeSelected}
-                doorToolActive={doorToolRoomId === selectedRoom?.id}
-                onStartDoorTool={() => selectedRoom && setDoorToolRoomId(doorToolRoomId === selectedRoom.id ? undefined : selectedRoom.id)}
-                onRemoveDoor={removeDoor}
-                onAutoConnect={autoConnectSelectedToCorridor}
-              />
+              renderPlannerInspector()
             )}
           </aside>
         )}
       </section>
+
+      {sectionModalTab && (
+        <Modal
+          titleId="section-context-title"
+          title={sectionModalTitle(sectionModalTab)}
+          subtitle={sectionModalSubtitle(sectionModalTab)}
+          className="section-modal"
+          onClose={() => setSectionModalTab(null)}
+        >
+          <div className="section-modal-body">
+            {renderSectionModalContent(sectionModalTab)}
+          </div>
+        </Modal>
+      )}
 
       {isScriptModalOpen && (
         <PlanningScriptModal
@@ -599,6 +714,40 @@ function App() {
   )
 }
 
+function WorkspaceSectionActions({
+  activeTab,
+  panelToggleAvailable,
+  leftVisible,
+  rightVisible,
+  onOpenSection,
+  onToggleLeft,
+  onToggleRight,
+}: {
+  activeTab: WorkspaceTab
+  panelToggleAvailable: boolean
+  leftVisible: boolean
+  rightVisible: boolean
+  onOpenSection: () => void
+  onToggleLeft: () => void
+  onToggleRight: () => void
+}) {
+  return (
+    <div className="section-action-controls">
+      <button type="button" className="section-modal-trigger" onClick={onOpenSection} aria-haspopup="dialog">
+        {sectionActionLabel(activeTab)}
+      </button>
+      {panelToggleAvailable && (
+        <PanelVisibilityControls
+          leftVisible={leftVisible}
+          rightVisible={rightVisible}
+          onToggleLeft={onToggleLeft}
+          onToggleRight={onToggleRight}
+        />
+      )}
+    </div>
+  )
+}
+
 function PanelVisibilityControls({
   leftVisible,
   rightVisible,
@@ -618,6 +767,113 @@ function PanelVisibilityControls({
       <button type="button" aria-pressed={rightVisible} onClick={onToggleRight}>
         {rightVisible ? 'Ocultar der.' : 'Mostrar der.'}
       </button>
+    </div>
+  )
+}
+
+function sectionActionLabel(tab: WorkspaceTab) {
+  if (tab === 'top') return 'Registrar'
+  if (tab === 'plan') return 'Herramientas'
+  if (tab === 'simulation') return 'Escenario'
+  if (tab === 'analysis') return 'Lectura'
+  return 'Resumen'
+}
+
+function sectionModalTitle(tab: WorkspaceTab) {
+  if (tab === 'top') return 'Top de arquitecturas'
+  if (tab === 'plan') return 'Herramientas del planificador'
+  if (tab === 'simulation') return 'Escenario de simulacion'
+  if (tab === 'analysis') return 'Lectura de analisis'
+  return 'Resumen de servicios'
+}
+
+function sectionModalSubtitle(tab: WorkspaceTab) {
+  if (tab === 'top') return 'Guardar la arquitectura actual y entender como puntua.'
+  if (tab === 'plan') return 'Plantas, construccion, accesos y edicion del bloque seleccionado.'
+  if (tab === 'simulation') return 'Casos clinicos, personal, parametros y resultado del replay.'
+  if (tab === 'analysis') return 'KPIs y reglas abiertas para leer cuellos de botella sin paneles laterales.'
+  return 'Distribucion funcional por tipo de servicio, m2 y capacidad.'
+}
+
+function AnalysisModalContent({
+  result,
+  rules,
+}: {
+  result: SimulationResult | null
+  rules: ArchitectureRuleResult[]
+}) {
+  const warnCount = rules.filter((rule) => rule.status === 'warn').length
+  const failCount = rules.filter((rule) => rule.status === 'fail').length
+  const openRules = rules.filter((rule) => rule.status !== 'ok')
+
+  return (
+    <div className="section-modal-grid section-modal-grid-wide">
+      <section className="section-modal-card">
+        <h3>Resultado operativo</h3>
+        <div className="section-metric-grid">
+          <Metric label="Pacientes" value={String(result?.kpis.completed ?? 0)} />
+          <Metric label="Bloqueados" value={String(result?.kpis.blockedPatients ?? 0)} />
+          <Metric label="ED P90" value={`${result?.kpis.edP90Minutes ?? 0} min`} />
+          <Metric label="Traslado medio" value={`${result?.kpis.averageTravelMinutes ?? 0} min`} />
+        </div>
+      </section>
+
+      <section className="section-modal-card">
+        <h3>Reglas abiertas</h3>
+        <div className="section-metric-grid">
+          <Metric label="Avisos" value={String(warnCount)} />
+          <Metric label="Criticas" value={String(failCount)} />
+          <Metric label="Zona cargada" value={result?.kpis.hottestRoomName ?? '-'} />
+          <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
+        </div>
+        <div className="rule-list compact">
+          {openRules.length > 0 ? (
+            openRules.slice(0, 8).map((rule) => (
+              <article key={rule.id} className={`rule-item ${rule.status}`}>
+                <strong>{rule.label}</strong>
+                <span>{rule.evidence}</span>
+              </article>
+            ))
+          ) : (
+            <article className="rule-item ok">
+              <strong>Sin reglas abiertas</strong>
+              <span>El plan actual no genera avisos arquitectonicos.</span>
+            </article>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ServicesModalContent({ plan }: { plan: HospitalPlan }) {
+  const rows = serviceRowsForPlan(plan)
+  const totalArea = rows.reduce((sum, row) => sum + row.area, 0)
+  const totalCapacity = rows.reduce((sum, row) => sum + row.capacity, 0)
+
+  return (
+    <div className="section-modal-grid">
+      <section className="section-modal-card">
+        <h3>Programa funcional</h3>
+        <div className="section-metric-grid">
+          <Metric label="Familias" value={String(rows.length)} />
+          <Metric label="Bloques" value={String(plan.rooms.length)} />
+          <Metric label="m2" value={formatNumber(totalArea)} />
+          <Metric label="Capacidad" value={String(totalCapacity)} />
+        </div>
+      </section>
+
+      <section className="section-modal-card">
+        <h3>Mayores bolsas de superficie</h3>
+        <div className="rule-list compact">
+          {rows.slice(0, 6).map((row) => (
+            <article key={row.label} className="rule-item ok">
+              <strong>{row.label}</strong>
+              <span>{row.count} bloques · {formatNumber(row.area)} m2 · capacidad {row.capacity}</span>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
@@ -1098,17 +1354,7 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
 }
 
 function ServiceMatrix({ plan }: { plan: HospitalPlan }) {
-  const rows = Object.entries(
-    plan.rooms.reduce<Record<string, { count: number; area: number; capacity: number }>>((acc, room) => {
-      const label = KIND_LABELS[room.kind]
-      acc[label] ??= { count: 0, area: 0, capacity: 0 }
-      acc[label].count += 1
-      acc[label].area += room.areaSqm
-      acc[label].capacity += room.capacity
-      return acc
-    }, {}),
-  ).sort((a, b) => b[1].area - a[1].area)
-
+  const rows = serviceRowsForPlan(plan)
   return (
     <div className="table-panel">
       <table>
@@ -1121,18 +1367,40 @@ function ServiceMatrix({ plan }: { plan: HospitalPlan }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map(([kind, value]) => (
-            <tr key={kind}>
-              <td>{kind}</td>
-              <td>{value.count}</td>
-              <td>{formatNumber(value.area)}</td>
-              <td>{value.capacity}</td>
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <td>{row.label}</td>
+              <td>{row.count}</td>
+              <td>{formatNumber(row.area)}</td>
+              <td>{row.capacity}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
   )
+}
+
+interface ServiceRow {
+  label: string
+  count: number
+  area: number
+  capacity: number
+}
+
+function serviceRowsForPlan(plan: HospitalPlan): ServiceRow[] {
+  return Object.entries(
+    plan.rooms.reduce<Record<string, Omit<ServiceRow, 'label'>>>((acc, room) => {
+      const label = KIND_LABELS[room.kind]
+      acc[label] ??= { count: 0, area: 0, capacity: 0 }
+      acc[label].count += 1
+      acc[label].area += room.areaSqm
+      acc[label].capacity += room.capacity
+      return acc
+    }, {}),
+  )
+    .map(([label, value]) => ({ label, ...value }))
+    .sort((a, b) => b.area - a.area)
 }
 
 function connectRoomToNearestCorridor(rooms: PlacedRoom[], target: PlacedRoom): PlacedRoom[] | undefined {
