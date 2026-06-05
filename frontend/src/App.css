@@ -23,7 +23,7 @@
 
 .brand-title {
   display: grid;
-  grid-template-columns: minmax(210px, 250px) minmax(0, 1fr);
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
   gap: 22px;
   align-items: center;
   min-width: 0;
@@ -32,7 +32,7 @@
 .brand-logo {
   display: block;
   width: 100%;
-  height: 70px;
+  height: 76px;
   padding: 10px 14px;
   border-radius: 8px;
   background: var(--clinic-surface);
@@ -41,17 +41,15 @@
   box-shadow: 0 12px 28px rgba(29, 47, 66, 0.24);
 }
 
+.brand-copy {
+  min-width: 0;
+}
+
 .app-header h1 {
   margin: 0;
   color: var(--clinic-surface);
-  font-size: 23px;
+  font-size: 24px;
   line-height: 1.15;
-}
-
-.app-header p {
-  margin: 5px 0 0;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 13px;
 }
 
 .header-metrics {

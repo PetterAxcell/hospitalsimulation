@@ -56,7 +56,7 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Saturacion compacta: la vista muestra presion, casos y estado en una pantalla escaneable; la lectura operativa vive en modal para no llenar la pagina con texto fijo.
 - Catalogo de hospital terciario: urgencias, diagnostico, quirofanos, PACU, UCI, wards, maternidad, neonatal, oncologia, farmacia, laboratorio, logistica, investigacion y command center.
 - Preset Hospital Clinic: primera vision del Nou Campus Clinic-UB con asistencia, docencia, investigacion, infraestructuras, campus, sotanos tecnicos/logisticos, urgencias, quirofanos, UCI, institutos clinicos, consultas, hospital de dia y reservas de crecimiento.
-- Identidad visual Clinic: paleta azul/verde/rojo/amarillo/cian aplicada a shell, controles, planificador, simulacion y estados de saturacion, manteniendo blanco como base y reforzando azul/verde en estructura, acciones, metricas y paneles.
+- Identidad visual Clinic: paleta azul/verde/rojo/amarillo/cian aplicada a shell, controles, planificador, simulacion y estados de saturacion, manteniendo blanco como base; la cabecera usa logotipo Clinic destacado y nombre del campus en blanco.
 - Elementos de seguridad arquitectonica: ascensores, escaleras, montacargas, escaleras protegidas/emergencia, refugios de evacuacion horizontal, sectorizacion PCI, central MEP critica y reserva de expansion.
 - Circulacion editable: pasillos publicos, pasillos clinicos para camas y pasillos logisticos limpio/sucio se anaden desde el selector `Elemento`, igual que cualquier otro bloque. En la UI, `Asc/Mont` significa ascensores publicos, ascensores clinicos y montacargas; las escaleras son componentes independientes.
 - Dimensiones editables en metros: cada bloque tiene ancho y alto, y los m2 se recalculan automaticamente con una escala de 3 m por unidad de plano.
@@ -117,7 +117,7 @@ Esto no es aun una certificacion normativa. Las distancias exactas, anchuras, oc
 frontend/
   src/data/        Catalogo de estancias, equipamiento y presets hospitalarios
   src/engine/      Geometria, circulacion, casos clinicos, simulacion, staff y reglas
-  src/components/  Canvas editable, escena Phaser y controles de replay
+  src/components/  Shell de marca, tabs, canvas editable, escena Phaser y controles de replay
   src/components/ui/ Primitivas compartidas como metricas y modales
   src/features/    Funcionalidades de producto separadas: top, saturacion y simulacion
 hospital_sim/      Prototipo Python/SimPy inicial, mantenido como referencia

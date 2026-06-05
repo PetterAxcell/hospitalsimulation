@@ -1,7 +1,8 @@
 import { Suspense, lazy, useMemo, useState } from 'react'
 import './App.css'
-import clinicLogoUrl from './assets/clinic-barcelona-logo.svg'
+import { AppHeader } from './components/AppHeader'
 import { HospitalCanvas } from './components/HospitalCanvas'
+import { WorkspaceTabs, type WorkspaceTab } from './components/WorkspaceTabs'
 import { Metric } from './components/ui/Metric'
 import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
 import { createHospitalClinicCampusPlan } from './data/presets'
@@ -49,8 +50,6 @@ import {
 } from './features/top/scoring'
 import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
 import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
-
-type WorkspaceTab = 'plan' | 'simulation' | 'saturation' | 'top' | 'services' | 'analysis'
 
 const INITIAL_PLAN = createHospitalClinicCampusPlan()
 const DOOR_MAGNET_DISTANCE = 6
@@ -407,30 +406,15 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="app-header">
-        <div className="brand-title">
-          <img src={clinicLogoUrl} alt="Clinic Barcelona" className="brand-logo" />
-          <div>
-            <h1>{plan.name}</h1>
-            <p>Editor y simulador espacial para hospital terciario de alta complejidad</p>
-          </div>
-        </div>
-        <div className="header-metrics">
-          <Metric label="m2 objetivo" value={formatNumber(plan.targetAreaSqm)} />
-          <Metric label="m2 modelados" value={formatNumber(totalArea)} />
-          <Metric label="Plantas" value={String(plan.floors.length)} />
-          <Metric label="Estancias" value={String(plan.rooms.length)} />
-        </div>
-      </header>
+      <AppHeader
+        planName={plan.name}
+        targetAreaSqm={plan.targetAreaSqm}
+        modeledAreaSqm={totalArea}
+        floorCount={plan.floors.length}
+        roomCount={plan.rooms.length}
+      />
 
-      <nav className="workspace-tabs" aria-label="Modulos">
-        <TabButton id="top" active={activeTab} onClick={setActiveTab}>Top</TabButton>
-        <TabButton id="plan" active={activeTab} onClick={setActiveTab}>Planificador</TabButton>
-        <TabButton id="simulation" active={activeTab} onClick={setActiveTab}>Simulacion</TabButton>
-        <TabButton id="saturation" active={activeTab} onClick={setActiveTab}>Saturacion</TabButton>
-        <TabButton id="services" active={activeTab} onClick={setActiveTab}>Servicios</TabButton>
-        <TabButton id="analysis" active={activeTab} onClick={setActiveTab}>Analisis</TabButton>
-      </nav>
+      <WorkspaceTabs active={activeTab} onChange={setActiveTab} />
 
       <section className={`workbench ${showLeftPanel ? 'has-left-panel' : 'without-left-panel'} ${showRightPanel ? 'has-right-panel' : 'without-right-panel'}`}>
         {showLeftPanel && (
@@ -1078,21 +1062,6 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
         </div>
       </section>
     </div>
-  )
-}
-
-interface TabButtonProps {
-  id: WorkspaceTab
-  active: WorkspaceTab
-  children: string
-  onClick: (tab: WorkspaceTab) => void
-}
-
-function TabButton({ id, active, children, onClick }: TabButtonProps) {
-  return (
-    <button type="button" className={active === id ? 'is-active' : ''} onClick={() => onClick(id)}>
-      {children}
-    </button>
   )
 }
 
