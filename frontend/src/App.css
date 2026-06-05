@@ -1104,6 +1104,11 @@ th {
   background: var(--clinic-success-bg);
 }
 
+.saturation-hero-main {
+  display: grid;
+  gap: 8px;
+}
+
 .saturation-hero span,
 .saturation-block h3,
 .top-hero span,
@@ -1143,6 +1148,10 @@ th {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
   gap: 0;
+}
+
+.saturation-grid-compact {
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.75fr);
 }
 
 .top-grid-compact {
@@ -1308,6 +1317,30 @@ th {
   background: var(--clinic-info-bg);
 }
 
+.chart-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chart-chips span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--clinic-surface-tint);
+  color: var(--clinic-blue);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.saturation-summary {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
 .proposal-metrics,
 .score-breakdown {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1338,7 +1371,7 @@ th {
   gap: 8px;
 }
 
-.top-detail-modal {
+.app-modal {
   width: min(760px, calc(100vw - 32px));
   max-height: min(760px, calc(100vh - 32px));
   overflow: auto;
@@ -1347,6 +1380,12 @@ th {
   border-radius: 10px;
   background: var(--clinic-surface);
   box-shadow: 0 24px 80px rgba(29, 47, 66, 0.28);
+}
+
+.modal-empty {
+  margin: 0;
+  padding: 16px;
+  color: var(--clinic-muted);
 }
 
 .top-modal-grid,
@@ -1396,6 +1435,10 @@ th {
 .penalty-row strong {
   color: var(--clinic-blue);
   font-variant-numeric: tabular-nums;
+}
+
+.modal-rule-list {
+  padding: 16px;
 }
 
 .analysis-block {
@@ -1977,7 +2020,7 @@ th {
     height: calc(100dvh - 12px);
   }
 
-  .top-detail-modal {
+  .app-modal {
     width: calc(100vw - 12px);
     max-height: calc(100dvh - 12px);
   }

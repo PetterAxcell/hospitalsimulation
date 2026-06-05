@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Metric } from '../../components/ui/Metric'
+import { Modal } from '../../components/ui/Modal'
 import { bestProposalByOwner, formatScore } from './scoring'
 import type { ArchitectureProposal, ArchitectureScore, ProposalOwner } from './types'
 
@@ -129,62 +130,52 @@ export function TopControls({
 
 function ProposalDetailModal({ proposal, onClose }: { proposal: ArchitectureProposal; onClose: () => void }) {
   return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="top-detail-modal" role="dialog" aria-modal="true" aria-labelledby="proposal-detail-title">
-        <header className="script-modal-header">
-          <div>
-            <h2 id="proposal-detail-title">{proposal.title}</h2>
-            <p>{proposal.owner} · score {formatScore(proposal.score.value)}</p>
-          </div>
-          <button type="button" onClick={onClose}>Cerrar</button>
-        </header>
+    <Modal
+      titleId="proposal-detail-title"
+      title={proposal.title}
+      subtitle={`${proposal.owner} · score ${formatScore(proposal.score.value)}`}
+      onClose={onClose}
+    >
+      <div className="top-modal-grid">
+        <Metric label="Completados" value={String(proposal.completed)} />
+        <Metric label="Bloqueados" value={String(proposal.blocked)} />
+        <Metric label="ED P90" value={`${proposal.edP90} min`} />
+        <Metric label="Traslado" value={`${proposal.averageTravel} min`} />
+        <Metric label="Cambios planta" value={String(proposal.verticalMoves)} />
+        <Metric label="Reglas abiertas" value={String(proposal.ruleIssues)} />
+        <Metric label="m2 modelados" value={formatInteger(proposal.modeledArea)} />
+        <Metric label="Estancias" value={String(proposal.roomCount)} />
+      </div>
 
-        <div className="top-modal-grid">
-          <Metric label="Completados" value={String(proposal.completed)} />
-          <Metric label="Bloqueados" value={String(proposal.blocked)} />
-          <Metric label="ED P90" value={`${proposal.edP90} min`} />
-          <Metric label="Traslado" value={`${proposal.averageTravel} min`} />
-          <Metric label="Cambios planta" value={String(proposal.verticalMoves)} />
-          <Metric label="Reglas abiertas" value={String(proposal.ruleIssues)} />
-          <Metric label="m2 modelados" value={formatInteger(proposal.modeledArea)} />
-          <Metric label="Estancias" value={String(proposal.roomCount)} />
-        </div>
-
-        <section className="top-modal-section">
-          <h3>Zona caliente</h3>
-          <p>{proposal.hottestRoomName}</p>
-        </section>
+      <section className="top-modal-section">
+        <h3>Zona caliente</h3>
+        <p>{proposal.hottestRoomName}</p>
       </section>
-    </div>
+    </Modal>
   )
 }
 
 function ScoreFormulaModal({ proposal, onClose }: { proposal?: ArchitectureProposal; onClose: () => void }) {
   return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="top-detail-modal" role="dialog" aria-modal="true" aria-labelledby="score-formula-title">
-        <header className="script-modal-header">
-          <div>
-            <h2 id="score-formula-title">Formula del score</h2>
-            <p>100 puntos menos penalizaciones operativas y arquitectonicas.</p>
-          </div>
-          <button type="button" onClick={onClose}>Cerrar</button>
-        </header>
-
-        {proposal ? (
-          <div className="score-penalty-list">
-            <Penalty label="Bloqueos" value={proposal.score.blockedPenalty} />
-            <Penalty label="Espera ED" value={proposal.score.waitPenalty} />
-            <Penalty label="Traslado" value={proposal.score.travelPenalty} />
-            <Penalty label="Vertical" value={proposal.score.verticalPenalty} />
-            <Penalty label="Reglas" value={proposal.score.rulePenalty} />
-            <Penalty label="m2" value={proposal.score.areaPenalty} />
-          </div>
-        ) : (
-          <p className="muted">Guarda una propuesta para ver su desglose.</p>
-        )}
-      </section>
-    </div>
+    <Modal
+      titleId="score-formula-title"
+      title="Formula del score"
+      subtitle="100 puntos menos penalizaciones operativas y arquitectonicas."
+      onClose={onClose}
+    >
+      {proposal ? (
+        <div className="score-penalty-list">
+          <Penalty label="Bloqueos" value={proposal.score.blockedPenalty} />
+          <Penalty label="Espera ED" value={proposal.score.waitPenalty} />
+          <Penalty label="Traslado" value={proposal.score.travelPenalty} />
+          <Penalty label="Vertical" value={proposal.score.verticalPenalty} />
+          <Penalty label="Reglas" value={proposal.score.rulePenalty} />
+          <Penalty label="m2" value={proposal.score.areaPenalty} />
+        </div>
+      ) : (
+        <p className="modal-empty">Guarda una propuesta para ver su desglose.</p>
+      )}
+    </Modal>
   )
 }
 
