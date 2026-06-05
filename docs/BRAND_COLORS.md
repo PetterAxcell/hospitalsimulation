@@ -36,4 +36,6 @@ La interfaz de esta rama usa la paleta facilitada desde Marca Clinic Barcelona c
 - Amarillo: avisos, congestiones moderadas y puntos que requieren observacion.
 - Rojo: criticidad, bloqueo, errores de arquitectura y saturacion severa.
 
+La aplicacion visual actual mantiene una superficie blanca de trabajo, pero refuerza la lectura corporativa con una franja azul en la cabecera, navegacion azul, logo sobre fondo blanco y acentos verdes en pestañas activas, paneles, metricas y propuestas. Esta decision conserva densidad operativa para el planificador y evita convertir la herramienta en una pagina institucional.
+
 Los tokens viven en `frontend/src/index.css`. Los mapas de color que no pueden leer CSS variables, como canvas y Phaser, usan los mismos valores en hexadecimal dentro de `frontend/src/data/catalog.ts`, `frontend/src/components/HospitalCanvas.tsx`, `frontend/src/components/SimulationCanvas.tsx` y `frontend/src/engine/simulation.ts`.

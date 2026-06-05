@@ -2,26 +2,30 @@
   min-height: 100vh;
   display: grid;
   grid-template-rows: auto auto 1fr;
-  background: var(--clinic-page);
+  background:
+    linear-gradient(180deg, rgba(74, 204, 211, 0.12) 0, rgba(74, 204, 211, 0) 260px),
+    var(--clinic-page);
   color: var(--clinic-text);
 }
 
 .app-header {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) auto;
-  gap: 24px;
+  grid-template-columns: minmax(420px, 1fr) minmax(336px, auto);
+  gap: 18px;
   align-items: center;
-  padding: 18px 22px 14px;
+  padding: 16px 20px 13px;
   border-top: 4px solid var(--clinic-green);
   border-bottom: 1px solid var(--clinic-border);
-  background: var(--clinic-surface);
+  background:
+    linear-gradient(90deg, var(--clinic-blue) 0, var(--clinic-blue) 188px, var(--clinic-surface) 188px),
+    var(--clinic-surface);
   box-shadow: 0 8px 24px var(--clinic-shadow);
 }
 
 .brand-title {
   display: grid;
-  grid-template-columns: minmax(142px, 190px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(132px, 160px) minmax(0, 1fr);
+  gap: 16px;
   align-items: center;
   min-width: 0;
 }
@@ -29,15 +33,19 @@
 .brand-logo {
   display: block;
   width: 100%;
-  max-height: 58px;
+  max-height: 52px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--clinic-surface);
   object-fit: contain;
   object-position: left center;
+  box-shadow: 0 10px 28px rgba(29, 47, 66, 0.2);
 }
 
 .app-header h1 {
   margin: 0;
   color: var(--clinic-blue);
-  font-size: 22px;
+  font-size: 21px;
   line-height: 1.15;
 }
 
@@ -49,7 +57,7 @@
 
 .header-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  grid-template-columns: repeat(4, minmax(78px, 1fr));
   gap: 8px;
 }
 
@@ -57,8 +65,8 @@
   display: flex;
   gap: 2px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--clinic-border);
-  background: var(--clinic-surface);
+  border-bottom: 1px solid rgba(133, 222, 118, 0.48);
+  background: var(--clinic-blue);
 }
 
 .workspace-tabs button {
@@ -67,14 +75,19 @@
   border: 0;
   border-bottom: 3px solid transparent;
   background: transparent;
-  color: var(--clinic-text-soft);
+  color: rgba(255, 255, 255, 0.82);
   font-weight: 700;
   cursor: pointer;
 }
 
 .workspace-tabs button.is-active {
-  color: var(--clinic-blue);
+  color: var(--clinic-surface);
   border-bottom-color: var(--clinic-green);
+}
+
+.workspace-tabs button:hover {
+  color: var(--clinic-surface);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .workbench {
@@ -122,17 +135,21 @@
 .panel-section h2,
 .analysis-block h2 {
   margin: 0 0 12px;
+  padding-left: 9px;
+  border-left: 4px solid var(--clinic-green);
   font-size: 13px;
   text-transform: uppercase;
-  color: var(--clinic-muted);
+  color: var(--clinic-blue);
 }
 
 .metric {
   min-height: 54px;
   padding: 9px 10px;
   border: 1px solid var(--clinic-border);
+  border-top: 3px solid var(--clinic-green);
   border-radius: 6px;
   background: var(--clinic-surface);
+  box-shadow: 0 8px 18px rgba(55, 81, 113, 0.08);
 }
 
 .metric span {
@@ -214,6 +231,7 @@ output {
   width: 100%;
   background: var(--clinic-blue);
   color: var(--clinic-surface);
+  box-shadow: inset 0 -3px 0 var(--clinic-green);
 }
 
 .secondary-action {
@@ -1032,6 +1050,7 @@ th {
   min-height: 560px;
   overflow: auto;
   border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-green);
   border-radius: 8px;
   background: var(--clinic-surface-soft);
 }
@@ -1053,7 +1072,9 @@ th {
   align-items: start;
   padding: 18px;
   border-bottom: 1px solid var(--clinic-border);
-  background: var(--clinic-surface);
+  background:
+    linear-gradient(90deg, rgba(74, 204, 211, 0.16), rgba(255, 255, 255, 0) 46%),
+    var(--clinic-surface);
 }
 
 .saturation-hero span,
@@ -1070,7 +1091,7 @@ th {
 .saturation-hero h2,
 .top-hero h2 {
   margin: 4px 0 6px;
-  color: var(--clinic-text);
+  color: var(--clinic-blue);
   font-size: 24px;
   line-height: 1.15;
 }
@@ -1129,6 +1150,7 @@ th {
   align-items: center;
   padding: 10px;
   border: 1px solid var(--clinic-border);
+  border-left: 4px solid var(--clinic-cyan);
   border-radius: 8px;
   background: var(--clinic-surface);
 }
@@ -1139,8 +1161,8 @@ th {
   height: 28px;
   place-items: center;
   border-radius: 999px;
-  background: var(--clinic-info-bg);
-  color: var(--clinic-blue);
+  background: var(--clinic-blue);
+  color: var(--clinic-surface);
   font-size: 13px;
 }
 
@@ -1170,6 +1192,7 @@ th {
   gap: 10px;
   padding: 12px;
   border: 1px solid var(--clinic-border);
+  border-left: 4px solid var(--clinic-green);
   border-radius: 8px;
   background: var(--clinic-surface);
 }
@@ -1184,8 +1207,8 @@ th {
 .proposal-card header > span {
   padding: 4px 7px;
   border-radius: 999px;
-  background: var(--clinic-surface-tint);
-  color: var(--clinic-muted);
+  background: var(--clinic-info-bg);
+  color: var(--clinic-blue);
   font-size: 11px;
   font-weight: 900;
 }
@@ -1211,7 +1234,7 @@ th {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--clinic-cyan-1);
+  background: var(--clinic-green);
 }
 
 .proposal-metrics,
@@ -1692,6 +1715,17 @@ th {
 }
 
 @media (max-width: 1180px) {
+  .app-header {
+    grid-template-columns: 1fr;
+    background:
+      linear-gradient(90deg, var(--clinic-blue) 0, var(--clinic-blue) 188px, var(--clinic-surface) 188px),
+      var(--clinic-surface);
+  }
+
+  .header-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .workbench {
     grid-template-columns: 220px minmax(0, 1fr);
   }
@@ -1728,6 +1762,12 @@ th {
   .workbench,
   .right-panel {
     grid-template-columns: 1fr;
+  }
+
+  .app-header {
+    background:
+      linear-gradient(180deg, var(--clinic-blue) 0, var(--clinic-blue) 88px, var(--clinic-surface) 88px),
+      var(--clinic-surface);
   }
 
   .brand-title {
