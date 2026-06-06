@@ -25,7 +25,7 @@ export function SaturationPanel({
   if (!result) {
     return (
       <div className="saturation-panel">
-        <p className="muted">Ejecutando analisis.</p>
+        <p className="muted">Ejecutando análisis.</p>
       </div>
     )
   }
@@ -45,8 +45,8 @@ export function SaturationPanel({
     <div className="saturation-panel">
       <section className="saturation-hero">
         <div className="saturation-hero-main">
-          <span>Analisis de cuellos de botella</span>
-          <h2>{selectedCase ? selectedCase.label : 'Todos los casos clinicos'}</h2>
+          <span>Análisis de cuellos de botella</span>
+          <h2>{selectedCase ? selectedCase.label : 'Todos los casos clínicos'}</h2>
           <div className="top-hero-actions">
             <button type="button" className="ghost-action" onClick={() => setReadingOpen(true)}>Lectura operativa</button>
           </div>

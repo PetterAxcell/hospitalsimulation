@@ -48,16 +48,16 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
       const needsIcu = rng() < 0.78
       return [
         caseStep('arrival_ambulance', 'Entrada ambulancia'),
-        caseStep('resus', 'ABCDE y estabilizacion'),
+        caseStep('resus', 'ABCDE y estabilización'),
         caseStep('imaging', 'TAC urgente'),
-        ...(surgical ? [caseStep('or', 'Quirofano trauma'), caseStep('pacu', 'Reanimacion postoperatoria')] : []),
+        ...(surgical ? [caseStep('or', 'Quirófano trauma'), caseStep('pacu', 'Reanimación postoperatoria')] : []),
         caseStep(needsIcu ? 'icu' : 'ward', needsIcu ? 'Ingreso UCI' : 'Ingreso planta'),
       ]
     },
   },
   {
     id: 'stroke_code',
-    label: 'Codigo ictus',
+    label: 'Código ictus',
     code: 'ICT',
     stream: 'ed_ambulance',
     severity: 'high',
@@ -70,14 +70,14 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
         caseStep('arrival_ambulance', 'Preaviso SEM'),
         caseStep('triage', 'Triaje avanzado'),
         caseStep('imaging', 'TC craneal'),
-        ...(needsResus ? [caseStep('resus', 'Estabilizacion neuro')] : []),
-        caseStep(criticalUnit ? 'icu' : 'ward', criticalUnit ? 'Unidad critica' : 'Ingreso neurologia'),
+        ...(needsResus ? [caseStep('resus', 'Estabilización neuro')] : []),
+        caseStep(criticalUnit ? 'icu' : 'ward', criticalUnit ? 'Unidad crítica' : 'Ingreso neurología'),
       ]
     },
   },
   {
     id: 'chest_pain',
-    label: 'Dolor toracico',
+    label: 'Dolor torácico',
     code: 'DT',
     stream: 'ed_walkin',
     severity: 'high',
@@ -87,12 +87,12 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
       const needsImaging = rng() < 0.42
       const observation = rng() < 0.46
       return [
-        caseStep('registration', 'Admision rapida'),
+        caseStep('registration', 'Admisión rápida'),
         caseStep('triage', 'Triaje prioridad alta'),
         caseStep('ed_bay', 'Box monitorizado'),
         caseStep('lab', 'Troponinas seriadas'),
-        ...(needsImaging ? [caseStep('imaging', 'Prueba cardiologia')] : []),
-        caseStep(observation ? 'observation' : 'pharmacy', observation ? 'Observacion ED' : 'Alta con tratamiento'),
+        ...(needsImaging ? [caseStep('imaging', 'Prueba cardiología')] : []),
+        caseStep(observation ? 'observation' : 'pharmacy', observation ? 'Observación ED' : 'Alta con tratamiento'),
       ]
     },
   },
@@ -105,15 +105,15 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     color: '#fbc344',
     weight: 24,
     build: (rng) => [
-      caseStep('registration', 'Admision'),
+      caseStep('registration', 'Admisión'),
       caseStep('triage', 'Triaje'),
-      caseStep('ed_bay', rng() < 0.5 ? 'Cura / analgesia' : 'Valoracion medica'),
+      caseStep('ed_bay', rng() < 0.5 ? 'Cura / analgesia' : 'Valoración médica'),
       caseStep('pharmacy', 'Receta y alta'),
     ],
   },
   {
     id: 'ed_observation',
-    label: 'Urgencia con observacion',
+    label: 'Urgencia con observación',
     code: 'OBS',
     stream: 'ed_walkin',
     severity: 'medium',
@@ -124,12 +124,12 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
       const needsImaging = rng() < 0.38
       const admission = rng() < 0.32
       return [
-        caseStep('registration', 'Admision'),
+        caseStep('registration', 'Admisión'),
         caseStep('triage', 'Triaje'),
-        caseStep('ed_bay', 'Box diagnostico'),
-        ...(needsLab ? [caseStep('lab', 'Analitica')] : []),
+        caseStep('ed_bay', 'Box diagnóstico'),
+        ...(needsLab ? [caseStep('lab', 'Analítica')] : []),
         ...(needsImaging ? [caseStep('imaging', 'Imagen')] : []),
-        caseStep('observation', 'Observacion y decision'),
+        caseStep('observation', 'Observación y decisión'),
         caseStep(admission ? 'ward' : 'pharmacy', admission ? 'Ingreso planta' : 'Alta'),
       ]
     },
@@ -147,8 +147,8 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
       const needsImaging = rng() < 0.24
       return [
         caseStep('registration', 'Check-in'),
-        caseStep('consult', 'Consulta / hospital de dia'),
-        ...(needsLab ? [caseStep('lab', 'Extraccion')] : []),
+        caseStep('consult', 'Consulta / hospital de día'),
+        ...(needsLab ? [caseStep('lab', 'Extracción')] : []),
         ...(needsImaging ? [caseStep('imaging', 'Prueba imagen')] : []),
         caseStep('pharmacy', 'Farmacia / salida'),
       ]
@@ -156,7 +156,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
   },
   {
     id: 'scheduled_surgery',
-    label: 'Cirugia programada',
+    label: 'Cirugía programada',
     code: 'QX',
     stream: 'elective',
     severity: 'medium',
@@ -165,8 +165,8 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     build: (rng) => {
       const needsIcu = rng() < 0.18
       return [
-        caseStep('registration', 'Ingreso quirurgico'),
-        caseStep('or', 'Quirofano'),
+        caseStep('registration', 'Ingreso quirúrgico'),
+        caseStep('or', 'Quirófano'),
         caseStep('pacu', 'PACU'),
         caseStep(needsIcu ? 'icu' : 'ward', needsIcu ? 'UCI postoperatoria' : 'Planta postoperatoria'),
       ]
@@ -183,12 +183,12 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     build: (rng) => {
       const directIcu = rng() < 0.62
       return [
-        caseStep('registration', 'Admision infecciosa'),
-        caseStep('triage', 'Codigo sepsis'),
-        caseStep('resus', 'Fluidoterapia y antibiotico'),
+        caseStep('registration', 'Admisión infecciosa'),
+        caseStep('triage', 'Código sepsis'),
+        caseStep('resus', 'Fluidoterapia y antibiótico'),
         caseStep('lab', 'Hemocultivos / lactato'),
         ...(rng() < 0.35 ? [caseStep('imaging', 'Foco infeccioso')] : []),
-        caseStep(directIcu ? 'icu' : 'ward', directIcu ? 'UCI sepsis' : 'Hospitalizacion infecciosa'),
+        caseStep(directIcu ? 'icu' : 'ward', directIcu ? 'UCI sepsis' : 'Hospitalización infecciosa'),
       ]
     },
   },
@@ -203,11 +203,11 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     build: (rng) => [
       caseStep(rng() < 0.45 ? 'arrival_ambulance' : 'registration', 'Llegada fragilidad'),
       caseStep('triage', 'Triaje trauma fragil'),
-      caseStep('imaging', 'Radiologia urgente'),
+      caseStep('imaging', 'Radiología urgente'),
       caseStep('lab', 'Preoperatorio'),
-      caseStep('or', 'Cirugia traumatologia'),
-      caseStep('pacu', 'Reanimacion'),
-      caseStep('ward', 'Ingreso traumatologia'),
+      caseStep('or', 'Cirugía traumatología'),
+      caseStep('pacu', 'Reanimación'),
+      caseStep('ward', 'Ingreso traumatología'),
     ],
   },
   {
@@ -221,8 +221,8 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     build: (rng) => {
       const neonatalSupport = rng() < 0.16
       return [
-        caseStep('registration', 'Ingreso obstetrico'),
-        caseStep('maternity', rng() < 0.74 ? 'Dilatacion y parto' : 'Cesarea programada'),
+        caseStep('registration', 'Ingreso obstétrico'),
+        caseStep('maternity', rng() < 0.74 ? 'Dilatación y parto' : 'Cesárea programada'),
         ...(neonatalSupport ? [caseStep('neonatal_icu', 'Soporte neonatal')] : []),
         caseStep('ward', 'Puerperio / planta'),
       ]
@@ -230,7 +230,7 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
   },
   {
     id: 'neonatal_critical',
-    label: 'Neonato critico',
+    label: 'Neonato crítico',
     code: 'NEO',
     stream: 'ed_ambulance',
     severity: 'critical',
@@ -238,14 +238,14 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     weight: 3,
     build: () => [
       caseStep('arrival_ambulance', 'Traslado neonatal'),
-      caseStep('resus', 'Estabilizacion neonatal'),
+      caseStep('resus', 'Estabilización neonatal'),
       caseStep('neonatal_icu', 'Ingreso UCI neonatal'),
-      caseStep('lab', 'Analitica neonatal'),
+      caseStep('lab', 'Analítica neonatal'),
     ],
   },
   {
     id: 'psychiatric_crisis',
-    label: 'Crisis psiquiatrica',
+    label: 'Crisis psiquiátrica',
     code: 'PSQ',
     stream: 'ed_walkin',
     severity: 'medium',
@@ -254,33 +254,33 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     build: (rng) => {
       const admission = rng() < 0.38
       return [
-        caseStep('registration', 'Admision discreta'),
+        caseStep('registration', 'Admisión discreta'),
         caseStep('triage', 'Triaje salud mental'),
         caseStep('ed_bay', 'Box salud mental'),
-        caseStep('observation', 'Observacion protegida'),
-        caseStep(admission ? 'ward' : 'pharmacy', admission ? 'Ingreso psiquiatria' : 'Plan terapeutico y alta'),
+        caseStep('observation', 'Observación protegida'),
+        caseStep(admission ? 'ward' : 'pharmacy', admission ? 'Ingreso psiquiatría' : 'Plan terapéutico y alta'),
       ]
     },
   },
   {
     id: 'oncology_infusion',
-    label: 'Oncologia dia',
+    label: 'Oncología día',
     code: 'ONC',
     stream: 'outpatient',
     severity: 'medium',
     color: '#ed7369',
     weight: 9,
     build: (rng) => [
-      caseStep('registration', 'Check-in oncologia'),
-      caseStep('consult', 'Valoracion oncologica'),
-      ...(rng() < 0.52 ? [caseStep('lab', 'Analitica pretratamiento')] : []),
-      caseStep('pharmacy', 'Preparacion citostatico'),
-      caseStep('research', rng() < 0.2 ? 'Ensayo clinico' : 'Hospital de dia'),
+      caseStep('registration', 'Check-in oncología'),
+      caseStep('consult', 'Valoración oncológica'),
+      ...(rng() < 0.52 ? [caseStep('lab', 'Analítica pretratamiento')] : []),
+      caseStep('pharmacy', 'Preparación citostático'),
+      caseStep('research', rng() < 0.2 ? 'Ensayo clínico' : 'Hospital de día'),
     ],
   },
   {
     id: 'complex_diagnostic',
-    label: 'Diagnostico complejo',
+    label: 'Diagnóstico complejo',
     code: 'DXC',
     stream: 'outpatient',
     severity: 'medium',
@@ -289,9 +289,9 @@ export const DEFAULT_PATIENT_CASES: PatientCaseDefinition[] = [
     build: (rng) => [
       caseStep('registration', 'Check-in pruebas'),
       caseStep('consult', 'Consulta especializada'),
-      caseStep('lab', 'Analitica avanzada'),
-      caseStep('imaging', rng() < 0.5 ? 'RM / TAC programado' : 'Intervencionismo diagnostico'),
-      caseStep('consult', 'Decision clinica'),
+      caseStep('lab', 'Analítica avanzada'),
+      caseStep('imaging', rng() < 0.5 ? 'RM / TAC programado' : 'Intervencionismo diagnóstico'),
+      caseStep('consult', 'Decisión clínica'),
     ],
   },
 ]
@@ -337,13 +337,17 @@ const NODE_ALIASES: Record<string, SimulationNode> = {
   consulta: 'consult',
   consultorio: 'consult',
   diagnostico: 'imaging',
+  diagnóstico: 'imaging',
   emergency: 'ed_bay',
   farmacia: 'pharmacy',
   hospitalizacion: 'ward',
+  hospitalización: 'ward',
   imagen: 'imaging',
   laboratorio: 'lab',
   quirofano: 'or',
+  quirófano: 'or',
   reanimacion: 'resus',
+  reanimación: 'resus',
   shock: 'resus',
   urgencias: 'ed_bay',
   uci: 'icu',
@@ -439,7 +443,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     weight: 24
     steps:
       - node: registration
-        phase: Admision
+        phase: Admisión
       - node: triage
         phase: Triaje
       - choose:
@@ -448,12 +452,12 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
             phase: Cura / analgesia
           - weight: 0.5
             node: ed_bay
-            phase: Valoracion medica
+            phase: Valoración médica
       - node: pharmacy
         phase: Receta y alta
 
   - id: ed_observation
-    label: Urgencia con observacion
+    label: Urgencia con observación
     code: OBS
     stream: ed_walkin
     severity: medium
@@ -461,19 +465,19 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     weight: 17
     steps:
       - node: registration
-        phase: Admision
+        phase: Admisión
       - node: triage
         phase: Triaje
       - node: ed_bay
-        phase: Box diagnostico
+        phase: Box diagnóstico
       - chance: 0.64
         node: lab
-        phase: Analitica
+        phase: Analítica
       - chance: 0.38
         node: imaging
         phase: Imagen
       - node: observation
-        phase: Observacion y decision
+        phase: Observación y decisión
       - choose:
           - weight: 0.32
             node: ward
@@ -493,10 +497,10 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
       - node: registration
         phase: Check-in
       - node: consult
-        phase: Consulta / hospital de dia
+        phase: Consulta / hospital de día
       - chance: 0.36
         node: lab
-        phase: Extraccion
+        phase: Extracción
       - chance: 0.24
         node: imaging
         phase: Prueba imagen
@@ -504,7 +508,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
         phase: Farmacia / salida
 
   - id: scheduled_surgery
-    label: Cirugia programada
+    label: Cirugía programada
     code: QX
     stream: elective
     severity: medium
@@ -512,9 +516,9 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     weight: 9
     steps:
       - node: registration
-        phase: Ingreso quirurgico
+        phase: Ingreso quirúrgico
       - node: or
-        phase: Quirofano
+        phase: Quirófano
       - node: pacu
         phase: PACU
       - choose:
@@ -534,11 +538,11 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     weight: 8
     steps:
       - node: registration
-        phase: Admision infecciosa
+        phase: Admisión infecciosa
       - node: triage
-        phase: Codigo sepsis
+        phase: Código sepsis
       - node: resus
-        phase: Fluidoterapia y antibiotico
+        phase: Fluidoterapia y antibiótico
       - node: lab
         phase: Hemocultivos / lactato
       - chance: 0.35
@@ -550,7 +554,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
             phase: UCI sepsis
           - weight: 0.38
             node: ward
-            phase: Hospitalizacion infecciosa
+            phase: Hospitalización infecciosa
 
   - id: hip_fracture
     label: Fractura de cadera
@@ -566,19 +570,19 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
             phase: Llegada ambulancia fragilidad
           - weight: 0.55
             node: registration
-            phase: Admision fragilidad
+            phase: Admisión fragilidad
       - node: triage
         phase: Triaje trauma fragil
       - node: imaging
-        phase: Radiologia urgente
+        phase: Radiología urgente
       - node: lab
         phase: Preoperatorio
       - node: or
-        phase: Cirugia traumatologia
+        phase: Cirugía traumatología
       - node: pacu
-        phase: Reanimacion
+        phase: Reanimación
       - node: ward
-        phase: Ingreso traumatologia
+        phase: Ingreso traumatología
 
   - id: maternity_delivery
     label: Parto y puerperio
@@ -589,14 +593,14 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     weight: 6
     steps:
       - node: registration
-        phase: Ingreso obstetrico
+        phase: Ingreso obstétrico
       - choose:
           - weight: 0.74
             node: maternity
-            phase: Dilatacion y parto
+            phase: Dilatación y parto
           - weight: 0.26
             node: maternity
-            phase: Cesarea programada
+            phase: Cesárea programada
       - chance: 0.16
         node: neonatal_icu
         phase: Soporte neonatal
@@ -604,7 +608,7 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
         phase: Puerperio / planta
 
   - id: neonatal_critical
-    label: Neonato critico
+    label: Neonato crítico
     code: NEO
     stream: ed_ambulance
     severity: critical
@@ -614,14 +618,14 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
       - node: arrival_ambulance
         phase: Traslado neonatal
       - node: resus
-        phase: Estabilizacion neonatal
+        phase: Estabilización neonatal
       - node: neonatal_icu
         phase: Ingreso UCI neonatal
       - node: lab
-        phase: Analitica neonatal
+        phase: Analítica neonatal
 
   - id: psychiatric_crisis
-    label: Crisis psiquiatrica
+    label: Crisis psiquiátrica
     code: PSQ
     stream: ed_walkin
     severity: medium
@@ -629,23 +633,23 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     weight: 6
     steps:
       - node: registration
-        phase: Admision discreta
+        phase: Admisión discreta
       - node: triage
         phase: Triaje salud mental
       - node: ed_bay
         phase: Box salud mental
       - node: observation
-        phase: Observacion protegida
+        phase: Observación protegida
       - choose:
           - weight: 0.38
             node: ward
-            phase: Ingreso psiquiatria
+            phase: Ingreso psiquiatría
           - weight: 0.62
             node: pharmacy
-            phase: Plan terapeutico y alta
+            phase: Plan terapéutico y alta
 
   - id: oncology_infusion
-    label: Oncologia dia
+    label: Oncología día
     code: ONC
     stream: outpatient
     severity: medium
@@ -653,24 +657,24 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
     weight: 9
     steps:
       - node: registration
-        phase: Check-in oncologia
+        phase: Check-in oncología
       - node: consult
-        phase: Valoracion oncologica
+        phase: Valoración oncológica
       - chance: 0.52
         node: lab
-        phase: Analitica pretratamiento
+        phase: Analítica pretratamiento
       - node: pharmacy
-        phase: Preparacion citostatico
+        phase: Preparación citostático
       - choose:
           - weight: 0.2
             node: research
-            phase: Ensayo clinico
+            phase: Ensayo clínico
           - weight: 0.8
             node: research
-            phase: Hospital de dia
+            phase: Hospital de día
 
   - id: complex_diagnostic
-    label: Diagnostico complejo
+    label: Diagnóstico complejo
     code: DXC
     stream: outpatient
     severity: medium
@@ -689,9 +693,9 @@ export const DEFAULT_CLINICAL_CASES_YAML = `cases:
             phase: RM / TAC programado
           - weight: 0.5
             node: imaging
-            phase: Intervencionismo diagnostico
+            phase: Intervencionismo diagnóstico
       - node: consult
-        phase: Decision clinica`
+        phase: Decisión clínica`
 
 export function compileClinicalCases(source: string): ClinicalCaseCompileResult {
   let document: unknown

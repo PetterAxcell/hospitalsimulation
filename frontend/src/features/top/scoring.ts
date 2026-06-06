@@ -19,7 +19,7 @@ export function demoArchitectureProposals(
   }> = [
     {
       owner: 'Equipo A',
-      title: 'Urgencias compactas y diagnostico cercano',
+      title: 'Urgencias compactas y diagnóstico cercano',
       createdAt: 'propuesta demo',
       metrics: adjustArchitectureMetrics(baseMetrics, {
         blockedFactor: 0.9,
@@ -42,7 +42,7 @@ export function demoArchitectureProposals(
     {
       owner: 'Plano actual',
       title: 'Plano actual colaborativo',
-      createdAt: 'simulacion actual',
+      createdAt: 'simulación actual',
       metrics: baseMetrics,
     },
   ]

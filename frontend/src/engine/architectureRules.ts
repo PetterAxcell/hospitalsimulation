@@ -23,15 +23,15 @@ const REQUIRED_NODES: RequiredNode[] = [
   { node: 'triage', label: 'Triaje ED', category: 'emergencia' },
   { node: 'resus', label: 'Shock rooms / reanimacion ED', category: 'emergencia' },
   { node: 'ed_bay', label: 'Boxes de urgencias', category: 'emergencia' },
-  { node: 'imaging', label: 'Diagnostico por imagen', category: 'clinico' },
+  { node: 'imaging', label: 'Diagnóstico por imagen', category: 'clinico' },
   { node: 'lab', label: 'Laboratorio/core lab', category: 'clinico' },
-  { node: 'or', label: 'Bloque quirurgico', category: 'clinico' },
+  { node: 'or', label: 'Bloque quirúrgico', category: 'clinico' },
   { node: 'pacu', label: 'PACU', category: 'clinico' },
   { node: 'icu', label: 'UCI', category: 'clinico' },
-  { node: 'ward', label: 'Hospitalizacion', category: 'clinico' },
+  { node: 'ward', label: 'Hospitalización', category: 'clinico' },
   { node: 'pharmacy', label: 'Farmacia hospitalaria', category: 'logistica' },
   { node: 'logistics', label: 'Muelle/logistica/CSSD', category: 'logistica' },
-  { node: 'vertical_core', label: 'Ascensores clinicos y montacargas', category: 'evacuacion' },
+  { node: 'vertical_core', label: 'Ascensores clínicos y montacargas', category: 'evacuacion' },
   { node: 'emergency_stair', label: 'Escaleras protegidas/de emergencia', category: 'evacuacion' },
   { node: 'refuge_area', label: 'Refugios de evacuacion horizontal', category: 'evacuacion' },
   { node: 'fire_sector', label: 'Sectorizacion PCI y control de humo', category: 'evacuacion' },
@@ -47,13 +47,13 @@ const ADJACENCY_RULES: Array<{
   category: ArchitectureRuleResult['category']
 }> = [
   { id: 'ed-imaging', label: 'Urgencias cerca de imagen', a: 'ed_bay', b: 'imaging', warn: 34, fail: 55, category: 'clinico' },
-  { id: 'resus-or', label: 'Shock rooms con ruta rapida a quirofano', a: 'resus', b: 'or', warn: 42, fail: 65, category: 'emergencia' },
-  { id: 'resus-icu', label: 'Shock rooms con ruta rapida a UCI', a: 'resus', b: 'icu', warn: 42, fail: 65, category: 'emergencia' },
-  { id: 'or-pacu', label: 'Quirofano contiguo a PACU', a: 'or', b: 'pacu', warn: 18, fail: 32, category: 'clinico' },
+  { id: 'resus-or', label: 'Shock rooms con ruta rápida a quirófano', a: 'resus', b: 'or', warn: 42, fail: 65, category: 'emergencia' },
+  { id: 'resus-icu', label: 'Shock rooms con ruta rápida a UCI', a: 'resus', b: 'icu', warn: 42, fail: 65, category: 'emergencia' },
+  { id: 'or-pacu', label: 'Quirófano contiguo a PACU', a: 'or', b: 'pacu', warn: 18, fail: 32, category: 'clinico' },
   { id: 'pacu-icu', label: 'PACU cerca de UCI', a: 'pacu', b: 'icu', warn: 30, fail: 48, category: 'clinico' },
-  { id: 'pacu-ward', label: 'PACU conectada a hospitalizacion', a: 'pacu', b: 'ward', warn: 52, fail: 80, category: 'clinico' },
-  { id: 'lab-icu', label: 'Laboratorio accesible desde criticos', a: 'lab', b: 'icu', warn: 52, fail: 82, category: 'clinico' },
-  { id: 'logistics-or', label: 'Logistica/CSSD conectada a quirofano', a: 'logistics', b: 'or', warn: 55, fail: 90, category: 'logistica' },
+  { id: 'pacu-ward', label: 'PACU conectada a hospitalización', a: 'pacu', b: 'ward', warn: 52, fail: 80, category: 'clinico' },
+  { id: 'lab-icu', label: 'Laboratorio accesible desde críticos', a: 'lab', b: 'icu', warn: 52, fail: 82, category: 'clinico' },
+  { id: 'logistics-or', label: 'Logística/CSSD conectada a quirófano', a: 'logistics', b: 'or', warn: 55, fail: 90, category: 'logistica' },
 ]
 
 export function evaluateArchitectureRules(plan: HospitalPlan): ArchitectureRuleResult[] {
@@ -109,7 +109,7 @@ function evaluateCorridorAccess(rooms: PlacedRoom[]): ArchitectureRuleResult {
     status: disconnected.length ? 'fail' : 'ok',
     evidence: disconnected.length
       ? `${disconnected.length} bloques sin puerta a pasillo: ${sample}${disconnected.length > 4 ? '...' : ''}`
-      : 'Todos los bloques operativos tienen puerta fisica a pasillo; los conectores verticales enlazan plantas desde esa red',
+      : 'Todos los bloques operativos tienen puerta física a pasillo; los conectores verticales enlazan plantas desde esa red',
     category: 'flujos',
   }
 }
@@ -119,11 +119,11 @@ function evaluatePassageContinuity(rooms: PlacedRoom[]): ArchitectureRuleResult 
   const sample = disconnected.slice(0, 4).map((room) => `${room.name} ${room.floor}`).join(', ')
   return {
     id: 'flow-passage-continuity',
-    label: 'Red de circulacion conectada',
+    label: 'Red de circulación conectada',
     status: disconnected.length ? 'fail' : 'ok',
     evidence: disconnected.length
       ? `${disconnected.length} elementos fuera de la red principal: ${sample}${disconnected.length > 4 ? '...' : ''}`
-      : 'Pasillos, escaleras y nucleos verticales pertenecen a una red de circulacion conectada',
+      : 'Pasillos, escaleras y núcleos verticales pertenecen a una red de circulación conectada',
     category: 'flujos',
   }
 }
@@ -140,9 +140,9 @@ function evaluateFlowSeparation(rooms: PlacedRoom[]): ArchitectureRuleResult[] {
   )
   results.push({
     id: 'flow-public-logistics',
-    label: 'Separacion publico-logistica/residuos',
+    label: 'Separación público-logística/residuos',
     status: logisticsPublicConflict ? 'warn' : 'ok',
-    evidence: logisticsPublicConflict ? 'Hay logistica demasiado cerca de zonas publicas' : 'Rutas publicas y logisticas separadas',
+    evidence: logisticsPublicConflict ? 'Hay logística demasiado cerca de zonas públicas' : 'Rutas públicas y logísticas separadas',
     category: 'flujos',
   })
 
@@ -150,9 +150,9 @@ function evaluateFlowSeparation(rooms: PlacedRoom[]): ArchitectureRuleResult[] {
     const sameSide = emergency.x > hall.x + hall.w || emergency.y < hall.y - 4
     results.push({
       id: 'flow-ambulance-public',
-      label: 'Ambulancias separadas de acceso publico',
+      label: 'Ambulancias separadas de acceso público',
       status: sameSide ? 'ok' : 'warn',
-      evidence: sameSide ? 'Puerta critica independiente' : 'Revisar cruce entre publico y ambulancias',
+      evidence: sameSide ? 'Puerta crítica independiente' : 'Revisar cruce entre público y ambulancias',
       category: 'flujos',
     })
   }
@@ -192,11 +192,11 @@ function evaluateEvacuation(rooms: PlacedRoom[]): ArchitectureRuleResult[] {
     },
     {
       id: 'evac-bed-elevators-every-floor',
-      label: 'Ascensores clinicos/camas en cada planta',
+      label: 'Ascensores clínicos/camas en cada planta',
       status: missingElevatorFloors.length ? 'fail' : 'ok',
       evidence: missingElevatorFloors.length
         ? `Faltan ascensores en plantas ${missingElevatorFloors.join(', ')}`
-        : 'Todas las plantas activas tienen ascensor clinico',
+        : 'Todas las plantas activas tienen ascensor clínico',
       category: 'evacuacion',
     },
     {

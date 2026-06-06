@@ -62,41 +62,41 @@ export const HOSPITAL_CLINIC_FUNCTIONAL_DIMENSIONS = [
     label: 'Asistencia',
     modelNeeds: [
       'Urgencias y procesos tiempo-dependientes',
-      'Hospitalizacion, UCI, bloque quirurgico y diagnostico',
-      'Consultas, hospital de dia y pruebas',
-      'Continuidad de alta y gestion de camas',
+      'Hospitalización, UCI, bloque quirúrgico y diagnóstico',
+      'Consultas, hospital de día y pruebas',
+      'Continuidad de alta y gestión de camas',
     ],
   },
   {
     id: 'teaching',
     label: 'Docencia',
     modelNeeds: [
-      'Grado, posgrado, residentes y formacion continuada',
-      'Aulas, simulacion clinica y espacios de aprendizaje cerca de actividad real',
+      'Grado, posgrado, residentes y formación continuada',
+      'Aulas, simulación clínica y espacios de aprendizaje cerca de actividad real',
     ],
   },
   {
     id: 'research',
-    label: 'Recerca e innovacion',
+    label: 'Recerca e innovación',
     modelNeeds: [
-      'Laboratorios, biobanco, investigacion traslacional y plataformas',
-      'Proximidad con clinica para ensayos, terapias avanzadas y transferencia',
+      'Laboratorios, biobanco, investigación traslacional y plataformas',
+      'Proximidad con clínica para ensayos, terapias avanzadas y transferencia',
     ],
   },
   {
     id: 'infrastructure',
     label: 'Infraestructuras y servicios generales',
     modelNeeds: [
-      'Logistica limpia/sucia, farmacia, CSSD, residuos, MEP critica e IT/OT',
-      'Movilidad interna, ascensores clinicos, montacargas y rutas segregadas',
+      'Logística limpia/sucia, farmacia, CSSD, residuos, MEP crítica e IT/OT',
+      'Movilidad interna, ascensores clínicos, montacargas y rutas segregadas',
     ],
   },
   {
     id: 'campus',
     label: 'Campus y convivencia',
     modelNeeds: [
-      'Relaciones con ciudadania, pacientes, estudiantes y entidades',
-      'Hall, orientacion, espacios comunes, patios y expansion futura',
+      'Relaciones con ciudadanía, pacientes, estudiantes y entidades',
+      'Hall, orientación, espacios comunes, patios y expansión futura',
     ],
   },
 ] as const
@@ -104,33 +104,32 @@ export const HOSPITAL_CLINIC_FUNCTIONAL_DIMENSIONS = [
 export const HOSPITAL_CLINIC_SERVICE_CLUSTERS = [
   {
     id: 'emergency-critical',
-    label: 'Urgencias, diagnostico urgente y criticos',
-    simulationFocus: ['boarding ED', 'resus-imagen-UCI', 'alta ocupacion UCI', 'ascensores clinicos'],
+    label: 'Urgencias, diagnóstico urgente y críticos',
+    simulationFocus: ['boarding ED', 'resus-imagen-UCI', 'alta ocupación UCI', 'ascensores clínicos'],
   },
   {
     id: 'surgery-pacu',
-    label: 'Bloque quirurgico, hibridos, PACU y esterilizacion',
-    simulationFocus: ['cancelacion quirurgica', 'bloqueo PACU', 'flujo limpio-sucio', 'traslado a UCI/planta'],
+    label: 'Bloque quirúrgico, híbridos, PACU y esterilización',
+    simulationFocus: ['cancelación quirúrgica', 'bloqueo PACU', 'flujo limpio-sucio', 'traslado a UCI/planta'],
   },
   {
     id: 'inpatient-institutes',
-    label: 'Hospitalizacion por institutos clinicos',
-    simulationFocus: ['ocupacion de camas', 'misplacement', 'alta tardia', 'interconsultas y pruebas'],
+    label: 'Hospitalización por institutos clínicos',
+    simulationFocus: ['ocupación de camas', 'misplacement', 'alta tardía', 'interconsultas y pruebas'],
   },
   {
     id: 'ambulatory-day-care',
-    label: 'Consultas, pruebas y hospitales de dia',
-    simulationFocus: ['esperas ambulatorias', 'diagnostico programado', 'hospital de dia onco/hematologico'],
+    label: 'Consultas, pruebas y hospitales de día',
+    simulationFocus: ['esperas ambulatorias', 'diagnóstico programado', 'hospital de día onco/hematológico'],
   },
   {
     id: 'research-teaching',
-    label: 'IDIBAPS, ISGlobal, UB, docencia y simulacion',
-    simulationFocus: ['proximidad clinica-recerca', 'flujos de estudiantes/profesionales', 'ensayos y terapias avanzadas'],
+    label: 'IDIBAPS, ISGlobal, UB, docencia y simulación',
+    simulationFocus: ['proximidad clínica-recerca', 'flujos de estudiantes/profesionales', 'ensayos y terapias avanzadas'],
   },
   {
     id: 'logistics-resilience',
-    label: 'Logistica, farmacia, MEP, residuos y resiliencia',
-    simulationFocus: ['suministros criticos', 'farmacia/medicamento', 'CSSD-quirofano', 'resiliencia energetica'],
+    label: 'Logística, farmacia, MEP, residuos y resiliencia',
+    simulationFocus: ['suministros críticos', 'farmacia/medicamento', 'CSSD-quirófano', 'resiliencia energética'],
   },
 ] as const
-

@@ -125,6 +125,10 @@
   background: rgba(133, 222, 118, 0.24);
 }
 
+.mobile-section-trigger {
+  display: none;
+}
+
 .workspace-tabs .workspace-tab-actions button {
   height: 30px;
   padding: 0 11px;
@@ -468,8 +472,8 @@ output {
 }
 
 .sim-controls {
-  display: grid;
-  grid-template-columns: 78px minmax(96px, 1.2fr) minmax(96px, auto) 70px 132px minmax(0, 1fr) minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   align-items: center;
   padding: 8px;
@@ -481,12 +485,28 @@ output {
   box-shadow: 0 8px 20px rgba(55, 81, 113, 0.1);
 }
 
+.sim-controls > button {
+  flex: 0 0 78px;
+}
+
+.sim-controls > input[type='range'] {
+  flex: 1 1 220px;
+  min-width: 150px;
+}
+
 .sim-controls span {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
+.sim-time-label {
+  flex: 0 0 auto;
+  min-width: 158px;
+  white-space: nowrap;
+}
+
 .sim-controls select {
+  flex: 1 1 220px;
   min-width: 0;
 }
 
@@ -498,12 +518,17 @@ output {
 }
 
 .sim-view-toggle {
+  flex: 0 0 72px;
   grid-template-columns: repeat(2, minmax(32px, 1fr));
 }
 
 .sim-speed-presets,
 .speed-preset-grid {
   grid-template-columns: repeat(4, minmax(34px, 1fr));
+}
+
+.sim-speed-presets {
+  flex: 0 0 148px;
 }
 
 .sim-view-toggle button,
@@ -1702,6 +1727,82 @@ th {
   font-size: 15px;
 }
 
+.compact-aside-section,
+.simulation-hub {
+  gap: 10px;
+}
+
+.compact-aside-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.compact-aside-grid .metric {
+  min-height: 46px;
+}
+
+.compact-aside-grid .metric strong {
+  font-size: 15px;
+}
+
+.compact-aside-list {
+  display: grid;
+  gap: 8px;
+}
+
+.aside-summary-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--clinic-border);
+  border-left: 4px solid var(--clinic-cyan-1);
+  border-radius: 8px;
+  background: var(--clinic-surface);
+  color: var(--clinic-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.aside-summary-card:hover,
+.aside-summary-card.is-active {
+  border-color: var(--clinic-green-1);
+  border-left-color: var(--clinic-green-1);
+  background: var(--clinic-green-wash);
+}
+
+.aside-summary-card span {
+  color: var(--clinic-blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.aside-summary-card strong {
+  color: var(--clinic-blue);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.aside-summary-card small {
+  grid-column: 1 / -1;
+  color: var(--clinic-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.simulation-parameter-modal,
+.simulation-modal-list {
+  padding: 16px;
+}
+
+.simulation-parameter-modal {
+  display: grid;
+  gap: 12px;
+}
+
 .simulation-panel-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2124,12 +2225,8 @@ th {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .sim-controls {
-    grid-template-columns: 86px minmax(120px, 1fr) 70px;
-  }
-
-  .sim-controls select {
-    grid-column: 1 / -1;
+  .sim-time-label {
+    min-width: 144px;
   }
 }
 
@@ -2187,6 +2284,11 @@ th {
     gap: 0;
   }
 
+  .mobile-section-trigger {
+    display: inline-flex;
+    align-items: center;
+  }
+
   .workbench,
   .workbench.is-simulation-workspace,
   .workbench.without-left-panel,
@@ -2240,20 +2342,17 @@ th {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .sim-controls {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .sim-controls input[type='range'] {
-    grid-column: 1 / -1;
-  }
-
+  .sim-controls > button,
+  .sim-view-toggle,
   .sim-speed-presets {
-    grid-column: 1 / -1;
+    flex: 1 1 calc(50% - 4px);
   }
 
+  .sim-controls > input[type='range'],
+  .sim-time-label,
   .sim-controls select {
-    grid-column: 1 / -1;
+    flex: 1 1 100%;
+    min-width: 0;
   }
 
   .modal-backdrop {

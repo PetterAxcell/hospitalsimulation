@@ -207,7 +207,7 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
         ref={hostRef}
         className={`phaser-stage ${viewMode === 'isometric' ? 'is-isometric' : ''}`}
         role="img"
-        aria-label={viewMode === 'isometric' ? 'Simulacion isometrica 3D del hospital completo' : 'Simulacion top-down del hospital'}
+        aria-label={viewMode === 'isometric' ? 'Simulación isométrica 3D del hospital completo' : 'Simulación top-down del hospital'}
       />
     </div>
   )

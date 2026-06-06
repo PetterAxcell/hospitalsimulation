@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Metric } from '../../components/ui/Metric'
+import { Modal } from '../../components/ui/Modal'
 import type { ClinicalCaseDiagnostic } from '../../engine/clinicalCases'
 import type { PatientCaseFilter, SimulationAgentLayer, SimulationResult } from '../../types'
 
 type SimulationPanelTab = 'cases' | 'staff'
+type SimulationSelectorModal = SimulationPanelTab | null
 
 interface SimulationCaseSelectorProps {
   result: SimulationResult | null
@@ -33,6 +35,7 @@ export function SimulationCaseSelector({
   onChangeAgentLayer,
 }: SimulationCaseSelectorProps) {
   const [activePanel, setActivePanel] = useState<SimulationPanelTab>('cases')
+  const [openModal, setOpenModal] = useState<SimulationSelectorModal>(null)
   const caseStats = (result?.caseStats ?? [])
     .filter((stat) => stat.attempted > 0)
     .sort((a, b) => b.completed - a.completed)
@@ -55,7 +58,7 @@ export function SimulationCaseSelector({
   return (
     <section className="panel-section simulation-hub">
       <div className="simulation-hub-header">
-        <h2>Simulacion</h2>
+        <h2>Simulación</h2>
         <p className="case-yaml-file">{fileName}</p>
       </div>
 
@@ -64,7 +67,34 @@ export function SimulationCaseSelector({
         <Metric label="Personal" value={String(staffOnShift)} />
       </div>
 
-      <div className="case-yaml-actions" aria-label="Herramientas de casos clinicos">
+      <div className="compact-aside-list">
+        <button
+          type="button"
+          className={`aside-summary-card ${activePanel === 'cases' ? 'is-active' : ''}`}
+          onClick={() => {
+            selectPanel('cases')
+            setOpenModal('cases')
+          }}
+        >
+          <span>Casos clínicos</span>
+          <strong>{completedCases}</strong>
+          <small>{caseStats.length} recorridos activos</small>
+        </button>
+        <button
+          type="button"
+          className={`aside-summary-card ${activePanel === 'staff' ? 'is-active' : ''}`}
+          onClick={() => {
+            selectPanel('staff')
+            setOpenModal('staff')
+          }}
+        >
+          <span>Personal</span>
+          <strong>{staffOnShift}</strong>
+          <small>{staffStats.filter((stat) => stat.moving > 0).length} roles con ruta</small>
+        </button>
+      </div>
+
+      <div className="case-yaml-actions" aria-label="Herramientas de casos clínicos">
         <ToolIconButton icon="edit" label="Editar YAML" onClick={onEditCases} />
         <label className="file-action icon-action" aria-label="Subir YAML" title="Subir YAML">
           <ToolIcon icon="upload" />
@@ -89,83 +119,90 @@ export function SimulationCaseSelector({
         </div>
       )}
 
-      <div className="agent-layer-grid" aria-label="Capa visible de simulacion">
+      <div className="agent-layer-grid" aria-label="Capa visible de simulación">
         <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => selectLayer('all')}>Todo</button>
         <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => selectLayer('patients')}>Casos</button>
         <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => selectLayer('staff')}>Personal</button>
       </div>
 
-      <div className="simulation-panel-tabs" aria-label="Grupo de simulacion">
-        <button type="button" className={activePanel === 'cases' ? 'is-active' : ''} onClick={() => selectPanel('cases')}>
-          <span>Casos</span>
-          <strong>{completedCases}</strong>
-        </button>
-        <button type="button" className={activePanel === 'staff' ? 'is-active' : ''} onClick={() => selectPanel('staff')}>
-          <span>Personal</span>
-          <strong>{staffOnShift}</strong>
-        </button>
-      </div>
-
-      {activePanel === 'cases' ? (
-        caseStats.length > 0 ? (
-          <div className="case-list simulation-hub-list">
-            <button
-              type="button"
-              className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
-              style={{ borderLeftColor: '#375171' }}
-              onClick={() => onSelectCase('all')}
-            >
-              <strong>Todos los casos</strong>
-              <span>{result?.kpis.completed ?? 0} pacientes completados</span>
-              <small>Vista completa de la actividad simulada.</small>
-            </button>
-            {caseStats.map((stat) => {
-              const route = stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'
-              return (
-                <article
-                  key={stat.id}
-                  className={`case-item case-item-with-action ${selectedCaseId === stat.id ? 'is-active' : ''}`}
-                  style={{ borderLeftColor: stat.color }}
-                >
-                  <button
-                    type="button"
-                    className="case-select-action"
-                    title={route}
-                    onClick={() => onSelectCase(stat.id)}
+      {openModal === 'cases' && (
+        <Modal
+          titleId="simulation-cases-title"
+          title="Casos clínicos"
+          subtitle="Recorridos simulados, bloqueos y edición YAML por caso."
+          className="simulation-detail-modal"
+          onClose={() => setOpenModal(null)}
+        >
+          {caseStats.length > 0 ? (
+            <div className="case-list simulation-modal-list">
+              <button
+                type="button"
+                className={`case-item ${selectedCaseId === 'all' ? 'is-active' : ''}`}
+                style={{ borderLeftColor: '#375171' }}
+                onClick={() => onSelectCase('all')}
+              >
+                <strong>Todos los casos</strong>
+                <span>{result?.kpis.completed ?? 0} pacientes completados</span>
+                <small>Vista completa de la actividad simulada.</small>
+              </button>
+              {caseStats.map((stat) => {
+                const route = stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Sin ruta completa'
+                return (
+                  <article
+                    key={stat.id}
+                    className={`case-item case-item-with-action ${selectedCaseId === stat.id ? 'is-active' : ''}`}
+                    style={{ borderLeftColor: stat.color }}
                   >
-                    <strong>{stat.label}</strong>
-                    <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="case-edit-action"
-                    aria-label={`Editar YAML de ${stat.label}`}
-                    title="Editar YAML"
-                    onClick={() => onEditCase(stat.id)}
-                  >
-                    <ToolIcon icon="edit" />
-                  </button>
-                </article>
-              )
-            })}
-          </div>
-        ) : (
-          <p className="muted">Ejecutando mezcla clinica.</p>
-        )
-      ) : (
-        <div className="case-list simulation-hub-list">
-          {staffStats.length > 0 ? (
-            staffStats.map((stat) => (
-              <article key={stat.role} className="case-item staff-item" style={{ borderLeftColor: stat.color }}>
-                <strong>{stat.label}</strong>
-                <span>{stat.count} en turno · {stat.moving} con ruta</span>
-                <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Turno local'}</small>
-              </article>
-            ))
+                    <button
+                      type="button"
+                      className="case-select-action"
+                      title={route}
+                      onClick={() => onSelectCase(stat.id)}
+                    >
+                      <strong>{stat.label}</strong>
+                      <span>{stat.completed}/{stat.attempted} completados · {stat.blocked} bloqueados</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="case-edit-action"
+                      aria-label={`Editar YAML de ${stat.label}`}
+                      title="Editar YAML"
+                      onClick={() => onEditCase(stat.id)}
+                    >
+                      <ToolIcon icon="edit" />
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
           ) : (
-            <p className="muted">Sin personal asignado a la planta activa.</p>
+            <p className="modal-empty">Ejecutando mezcla clínica.</p>
           )}
-        </div>
+        </Modal>
+      )}
+
+      {openModal === 'staff' && (
+        <Modal
+          titleId="simulation-staff-title"
+          title="Personal simulado"
+          subtitle="Roles activos, turnos y rutas visibles dentro del replay."
+          className="simulation-detail-modal"
+          onClose={() => setOpenModal(null)}
+        >
+          <div className="case-list simulation-modal-list">
+            {staffStats.length > 0 ? (
+              staffStats.map((stat) => (
+                <article key={stat.role} className="case-item staff-item" style={{ borderLeftColor: stat.color }}>
+                  <strong>{stat.label}</strong>
+                  <span>{stat.count} en turno · {stat.moving} con ruta</span>
+                  <small>{stat.samplePath.length ? stat.samplePath.join(' -> ') : 'Turno local'}</small>
+                </article>
+              ))
+            ) : (
+              <p className="muted">Sin personal asignado a la planta activa.</p>
+            )}
+          </div>
+        </Modal>
       )}
     </section>
   )

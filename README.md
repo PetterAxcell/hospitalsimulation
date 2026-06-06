@@ -52,25 +52,27 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Frontend React con editor multi-planta.
 - Canvas de Vision para colocar, mover y redimensionar servicios, pasillos, ascensores, escaleras, montacargas y piezas de seguridad.
 - Navegacion del planificador: el plano encaja por ancho y permite arrastrar sobre zonas vacias para desplazarse verticalmente por plantas grandes.
-- Simulacion 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presion por estancia y capas de RPG, flujos y reglas.
+- Simulación 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presión por estancia y capas de RPG, flujos y reglas.
 - Top de propuestas por autor: ranking local de arquitecturas, puntuado con KPIs de simulacion, reglas abiertas y desviacion de m2. Es la primera vista de la app para priorizar comparacion antes que edicion; ahora usa tarjetas compactas y modales de detalle para evitar paginas demasiado explicativas.
-- Analisis compacto: la vista muestra cuellos de botella, presion por estancia, casos bloqueados y estado en una pantalla sin paneles laterales; la lectura operativa vive en modal para no llenar la pagina con texto fijo.
-- Modales por seccion: cada pestana tiene una accion contextual en la barra superior para abrir sus herramientas o lectura avanzada sin cargar permanentemente la pantalla principal.
-- Paneles laterales contextuales: Planificador y Simulacion permiten ocultar/mostrar panel izquierdo y derecho desde la barra superior para trabajar a pantalla mas limpia; en movil estos paneles se ocultan y la edicion pasa por los modales de seccion.
-- Simulacion compacta: el panel lateral muestra parametros y cuatro KPIs; el detalle de personal, traslados, plantas y reglas abiertas queda en modal. El layout usa paneles laterales mas estrechos, controles compactos y encuadre 2D tipo videojuego que cubre todo el canvas sin bandas oscuras alrededor del mapa.
-- Catalogo de hospital terciario: urgencias, diagnostico, quirofanos, PACU, UCI, wards, maternidad, neonatal, oncologia, farmacia, laboratorio, logistica, investigacion y command center.
-- Preset Hospital Clinic: primera vision del Nou Campus Clinic-UB con asistencia, docencia, investigacion, infraestructuras, campus, sotanos tecnicos/logisticos, urgencias, quirofanos, UCI, institutos clinicos, consultas, hospital de dia y reservas de crecimiento.
+- Análisis compacto: la vista muestra cuellos de botella, presión por estancia, casos bloqueados y estado en una pantalla sin paneles laterales; la lectura operativa vive en modal para no llenar la página con texto fijo.
+- Modales por sección: Top, Análisis y Servicios tienen una acción contextual en la barra superior; Planificador y Simulación usan asides compactos donde cada bloque pequeño abre su propio modal de detalle.
+- Paneles laterales contextuales: Planificador y Simulación permiten ocultar/mostrar panel izquierdo y derecho desde la barra superior para trabajar a pantalla más limpia; en móvil estos paneles se ocultan y la edición pasa por el acceso contextual de herramientas.
+- Simulación compacta: el panel lateral muestra parámetros y cuatro KPIs; el detalle de personal, traslados, plantas y reglas abiertas queda en modal. El layout usa paneles laterales más estrechos, controles compactos y encuadre 2D tipo videojuego que cubre todo el canvas sin bandas oscuras alrededor del mapa.
+- Barra de replay responsive: los controles de tiempo, velocidad, capa de agentes y caso clínico se adaptan en varias líneas para evitar solapes en anchos pequeños.
+- Catálogo de hospital terciario: urgencias, diagnóstico, quirófanos, PACU, UCI, wards, maternidad, neonatal, oncología, farmacia, laboratorio, logística, investigación y command center.
+- Preset Hospital Clinic: primera visión del Nou Campus Clinic-UB con asistencia, docencia, investigación, infraestructuras, campus, sótanos técnicos/logísticos, urgencias, quirófanos, UCI, institutos clínicos, consultas, hospital de día y reservas de crecimiento.
 - Identidad visual Clinic: paleta azul/verde/rojo/amarillo/cian aplicada a shell, controles, planificador, simulacion y estados de saturacion, manteniendo blanco como base; la cabecera usa logotipo Clinic destacado y nombre del campus en blanco.
 - Elementos de seguridad arquitectonica: ascensores, escaleras, montacargas, escaleras protegidas/emergencia, refugios de evacuacion horizontal, sectorizacion PCI, central MEP critica y reserva de expansion.
 - Circulacion editable: pasillos publicos, pasillos clinicos para camas y pasillos logisticos limpio/sucio se anaden desde el selector `Elemento`, igual que cualquier otro bloque. En la UI, `Asc/Mont` significa ascensores publicos, ascensores clinicos y montacargas; las escaleras son componentes independientes.
 - Dimensiones editables en metros: cada bloque tiene ancho y alto, y los m2 se recalculan automaticamente con una escala de 3 m por unidad de plano.
 - Movimiento restringido por puertas y pasillos: los pacientes solo pueden salir de una sala por una puerta colocada en su perimetro que toque un pasillo conectado a la red de circulacion; si no existe esa ruta, quedan bloqueados y aparecen como `Sin puerta`.
-- Animacion por pasillos: el replay de pacientes y personal interpola por puertas, ejes de pasillo e intersecciones de circulacion, evitando diagonales directas entre salas.
+- Animación por pasillos: el replay de pacientes y personal interpola por puertas, ejes de pasillo e intersecciones de circulación, evitando diagonales directas entre salas.
 - Puertas con efecto iman: al crear o mover una puerta, Vision la deja libre hasta que entra cerca de un pasillo; entonces se pega al bloque de pasillo y genera/actualiza un umbral transitable.
+- Preset Clinic con red de pasillos continua: el pasillo de ambulancias, el pasillo clínico principal, el pasillo público vertical, ascensores y escaleras de emergencia quedan alineados para no arrancar como islas de circulación.
 - Conectores verticales por familia: ascensores/montacargas y escaleras tienen una familia de conector y selector visual de `plantas conectadas`, de modo que un tramo 0-1 debe existir y alinearse en las plantas que declara servir.
 - Planificador sin escaleras duplicadas: Vision representa las escaleras como bloques arquitectonicos independientes, no como iconos de equipamiento dentro de otros componentes.
 - Reglas de continuidad de pasillos: la app avisa si un pasillo queda fuera de la red principal de circulacion.
-- Ayuda de conexion: las puertas rojas no tocan ningun pasillo; los pasillos con borde rojo estan aislados de la red principal. El editor puede proponer un conector de pasillo hacia la sala seleccionada o hacia toda la planta.
+- Ayuda de conexión: las puertas rojas no tocan ningún pasillo; los pasillos con borde rojo están aislados de la red principal. El editor puede proponer un conector de pasillo hacia la sala seleccionada o hacia toda la planta.
 - Evaluador inicial de reglas para presencia de servicios, proximidades criticas, separacion de flujos, evacuacion y resiliencia.
 - Backend FastAPI desacoplado con contratos Pydantic, repositorio en memoria, versionado de planes, evaluacion de reglas y ejecucion del motor DES.
 
@@ -122,7 +124,7 @@ frontend/
   src/data/        Catalogo de estancias, equipamiento y presets hospitalarios
   src/engine/      Geometria, circulacion, casos clinicos, simulacion, staff y reglas
   src/components/  Shell de marca, tabs, canvas editable, escena Phaser y controles de replay
-  src/components/ui/ Primitivas compartidas como metricas y modales
+  src/components/ui/ Primitivas compartidas como métricas y modales
   src/features/    Funcionalidades de producto separadas: planning, top, saturacion y simulacion
   src/utils/       Formato compartido de numeros y plantas
 hospital_sim/      Prototipo Python/SimPy inicial, mantenido como referencia
@@ -140,6 +142,6 @@ El modelo actual es una primera base calibrable, no una representacion validada 
 2. Sustituir el repositorio en memoria por PostgreSQL y migraciones.
 3. Mover simulaciones largas a jobs asincronos con Redis/RQ o Celery.
 4. Convertir el catalogo en datos editables y versionados desde backend.
-5. Anadir reglas normativas parametrizables por jurisdiccion.
+5. Añadir reglas normativas parametrizables por jurisdicción.
 6. Implementar imports BIM/IFC o CSV para planos reales.
 7. Introducir agentes de pacientes, medicos, enfermeria, celadores y tecnicos con perfiles configurables.

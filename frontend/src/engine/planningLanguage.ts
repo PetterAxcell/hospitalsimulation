@@ -83,19 +83,19 @@ generics:
       floors: all
       at: [0, 31]
       size: [100, 7]
-      name: Pasillo clinico principal
+      name: Pasillo clínico principal
     - template: public
       id: public
       floors: all
       at: [47, 0]
       size: [9, 70]
-      name: Pasillo publico vertical
+      name: Pasillo público vertical
     - template: logistics
       id: logistics
       floors: all
       at: [0, 58]
       size: [100, 5]
-      name: Pasillo logistico
+      name: Pasillo logístico
   rooms:
     - template: refuge
       id: refuge
@@ -273,7 +273,7 @@ levels:
         id: peds-p3
         at: [17, 40]
         size: [30, 14]
-        name: Pediatria y mujer
+        name: Pediatría y mujer
 
   P4:
     rooms:
@@ -457,7 +457,7 @@ function finishResult(state: ScriptState): PlanningLanguageResult {
     state.diagnostics.push({
       level: 'warning',
       line: 1,
-      message: `${disconnected.length} bloques quedan sin acceso fisico a pasillo: ${sample}${disconnected.length > 4 ? '...' : ''}`,
+      message: `${disconnected.length} bloques quedan sin acceso físico a pasillo: ${sample}${disconnected.length > 4 ? '...' : ''}`,
     })
   }
   const disconnectedCorridors = disconnectedPassages(rooms)
@@ -466,7 +466,7 @@ function finishResult(state: ScriptState): PlanningLanguageResult {
     state.diagnostics.push({
       level: 'warning',
       line: 1,
-      message: `${disconnectedCorridors.length} elementos de circulacion quedan fuera de la red principal: ${sample}${disconnectedCorridors.length > 4 ? '...' : ''}`,
+      message: `${disconnectedCorridors.length} elementos de circulación quedan fuera de la red principal: ${sample}${disconnectedCorridors.length > 4 ? '...' : ''}`,
     })
   }
   return {

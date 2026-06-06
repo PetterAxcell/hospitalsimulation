@@ -15,7 +15,7 @@ export function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
     <div className="top-panel">
       <section className="top-hero">
         <div className="top-hero-main">
-          <span>Ranking por simulacion</span>
+          <span>Ranking por simulación</span>
           <h2>{best ? `${best.owner} · ${formatScore(best.score.value)}` : 'Sin propuestas'}</h2>
           <div className="top-hero-actions">
             <button type="button" className="ghost-action" onClick={() => setScoreModalOpen(true)}>Ver formula</button>
@@ -160,7 +160,7 @@ function ScoreFormulaModal({ proposal, onClose }: { proposal?: ArchitecturePropo
     <Modal
       titleId="score-formula-title"
       title="Formula del score"
-      subtitle="100 puntos menos penalizaciones operativas y arquitectonicas."
+      subtitle="100 puntos menos penalizaciones operativas y arquitectónicas."
       onClose={onClose}
     >
       {proposal ? (

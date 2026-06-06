@@ -38,22 +38,26 @@ export function SimulationControlsBar({
   onChangeAgentLayer,
   onSelectCase,
 }: SimulationControlsBarProps) {
+  const safeDuration = Math.max(0, result.durationMinutes)
+  const safeMinute = clamp(minute, 0, safeDuration)
+  const safeMotionMinute = Math.max(0, motionMinute)
+
   return (
     <div className="sim-controls">
       <button type="button" onClick={onTogglePlaying}>{playing ? 'Pausa' : 'Play'}</button>
       <input
         type="range"
         min={0}
-        max={result.durationMinutes}
-        value={minute}
+        max={safeDuration}
+        value={safeMinute}
         onChange={(event) => {
           const nextMinute = Number(event.target.value)
-          const nextMotionMinute = (nextMinute / Math.max(1, result.durationMinutes)) * result.motionCycleMinutes
+          const nextMotionMinute = (nextMinute / Math.max(1, safeDuration)) * result.motionCycleMinutes
           onChangeMinute(nextMinute, nextMotionMinute)
         }}
       />
-      <span>{formatHorizonTime(minute, motionMinute, settings.horizonYears)}</span>
-      <div className="sim-view-toggle" aria-label="Vista de simulacion">
+      <span className="sim-time-label">{formatHorizonTime(safeMinute, safeMotionMinute, settings.horizonYears)}</span>
+      <div className="sim-view-toggle" aria-label="Vista de simulación">
         <button
           type="button"
           className={viewMode === 'topDown' ? 'is-active' : ''}
@@ -69,7 +73,7 @@ export function SimulationControlsBar({
           3D
         </button>
       </div>
-      <div className="sim-speed-presets" aria-label="Velocidad de simulacion">
+      <div className="sim-speed-presets" aria-label="Velocidad de simulación">
         {SPEED_PRESETS.map((speed) => (
           <button
             key={speed}
@@ -87,7 +91,7 @@ export function SimulationControlsBar({
         <option value="patients">Solo casos</option>
         <option value="staff">Solo personal</option>
       </select>
-      <select value={selectedCaseId} onChange={(event) => onSelectCase(event.target.value as PatientCaseFilter)} aria-label="Caso clinico visible">
+      <select value={selectedCaseId} onChange={(event) => onSelectCase(event.target.value as PatientCaseFilter)} aria-label="Caso clínico visible">
         <option value="all">Todos los casos</option>
         {result.caseStats.map((stat) => (
           <option key={stat.id} value={stat.id}>
@@ -100,11 +104,17 @@ export function SimulationControlsBar({
 }
 
 function formatHorizonTime(minutes: number, motionMinutes: number, horizonYears: number) {
+  const normalizedMinutes = Math.max(0, minutes)
+  const normalizedMotionMinutes = Math.max(0, motionMinutes)
   const totalDays = Math.max(1, horizonYears) * 365
-  const dayIndex = Math.floor(minutes / (24 * 60)) % totalDays
+  const dayIndex = Math.floor(normalizedMinutes / (24 * 60)) % totalDays
   const year = Math.floor(dayIndex / 365) + 1
   const day = dayIndex % 365 + 1
-  const hour = Math.floor(motionMinutes / 60) % 24
-  const minute = Math.floor(motionMinutes % 60)
-  return `Ano ${year} · dia ${day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+  const hour = Math.floor(normalizedMotionMinutes / 60) % 24
+  const minute = Math.floor(normalizedMotionMinutes % 60)
+  return `Año ${year} · día ${day} · ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
 }

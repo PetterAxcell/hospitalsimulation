@@ -11,8 +11,8 @@ interface WorkspaceTabsProps {
 const WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string }> = [
   { id: 'top', label: 'Top' },
   { id: 'plan', label: 'Planificador' },
-  { id: 'simulation', label: 'Simulacion' },
-  { id: 'analysis', label: 'Analisis' },
+  { id: 'simulation', label: 'Simulación' },
+  { id: 'analysis', label: 'Análisis' },
   { id: 'services', label: 'Servicios' },
 ]
 

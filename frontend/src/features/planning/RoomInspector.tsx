@@ -92,7 +92,7 @@ export function RoomInspector({
         <div className="status-metrics">
           <Metric label="m2 calculados" value={formatNumber(room.areaSqm)} />
           <Metric
-            label={isPassage(room) ? 'Red circulacion' : 'Acceso pasillo'}
+            label={isPassage(room) ? 'Red circulación' : 'Acceso pasillo'}
             value={isPassage(room) ? (isDisconnectedPassage ? 'Aislado' : 'Conectado') : accessRequired ? (hasCorridor ? 'Conectado' : 'Sin pasillo') : 'Opcional'}
           />
         </div>
@@ -107,7 +107,7 @@ export function RoomInspector({
 
       {room.kind === 'vertical' && (
         <section className="panel-section">
-          <h2>Conexion vertical</h2>
+          <h2>Conexión vertical</h2>
           <label>
             Familia de conector
             <input
@@ -136,7 +136,7 @@ export function RoomInspector({
           onClick={onStartDoorTool}
           disabled={room.kind === 'circulation' || room.kind === 'future'}
         >
-          {doorToolActive ? 'Colocando puerta' : 'Anadir puerta'}
+          {doorToolActive ? 'Colocando puerta' : 'Añadir puerta'}
         </button>
         <button
           type="button"

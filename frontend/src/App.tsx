@@ -352,7 +352,7 @@ function App() {
         ...singleResult,
         diagnostics: singleResult.diagnostics.length > 0
           ? singleResult.diagnostics
-          : [{ level: 'error', line: 1, message: 'Este editor debe guardar un unico caso clinico.' }],
+          : [{ level: 'error', line: 1, message: 'Este editor debe guardar un único caso clínico.' }],
       })
       return
     }
@@ -440,7 +440,7 @@ function App() {
             ))}
           </select>
         </label>
-        <button type="button" className="primary-action" onClick={addRoom}>Anadir a planta {floorLabel(selectedFloor)}</button>
+        <button type="button" className="primary-action" onClick={addRoom}>Añadir a planta {floorLabel(selectedFloor)}</button>
         <button type="button" className="secondary-action" onClick={autoConnectFloorToCorridors}>Auto-conectar planta</button>
         <button type="button" className="secondary-action" onClick={() => setScriptModalOpen(true)}>Programar plan</button>
       </section>
@@ -731,11 +731,19 @@ function WorkspaceSectionActions({
   onToggleLeft: () => void
   onToggleRight: () => void
 }) {
+  const showSectionModalTrigger = !panelToggleAvailable
   return (
     <div className="section-action-controls">
-      <button type="button" className="section-modal-trigger" onClick={onOpenSection} aria-haspopup="dialog">
-        {sectionActionLabel(activeTab)}
-      </button>
+      {showSectionModalTrigger && (
+        <button type="button" className="section-modal-trigger" onClick={onOpenSection} aria-haspopup="dialog">
+          {sectionActionLabel(activeTab)}
+        </button>
+      )}
+      {panelToggleAvailable && (
+        <button type="button" className="section-modal-trigger mobile-section-trigger" onClick={onOpenSection} aria-haspopup="dialog">
+          {sectionActionLabel(activeTab)}
+        </button>
+      )}
       {panelToggleAvailable && (
         <PanelVisibilityControls
           leftVisible={leftVisible}
@@ -774,7 +782,7 @@ function PanelVisibilityControls({
 function sectionActionLabel(tab: WorkspaceTab) {
   if (tab === 'top') return 'Registrar'
   if (tab === 'plan') return 'Herramientas'
-  if (tab === 'simulation') return 'Escenario'
+  if (tab === 'simulation') return 'Herramientas'
   if (tab === 'analysis') return 'Lectura'
   return 'Resumen'
 }
@@ -782,17 +790,17 @@ function sectionActionLabel(tab: WorkspaceTab) {
 function sectionModalTitle(tab: WorkspaceTab) {
   if (tab === 'top') return 'Top de arquitecturas'
   if (tab === 'plan') return 'Herramientas del planificador'
-  if (tab === 'simulation') return 'Escenario de simulacion'
-  if (tab === 'analysis') return 'Lectura de analisis'
+  if (tab === 'simulation') return 'Herramientas de simulación'
+  if (tab === 'analysis') return 'Lectura de análisis'
   return 'Resumen de servicios'
 }
 
 function sectionModalSubtitle(tab: WorkspaceTab) {
-  if (tab === 'top') return 'Guardar la arquitectura actual y entender como puntua.'
-  if (tab === 'plan') return 'Plantas, construccion, accesos y edicion del bloque seleccionado.'
-  if (tab === 'simulation') return 'Casos clinicos, personal, parametros y resultado del replay.'
+  if (tab === 'top') return 'Guardar la arquitectura actual y entender cómo puntúa.'
+  if (tab === 'plan') return 'Plantas, construcción, accesos y edición del bloque seleccionado.'
+  if (tab === 'simulation') return 'Casos clínicos, personal, parámetros y resultado del replay.'
   if (tab === 'analysis') return 'KPIs y reglas abiertas para leer cuellos de botella sin paneles laterales.'
-  return 'Distribucion funcional por tipo de servicio, m2 y capacidad.'
+  return 'Distribución funcional por tipo de servicio, m2 y capacidad.'
 }
 
 function AnalysisModalContent({
@@ -822,7 +830,7 @@ function AnalysisModalContent({
         <h3>Reglas abiertas</h3>
         <div className="section-metric-grid">
           <Metric label="Avisos" value={String(warnCount)} />
-          <Metric label="Criticas" value={String(failCount)} />
+          <Metric label="Críticas" value={String(failCount)} />
           <Metric label="Zona cargada" value={result?.kpis.hottestRoomName ?? '-'} />
           <Metric label="Cambios planta" value={String(result?.kpis.verticalMoves ?? 0)} />
         </div>
@@ -837,7 +845,7 @@ function AnalysisModalContent({
           ) : (
             <article className="rule-item ok">
               <strong>Sin reglas abiertas</strong>
-              <span>El plan actual no genera avisos arquitectonicos.</span>
+              <span>El plan actual no genera avisos arquitectónicos.</span>
             </article>
           )}
         </div>
@@ -945,7 +953,7 @@ function PlanningScriptModal({
           {result?.diagnostics.length ? (
             result.diagnostics.map((diagnostic) => (
               <p key={`${diagnostic.line}-${diagnostic.message}`} className={diagnostic.level}>
-                Linea {diagnostic.line}: {diagnostic.message}
+                Línea {diagnostic.line}: {diagnostic.message}
               </p>
             ))
           ) : (
@@ -974,7 +982,7 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
           <div>
             <span>Manual YAML</span>
             <h2 id="script-info-title">Aprender la estructura del plan</h2>
-            <p>Lee el plan como una receta: primero contexto, luego piezas espaciales y al final las relaciones que hacen funcionar la simulacion.</p>
+            <p>Lee el plan como una receta: primero contexto, luego piezas espaciales y al final las relaciones que hacen funcionar la simulación.</p>
           </div>
           <button type="button" onClick={onClose}>Cerrar</button>
         </header>
@@ -987,7 +995,7 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
               <li><strong>`clear`</strong> decide si el YAML reemplaza el plano actual.</li>
               <li><strong>`generics`</strong> guarda pasillos, nucleos y piezas repetidas en varias plantas.</li>
               <li><strong>`levels`</strong> agrupa `rooms`, `corridors` y `connections` por planta.</li>
-              <li><strong>`corridors`</strong> crea pasillos publicos, clinicos o logisticos.</li>
+              <li><strong>`corridors`</strong> crea pasillos públicos, clínicos o logísticos.</li>
               <li><strong>`rooms`</strong> crea servicios hospitalarios desde el catalogo.</li>
               <li><strong>`verticals`</strong> replica nucleos por planta y los agrupa.</li>
               <li><strong>`connections`</strong> declara accesos logicos entre bloques.</li>
@@ -1087,7 +1095,7 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
               </div>
               <div>
                 <h4>Como se ve conectado</h4>
-                <div className="script-connection-preview" aria-label="Vista grafica de boxes-pb conectado a clinical-pb">
+                <div className="script-connection-preview" aria-label="Vista gráfica de boxes-pb conectado a clinical-pb">
                   <div className="script-connection-room">
                     <strong>boxes-pb</strong>
                     <span>Boxes ED</span>
@@ -1095,7 +1103,7 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
                   <div className="script-connection-line" />
                   <div className="script-connection-corridor">
                     <strong>clinical-pb</strong>
-                    <span>Pasillo clinico</span>
+                    <span>Pasillo clínico</span>
                   </div>
                   <small>La conexion enlaza bloques que ya estan en contacto fisico, sin dibujar otro pasillo.</small>
                 </div>
@@ -1143,7 +1151,7 @@ function PlanningScriptHelpModal({ onClose }: { onClose: () => void }) {
               <li>Usa `PB`, `P1`, `P2`, `S1` o numeros para plantas.</li>
               <li>Usa `at: [x, y]` y `size: [w, h]`; el lienzo es de 100 x 70 unidades.</li>
               <li>Usa listas con guion dentro de `generics` o dentro de cada planta en `levels`.</li>
-              <li>Alias utiles: `hall`, `waiting`, `boxes`, `triage`, `icu`, `ward`, `public`, `clinical`, `logistics`, `core`, `stair`.</li>
+              <li>Alias útiles: `hall`, `waiting`, `boxes`, `triage`, `icu`, `ward`, `public`, `clinical`, `logistics`, `core`, `stair`.</li>
             </ul>
           </section>
         </div>
@@ -1167,7 +1175,7 @@ function AccessAlerts({ plan, selectedFloor }: { plan: HospitalPlan; selectedFlo
             {disconnectedBlocks.slice(0, 4).map((room) => (
               <article key={`block-${room.id}`} className="rule-item fail">
                 <strong>{room.name}</strong>
-                <span>{floorLabel(room.floor)} sin puerta fisica a pasillo.</span>
+                <span>{floorLabel(room.floor)} sin puerta física a pasillo.</span>
               </article>
             ))}
             {disconnectedCirculation.slice(0, 4).map((room) => (
@@ -1186,7 +1194,7 @@ function AccessAlerts({ plan, selectedFloor }: { plan: HospitalPlan; selectedFlo
         ) : (
           <article className="rule-item ok">
             <strong>Red accesible</strong>
-            <span>Todos los bloques operativos y elementos de circulacion estan conectados.</span>
+            <span>Todos los bloques operativos y elementos de circulación están conectados.</span>
           </article>
         )}
       </div>
@@ -1227,7 +1235,7 @@ function ClinicalCasesModal({
       <section className="script-modal" role="dialog" aria-modal="true" aria-labelledby="clinical-cases-modal-title">
         <header className="script-modal-header">
           <div>
-            <h2 id="clinical-cases-modal-title">{editingSingleCase ? 'Programar caso clinico' : 'Programar casos clinicos'}</h2>
+            <h2 id="clinical-cases-modal-title">{editingSingleCase ? 'Programar caso clínico' : 'Programar casos clínicos'}</h2>
             <p>{editingSingleCase ? `${fileName} · recorrido editable` : fileName}</p>
           </div>
           <div className="script-modal-actions">
@@ -1255,7 +1263,7 @@ function ClinicalCasesModal({
         </div>
 
         <textarea
-          aria-label="Plantilla de casos clinicos"
+          aria-label="Plantilla de casos clínicos"
           wrap="off"
           spellCheck={false}
           value={source}
@@ -1266,7 +1274,7 @@ function ClinicalCasesModal({
           {result?.diagnostics.length ? (
             result.diagnostics.map((diagnostic) => (
               <p key={`${diagnostic.line}-${diagnostic.message}`} className={diagnostic.level}>
-                Linea {diagnostic.line}: {diagnostic.message}
+                Línea {diagnostic.line}: {diagnostic.message}
               </p>
             ))
           ) : (
@@ -1294,8 +1302,8 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
         <header className="script-info-header">
           <div>
             <span>Manual YAML</span>
-            <h2 id="clinical-cases-info-title">Casos para la simulacion</h2>
-            <p>Define perfiles clinicos, su peso de llegada y la secuencia de nodos hospitalarios que recorren los pacientes.</p>
+            <h2 id="clinical-cases-info-title">Casos para la simulación</h2>
+            <p>Define perfiles clínicos, su peso de llegada y la secuencia de nodos hospitalarios que recorren los pacientes.</p>
           </div>
           <button type="button" onClick={onClose}>Cerrar</button>
         </header>
@@ -1330,7 +1338,7 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
           <section className="script-info-card">
             <h3>Campos</h3>
             <ul>
-              <li><strong>`id`</strong> debe ser unico y no puede ser `all`.</li>
+              <li><strong>`id`</strong> debe ser único y no puede ser `all`.</li>
               <li><strong>`stream`</strong>: `ed_ambulance`, `ed_walkin`, `outpatient` o `elective`.</li>
               <li><strong>`severity`</strong>: `low`, `medium`, `high` o `critical`.</li>
               <li><strong>`weight`</strong> aumenta o reduce la frecuencia relativa del caso.</li>
