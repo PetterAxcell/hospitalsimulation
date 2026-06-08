@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Metric } from '../../components/ui/Metric'
 import { Modal } from '../../components/ui/Modal'
 import type { ClinicalCaseDiagnostic } from '../../engine/clinicalCases'
 import type { PatientCaseFilter, SimulationAgentLayer, SimulationResult } from '../../types'
@@ -39,12 +38,8 @@ export function SimulationCaseSelector({
     .filter((stat) => stat.attempted > 0)
     .sort((a, b) => b.completed - a.completed)
   const staffStats = result?.staffStats ?? []
-  const staffOnShift = result?.kpis.staffOnShift ?? staffStats.reduce((sum, stat) => sum + stat.count, 0)
-  const staffInMotion = result?.kpis.staffInMotion ?? staffStats.reduce((sum, stat) => sum + stat.moving, 0)
-  const completedCases = result?.kpis.completed ?? 0
-  const blockedPatients = result?.kpis.blockedPatients ?? caseStats.reduce((sum, stat) => sum + stat.blocked, 0)
   const selectedCaseStat = selectedCaseId === 'all' ? null : caseStats.find((stat) => stat.id === selectedCaseId) ?? null
-  const visibleScope = describeVisibleScope(agentLayer, selectedCaseStat, completedCases, staffOnShift, caseStats.length)
+  const visibleScope = describeVisibleScope(agentLayer, selectedCaseStat)
 
   function selectLayer(layer: SimulationAgentLayer) {
     onChangeAgentLayer(layer)
@@ -68,12 +63,6 @@ export function SimulationCaseSelector({
         </div>
       </div>
 
-      <div className="simulation-quick-stats" aria-label="Resumen de simulación">
-        <Metric label="Pacientes" value={String(completedCases)} />
-        <Metric label="Personal" value={String(staffOnShift)} />
-        <Metric label="Bloqueos" value={String(blockedPatients)} />
-      </div>
-
       <div className="simulation-context-list">
         <button
           type="button"
@@ -84,8 +73,7 @@ export function SimulationCaseSelector({
           }}
         >
           <span>Recorridos clínicos</span>
-          <strong>{caseStats.length}</strong>
-          <small>{completedCases} pacientes · abrir filtros y YAML.</small>
+          <small>Filtrar pacientes y editar YAML por caso.</small>
         </button>
         <button
           type="button"
@@ -96,8 +84,7 @@ export function SimulationCaseSelector({
           }}
         >
           <span>Roles de personal</span>
-          <strong>{staffStats.length}</strong>
-          <small>{staffOnShift} profesionales · {staffInMotion} con ruta.</small>
+          <small>Ver turnos, rutas y dotación simulada.</small>
         </button>
       </div>
 
@@ -215,41 +202,38 @@ export function SimulationCaseSelector({
 function describeVisibleScope(
   agentLayer: SimulationAgentLayer,
   selectedCaseStat: SimulationResult['caseStats'][number] | null,
-  completedCases: number,
-  staffOnShift: number,
-  activeCaseCount: number,
 ) {
   if (agentLayer === 'staff') {
     return {
       title: 'Solo personal',
-      detail: `${staffOnShift} profesionales visibles en el replay.`,
+      detail: 'Se ocultan pacientes para revisar dotación, turnos y rutas.',
     }
   }
 
   if (selectedCaseStat && agentLayer === 'patients') {
     return {
       title: selectedCaseStat.label,
-      detail: `${selectedCaseStat.completed} pacientes de este recorrido visibles.`,
+      detail: 'Se muestra solo este recorrido clínico.',
     }
   }
 
   if (selectedCaseStat) {
     return {
       title: `${selectedCaseStat.label} + personal`,
-      detail: `${selectedCaseStat.completed} pacientes del caso y ${staffOnShift} profesionales.`,
+      detail: 'Caso clínico filtrado con personal visible.',
     }
   }
 
   if (agentLayer === 'patients') {
     return {
       title: 'Todos los pacientes',
-      detail: `${completedCases} pacientes repartidos en ${activeCaseCount} recorridos clínicos.`,
+      detail: 'Se oculta el personal para revisar los recorridos clínicos.',
     }
   }
 
   return {
     title: 'Pacientes + personal',
-    detail: `${completedCases} pacientes y ${staffOnShift} profesionales visibles.`,
+    detail: 'Vista completa del replay con casos clínicos y dotación.',
   }
 }
 

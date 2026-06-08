@@ -20,6 +20,8 @@ export function SimulationControlsPanel({ settings, result, rules, onChange }: S
   const failingRules = rules.filter((rule) => rule.status !== 'ok')
   const warnCount = rules.filter((rule) => rule.status === 'warn').length
   const failCount = rules.filter((rule) => rule.status === 'fail').length
+  const activeCaseCount = result?.caseStats.filter((stat) => stat.attempted > 0).length ?? 0
+  const staffRoleCount = result?.staffStats.length ?? 0
 
   return (
     <>
@@ -43,8 +45,10 @@ export function SimulationControlsPanel({ settings, result, rules, onChange }: S
         </div>
         <div className="simulation-kpi-grid">
           <Metric label="Pacientes" value={String(result?.kpis.completed ?? 0)} />
-          <Metric label="ED P90" value={`${result?.kpis.edP90Minutes ?? 0} min`} />
-          <Metric label="Bloqueados" value={String(result?.kpis.blockedPatients ?? 0)} />
+          <Metric label="Personal" value={String(result?.kpis.staffOnShift ?? 0)} />
+          <Metric label="Recorridos" value={String(activeCaseCount)} />
+          <Metric label="Roles" value={String(staffRoleCount)} />
+          <Metric label="Bloqueos" value={String(result?.kpis.blockedPatients ?? 0)} />
           <Metric label="Avisos" value={String(warnCount + failCount)} />
         </div>
       </section>

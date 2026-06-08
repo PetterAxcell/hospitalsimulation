@@ -1764,39 +1764,6 @@ th {
   line-height: 1.35;
 }
 
-.simulation-quick-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.simulation-quick-stats .metric {
-  display: flex;
-  min-width: 0;
-  min-height: 50px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 7px;
-  border-top-width: 0;
-}
-
-.simulation-quick-stats .metric:first-child {
-  grid-column: 1 / -1;
-}
-
-.simulation-quick-stats .metric span {
-  min-width: max-content;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.simulation-quick-stats .metric strong {
-  margin-top: 0;
-  font-size: 17px;
-}
-
 .simulation-context-list {
   display: grid;
   gap: 8px;
@@ -1833,12 +1800,6 @@ th {
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.simulation-context-card strong {
-  color: var(--clinic-blue);
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
 }
 
 .simulation-context-card small {
