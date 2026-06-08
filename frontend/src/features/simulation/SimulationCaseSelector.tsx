@@ -34,25 +34,20 @@ export function SimulationCaseSelector({
   onSelectCase,
   onChangeAgentLayer,
 }: SimulationCaseSelectorProps) {
-  const [activePanel, setActivePanel] = useState<SimulationPanelTab>('cases')
   const [openModal, setOpenModal] = useState<SimulationSelectorModal>(null)
   const caseStats = (result?.caseStats ?? [])
     .filter((stat) => stat.attempted > 0)
     .sort((a, b) => b.completed - a.completed)
   const staffStats = result?.staffStats ?? []
   const staffOnShift = result?.kpis.staffOnShift ?? staffStats.reduce((sum, stat) => sum + stat.count, 0)
+  const staffInMotion = result?.kpis.staffInMotion ?? staffStats.reduce((sum, stat) => sum + stat.moving, 0)
   const completedCases = result?.kpis.completed ?? 0
-
-  function selectPanel(panel: SimulationPanelTab) {
-    setActivePanel(panel)
-    if (panel === 'cases' && agentLayer === 'staff') onChangeAgentLayer('patients')
-    if (panel === 'staff' && agentLayer !== 'staff') onChangeAgentLayer('staff')
-  }
+  const blockedPatients = result?.kpis.blockedPatients ?? caseStats.reduce((sum, stat) => sum + stat.blocked, 0)
+  const selectedCaseStat = selectedCaseId === 'all' ? null : caseStats.find((stat) => stat.id === selectedCaseId) ?? null
+  const visibleScope = describeVisibleScope(agentLayer, selectedCaseStat, completedCases, staffOnShift, caseStats.length)
 
   function selectLayer(layer: SimulationAgentLayer) {
     onChangeAgentLayer(layer)
-    if (layer === 'patients') setActivePanel('cases')
-    if (layer === 'staff') setActivePanel('staff')
   }
 
   return (
@@ -62,53 +57,68 @@ export function SimulationCaseSelector({
         <p className="case-yaml-file">{fileName}</p>
       </div>
 
-      <div className="simulation-hub-summary">
-        <Metric label="Casos" value={String(caseStats.length)} />
-        <Metric label="Personal" value={String(staffOnShift)} />
+      <div className="simulation-scope-card">
+        <span>Vista activa</span>
+        <strong>{visibleScope.title}</strong>
+        <small>{visibleScope.detail}</small>
+        <div className="agent-layer-grid" aria-label="Capa visible de simulación">
+          <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => selectLayer('all')}>Todo</button>
+          <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => selectLayer('patients')}>Pacientes</button>
+          <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => selectLayer('staff')}>Personal</button>
+        </div>
       </div>
 
-      <div className="compact-aside-list">
+      <div className="simulation-quick-stats" aria-label="Resumen de simulación">
+        <Metric label="Pacientes" value={String(completedCases)} />
+        <Metric label="Personal" value={String(staffOnShift)} />
+        <Metric label="Bloqueos" value={String(blockedPatients)} />
+      </div>
+
+      <div className="simulation-context-list">
         <button
           type="button"
-          className={`aside-summary-card ${activePanel === 'cases' ? 'is-active' : ''}`}
+          className={`simulation-context-card ${agentLayer === 'patients' ? 'is-active' : ''}`}
           onClick={() => {
-            selectPanel('cases')
+            onChangeAgentLayer('patients')
             setOpenModal('cases')
           }}
         >
-          <span>Casos clínicos</span>
-          <strong>{completedCases}</strong>
-          <small>{caseStats.length} recorridos activos</small>
+          <span>Recorridos clínicos</span>
+          <strong>{caseStats.length}</strong>
+          <small>{completedCases} pacientes · abrir filtros y YAML.</small>
         </button>
         <button
           type="button"
-          className={`aside-summary-card ${activePanel === 'staff' ? 'is-active' : ''}`}
+          className={`simulation-context-card ${agentLayer === 'staff' ? 'is-active' : ''}`}
           onClick={() => {
-            selectPanel('staff')
+            onChangeAgentLayer('staff')
             setOpenModal('staff')
           }}
         >
-          <span>Personal</span>
-          <strong>{staffOnShift}</strong>
-          <small>{staffStats.filter((stat) => stat.moving > 0).length} roles con ruta</small>
+          <span>Roles de personal</span>
+          <strong>{staffStats.length}</strong>
+          <small>{staffOnShift} profesionales · {staffInMotion} con ruta.</small>
         </button>
       </div>
 
-      <div className="case-yaml-actions" aria-label="Herramientas de casos clínicos">
-        <ToolIconButton icon="edit" label="Editar YAML" onClick={onEditCases} />
-        <label className="file-action icon-action" aria-label="Subir YAML" title="Subir YAML">
-          <ToolIcon icon="upload" />
-          <span className="visually-hidden">Subir YAML</span>
-          <input
-            type="file"
-            accept=".yaml"
-            onChange={(event) => {
-              onUploadCases(event.target.files?.[0])
-              event.currentTarget.value = ''
-            }}
-          />
-        </label>
-        <ToolIconButton icon="reset" label="Restaurar casos" onClick={onResetCases} />
+      <div className="simulation-yaml-panel">
+        <span>Plantilla de casos</span>
+        <div className="case-yaml-actions" aria-label="Herramientas de casos clínicos">
+          <ToolIconButton icon="edit" label="Editar YAML" onClick={onEditCases} />
+          <label className="file-action icon-action" aria-label="Subir YAML" title="Subir YAML">
+            <ToolIcon icon="upload" />
+            <span className="visually-hidden">Subir YAML</span>
+            <input
+              type="file"
+              accept=".yaml"
+              onChange={(event) => {
+                onUploadCases(event.target.files?.[0])
+                event.currentTarget.value = ''
+              }}
+            />
+          </label>
+          <ToolIconButton icon="reset" label="Restaurar casos" onClick={onResetCases} />
+        </div>
       </div>
 
       {diagnostics.length > 0 && (
@@ -118,12 +128,6 @@ export function SimulationCaseSelector({
           ))}
         </div>
       )}
-
-      <div className="agent-layer-grid" aria-label="Capa visible de simulación">
-        <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => selectLayer('all')}>Todo</button>
-        <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => selectLayer('patients')}>Casos</button>
-        <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => selectLayer('staff')}>Personal</button>
-      </div>
 
       {openModal === 'cases' && (
         <Modal
@@ -206,6 +210,47 @@ export function SimulationCaseSelector({
       )}
     </section>
   )
+}
+
+function describeVisibleScope(
+  agentLayer: SimulationAgentLayer,
+  selectedCaseStat: SimulationResult['caseStats'][number] | null,
+  completedCases: number,
+  staffOnShift: number,
+  activeCaseCount: number,
+) {
+  if (agentLayer === 'staff') {
+    return {
+      title: 'Solo personal',
+      detail: `${staffOnShift} profesionales visibles en el replay.`,
+    }
+  }
+
+  if (selectedCaseStat && agentLayer === 'patients') {
+    return {
+      title: selectedCaseStat.label,
+      detail: `${selectedCaseStat.completed} pacientes de este recorrido visibles.`,
+    }
+  }
+
+  if (selectedCaseStat) {
+    return {
+      title: `${selectedCaseStat.label} + personal`,
+      detail: `${selectedCaseStat.completed} pacientes del caso y ${staffOnShift} profesionales.`,
+    }
+  }
+
+  if (agentLayer === 'patients') {
+    return {
+      title: 'Todos los pacientes',
+      detail: `${completedCases} pacientes repartidos en ${activeCaseCount} recorridos clínicos.`,
+    }
+  }
+
+  return {
+    title: 'Pacientes + personal',
+    detail: `${completedCases} pacientes y ${staffOnShift} profesionales visibles.`,
+  }
 }
 
 function ToolIconButton({

@@ -1727,6 +1727,127 @@ th {
   font-size: 15px;
 }
 
+.simulation-scope-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--clinic-border);
+  border-left: 4px solid var(--clinic-green-1);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, var(--clinic-surface), var(--clinic-green-wash));
+}
+
+.simulation-scope-card > span,
+.simulation-yaml-panel > span {
+  color: var(--clinic-blue);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.simulation-scope-card > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--clinic-text);
+  font-size: 15px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-scope-card > small {
+  color: var(--clinic-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.simulation-quick-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.simulation-quick-stats .metric {
+  min-height: 50px;
+  padding: 8px 7px;
+  border-top-width: 0;
+}
+
+.simulation-quick-stats .metric span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-quick-stats .metric strong {
+  margin-top: 4px;
+  font-size: 17px;
+}
+
+.simulation-context-list {
+  display: grid;
+  gap: 8px;
+}
+
+.simulation-context-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--clinic-border);
+  border-left: 4px solid var(--clinic-cyan-1);
+  border-radius: 8px;
+  background: var(--clinic-surface);
+  color: var(--clinic-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.simulation-context-card:hover,
+.simulation-context-card.is-active {
+  border-color: var(--clinic-green-1);
+  border-left-color: var(--clinic-green-1);
+  background: var(--clinic-info-bg);
+}
+
+.simulation-context-card span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--clinic-blue);
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-context-card strong {
+  color: var(--clinic-blue);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.simulation-context-card small {
+  grid-column: 1 / -1;
+  color: var(--clinic-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.simulation-yaml-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--clinic-border);
+  border-radius: 8px;
+  background: var(--clinic-surface-tint);
+}
+
 .compact-aside-section,
 .simulation-hub {
   gap: 10px;
