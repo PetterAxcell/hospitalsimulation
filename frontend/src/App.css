@@ -1757,13 +1757,6 @@ th {
   white-space: nowrap;
 }
 
-.simulation-scope-card > small {
-  color: var(--clinic-muted);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
 .simulation-context-list {
   display: grid;
   gap: 8px;
@@ -1772,10 +1765,10 @@ th {
 .simulation-context-card {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 3px 10px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  padding: 10px;
+  min-height: 42px;
+  padding: 9px 10px;
   border: 1px solid var(--clinic-border);
   border-left: 4px solid var(--clinic-cyan-1);
   border-radius: 8px;
@@ -1800,14 +1793,6 @@ th {
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.simulation-context-card small {
-  grid-column: 1 / -1;
-  color: var(--clinic-muted);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.35;
 }
 
 .simulation-yaml-panel {
@@ -2015,14 +2000,6 @@ th {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.case-yaml-file {
-  margin: 0;
-  color: var(--clinic-muted);
-  font-size: 11px;
-  font-weight: 800;
-  overflow-wrap: anywhere;
 }
 
 .case-yaml-diagnostics {

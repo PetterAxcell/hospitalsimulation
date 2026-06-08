@@ -10,7 +10,6 @@ interface SimulationCaseSelectorProps {
   result: SimulationResult | null
   selectedCaseId: PatientCaseFilter
   agentLayer: SimulationAgentLayer
-  fileName: string
   diagnostics: ClinicalCaseDiagnostic[]
   onEditCases: () => void
   onEditCase: (caseId: PatientCaseFilter) => void
@@ -24,7 +23,6 @@ export function SimulationCaseSelector({
   result,
   selectedCaseId,
   agentLayer,
-  fileName,
   diagnostics,
   onEditCases,
   onEditCase,
@@ -49,13 +47,11 @@ export function SimulationCaseSelector({
     <section className="panel-section simulation-hub">
       <div className="simulation-hub-header">
         <h2>Simulación</h2>
-        <p className="case-yaml-file">{fileName}</p>
       </div>
 
       <div className="simulation-scope-card">
         <span>Vista activa</span>
-        <strong>{visibleScope.title}</strong>
-        <small>{visibleScope.detail}</small>
+        <strong>{visibleScope}</strong>
         <div className="agent-layer-grid" aria-label="Capa visible de simulación">
           <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => selectLayer('all')}>Todo</button>
           <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => selectLayer('patients')}>Casos</button>
@@ -73,7 +69,6 @@ export function SimulationCaseSelector({
           }}
         >
           <span>Recorridos clínicos</span>
-          <small>Filtrar pacientes y editar YAML por caso.</small>
         </button>
         <button
           type="button"
@@ -84,7 +79,6 @@ export function SimulationCaseSelector({
           }}
         >
           <span>Roles de personal</span>
-          <small>Ver turnos, rutas y dotación simulada.</small>
         </button>
       </div>
 
@@ -204,37 +198,22 @@ function describeVisibleScope(
   selectedCaseStat: SimulationResult['caseStats'][number] | null,
 ) {
   if (agentLayer === 'staff') {
-    return {
-      title: 'Solo personal',
-      detail: 'Se ocultan pacientes para revisar dotación, turnos y rutas.',
-    }
+    return 'Solo personal'
   }
 
   if (selectedCaseStat && agentLayer === 'patients') {
-    return {
-      title: selectedCaseStat.label,
-      detail: 'Se muestra solo este recorrido clínico.',
-    }
+    return selectedCaseStat.label
   }
 
   if (selectedCaseStat) {
-    return {
-      title: `${selectedCaseStat.label} + personal`,
-      detail: 'Caso clínico filtrado con personal visible.',
-    }
+    return `${selectedCaseStat.label} + personal`
   }
 
   if (agentLayer === 'patients') {
-    return {
-      title: 'Todos los pacientes',
-      detail: 'Se oculta el personal para revisar los recorridos clínicos.',
-    }
+    return 'Todos los pacientes'
   }
 
-  return {
-    title: 'Pacientes + personal',
-    detail: 'Vista completa del replay con casos clínicos y dotación.',
-  }
+  return 'Pacientes + personal'
 }
 
 function ToolIconButton({

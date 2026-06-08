@@ -481,7 +481,6 @@ function App() {
         result={simulationResult}
         selectedCaseId={selectedCaseId}
         agentLayer={simulationAgentLayer}
-        fileName={clinicalCaseFileName}
         diagnostics={clinicalCaseResult?.diagnostics ?? []}
         onEditCases={openClinicalCaseLibrary}
         onEditCase={openClinicalCaseEditor}
