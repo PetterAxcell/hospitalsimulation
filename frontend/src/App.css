@@ -156,7 +156,7 @@
 }
 
 .workbench.is-simulation-workspace {
-  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(246px, 284px);
+  grid-template-columns: minmax(240px, 270px) minmax(0, 1fr) minmax(246px, 284px);
 }
 
 .workbench.is-simulation-workspace.without-left-panel.has-right-panel {
@@ -164,7 +164,7 @@
 }
 
 .workbench.is-simulation-workspace.has-left-panel.without-right-panel {
-  grid-template-columns: minmax(210px, 240px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 270px) minmax(0, 1fr);
 }
 
 .workbench.without-left-panel.has-right-panel {
@@ -1766,24 +1766,34 @@ th {
 
 .simulation-quick-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
 .simulation-quick-stats .metric {
+  display: flex;
+  min-width: 0;
   min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 7px;
   border-top-width: 0;
 }
 
+.simulation-quick-stats .metric:first-child {
+  grid-column: 1 / -1;
+}
+
 .simulation-quick-stats .metric span {
+  min-width: max-content;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .simulation-quick-stats .metric strong {
-  margin-top: 4px;
+  margin-top: 0;
   font-size: 17px;
 }
 
@@ -1991,13 +2001,18 @@ th {
 
 .agent-layer-grid button {
   min-height: 34px;
+  min-width: 0;
+  padding: 0 4px;
   border: 1px solid var(--clinic-border-strong);
   border-radius: 6px;
   background: var(--clinic-surface);
   color: var(--clinic-text-soft);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-layer-grid button.is-active {
@@ -2336,6 +2351,19 @@ th {
 
   .workbench.has-left-panel.without-right-panel {
     grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .workbench.is-simulation-workspace {
+    grid-template-columns: minmax(230px, 250px) minmax(0, 1fr);
+  }
+
+  .workbench.is-simulation-workspace.without-left-panel.has-right-panel,
+  .workbench.is-simulation-workspace.without-left-panel.without-right-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workbench.is-simulation-workspace.has-left-panel.without-right-panel {
+    grid-template-columns: minmax(230px, 250px) minmax(0, 1fr);
   }
 
   .right-panel {

@@ -63,8 +63,8 @@ export function SimulationCaseSelector({
         <small>{visibleScope.detail}</small>
         <div className="agent-layer-grid" aria-label="Capa visible de simulación">
           <button type="button" className={agentLayer === 'all' ? 'is-active' : ''} onClick={() => selectLayer('all')}>Todo</button>
-          <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => selectLayer('patients')}>Pacientes</button>
-          <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => selectLayer('staff')}>Personal</button>
+          <button type="button" className={agentLayer === 'patients' ? 'is-active' : ''} onClick={() => selectLayer('patients')}>Casos</button>
+          <button type="button" className={agentLayer === 'staff' ? 'is-active' : ''} onClick={() => selectLayer('staff')}>Pers.</button>
         </div>
       </div>
 
