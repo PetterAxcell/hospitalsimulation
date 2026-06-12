@@ -6,6 +6,7 @@ import { WorkspaceTabs, type WorkspaceTab } from './components/WorkspaceTabs'
 import { Metric } from './components/ui/Metric'
 import { Modal } from './components/ui/Modal'
 import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
+import { CLINIC_SPACE_PROGRAM, clinicSpaceProgramById, componentsForSpaceProgramEntry } from './data/clinicSpaceProgram'
 import { createHospitalClinicCampusPlan } from './data/presets'
 import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
@@ -63,7 +64,7 @@ function App() {
   const [selectedFloor, setSelectedFloor] = useState(0)
   const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(plan.rooms[0]?.id)
   const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
-  const [templateToAdd, setTemplateToAdd] = useState('edBoxes')
+  const [elementToAdd, setElementToAdd] = useState('template:edBoxes')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
   const [patientCases, setPatientCases] = useState<PatientCaseDefinition[]>(DEFAULT_PATIENT_CASES)
   const [clinicalCaseLibrarySource, setClinicalCaseLibrarySource] = useState(DEFAULT_CLINICAL_CASES_YAML)
@@ -113,7 +114,11 @@ function App() {
   }
 
   function addRoom() {
-    addRoomFromTemplate(templateToAdd)
+    if (elementToAdd.startsWith('program:')) {
+      addRoomFromSpaceProgram(elementToAdd.replace('program:', ''))
+      return
+    }
+    addRoomFromTemplate(elementToAdd.replace('template:', ''))
   }
 
   function addRoomFromTemplate(templateId: string) {
@@ -144,6 +149,44 @@ function App() {
       const roomWithDoor = clampRoom({ ...nextRoom, doors: door ? [door] : [] })
       const rooms = [...current.rooms, roomWithDoor]
       return { ...current, rooms }
+    })
+    setSelectedRoomId(nextRoom.id)
+  }
+
+  function addRoomFromSpaceProgram(entryId: string) {
+    const entry = clinicSpaceProgramById(entryId)
+    if (!entry) return
+    const template = templateById(entry.templateIds[0] ?? 'ward')
+    const nextId = `program-${entry.id}-${Date.now()}`
+    const targetArea = entry.usefulAreaSqm ? Math.round(entry.usefulAreaSqm * entry.grossingFactor) : template.defaultAreaSqm
+    const dimensions = dimensionsForTargetArea(targetArea, template.kind)
+    const nextRoom: PlacedRoom = {
+      id: nextId,
+      templateId: template.id,
+      name: entry.label,
+      kind: template.kind,
+      floor: selectedFloor,
+      x: 8,
+      y: 8,
+      w: dimensions.w,
+      h: dimensions.h,
+      capacity: entry.expectedCapacity ?? template.defaultCapacity,
+      areaSqm: areaSqmForDimensions(dimensions.w, dimensions.h),
+      equipment: template.equipment,
+      staffModel: template.staffModel,
+      simulationNode: template.simulationNode,
+      verticalGroupId: template.kind === 'vertical' ? `${template.id}-${selectedFloor}` : undefined,
+      servesFloors: template.kind === 'vertical' ? [selectedFloor] : undefined,
+      spaceProgramEntryId: entry.id,
+      components: componentsForSpaceProgramEntry(entry).map((component) => ({
+        ...component,
+        id: `${nextId}-${component.id}`,
+      })),
+    }
+    setPlan((current) => {
+      const door = defaultDoorForRoom(nextRoom, current.rooms)
+      const roomWithDoor = clampRoom({ ...nextRoom, doors: door ? [door] : [] })
+      return { ...current, rooms: [...current.rooms, roomWithDoor] }
     })
     setSelectedRoomId(nextRoom.id)
   }
@@ -182,6 +225,7 @@ function App() {
       x: selectedRoom.x + 4,
       y: selectedRoom.y + 4,
       doors: selectedRoom.doors?.map((door, index) => ({ ...door, id: `${copyId}-door-${index + 1}` })) ?? [],
+      components: selectedRoom.components?.map((component, index) => ({ ...component, id: `${copyId}-component-${index + 1}` })),
       locked: false,
     })
     setPlan((current) => ({ ...current, rooms: [...current.rooms, copy] }))
@@ -433,12 +477,21 @@ function App() {
         <h2>Construir</h2>
         <label>
           Elemento
-          <select value={templateToAdd} onChange={(event) => setTemplateToAdd(event.target.value)}>
-            {ROOM_TEMPLATES.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.shortName} · {KIND_LABELS[template.kind]}
-              </option>
-            ))}
+          <select value={elementToAdd} onChange={(event) => setElementToAdd(event.target.value)}>
+            <optgroup label="Catálogo base">
+              {ROOM_TEMPLATES.map((template) => (
+                <option key={template.id} value={`template:${template.id}`}>
+                  {template.shortName} · {KIND_LABELS[template.kind]}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Pla d'Espais Nou Clínic">
+              {CLINIC_SPACE_PROGRAM.map((entry) => (
+                <option key={entry.id} value={`program:${entry.id}`}>
+                  PDF p.{entry.sourcePages.join('/')} · {entry.label}
+                </option>
+              ))}
+            </optgroup>
           </select>
         </label>
         <button type="button" className="primary-action" onClick={addRoom}>Añadir a planta {floorLabel(selectedFloor)}</button>
@@ -1418,6 +1471,31 @@ function serviceRowsForPlan(plan: HospitalPlan): ServiceRow[] {
   )
     .map(([label, value]) => ({ label, ...value }))
     .sort((a, b) => b.area - a.area)
+}
+
+function dimensionsForTargetArea(areaSqm: number, kind: PlacedRoom['kind']): { w: number; h: number } {
+  const worldArea = Math.max(36, areaSqm / 9)
+  const aspect = kind === 'public' || kind === 'waiting'
+    ? 1.6
+    : kind === 'surgery' || kind === 'critical'
+      ? 1.25
+      : kind === 'logistics' || kind === 'technical'
+        ? 1.45
+        : 1.35
+  let w = Math.sqrt(worldArea * aspect)
+  let h = worldArea / w
+  if (w > 42) {
+    w = 42
+    h = worldArea / w
+  }
+  if (h > 26) {
+    h = 26
+    w = worldArea / h
+  }
+  return {
+    w: Math.max(8, Math.min(42, Math.round(w * 10) / 10)),
+    h: Math.max(7, Math.min(26, Math.round(h * 10) / 10)),
+  }
 }
 
 function connectRoomToNearestCorridor(rooms: PlacedRoom[], target: PlacedRoom): PlacedRoom[] | undefined {

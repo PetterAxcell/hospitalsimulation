@@ -1,4 +1,4 @@
-import type { RoomKind } from '../types'
+import type { RoomComponent, RoomKind } from '../types'
 
 export type ClinicProgramScope = 'module_type' | 'area_shared' | 'campus_area' | 'configuration'
 
@@ -16,6 +16,7 @@ export interface ClinicSpaceProgramEntry {
   templateIds: string[]
   keywords: string[]
   requirements: string[]
+  components?: RoomComponent[]
   notes: string
 }
 
@@ -45,6 +46,19 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       '24 habitaciones por modulo.',
       '4 dobles, 18 individuales y 2 individuales con aislamiento.',
       'Control de enfermeria, limpio/sucio, carros/AGV, residuos y locales tecnicos.',
+    ],
+    components: [
+      component('habitacion-doble', 'Habitacion estandar doble', 4, 28, 'habitaciones'),
+      component('habitacion-individual', 'Habitacion estandar individual', 18, 20, 'habitaciones'),
+      component('habitacion-aislamiento', 'Habitacion individual de aislamiento', 2, 20, 'aislamiento'),
+      component('avantsala', 'Avantsala / resclosa', 2, 6, 'aislamiento'),
+      component('sala-estar-pacientes', 'Sala de estar para pacientes', 1, 40, 'pacientes'),
+      component('control-enfermeria', 'Control de enfermeria', 1, 20, 'clinico'),
+      component('zona-limpia', 'Zona limpia', 1, 10, 'logistica limpia'),
+      component('zona-bruta', 'Zona bruta', 1, 8, 'logistica sucia'),
+      component('carros-agv', 'Zona de carros / AGV', 1, 8, 'logistica'),
+      component('magatzem-general', 'Almacen general', 1, 30, 'almacen'),
+      component('local-tecnico', 'Locales tecnicos de control y climatizacion', 4, 17.5, 'tecnico'),
     ],
     notes: 'La tabla es un modulo repetible, no el total de hospitalizacion del campus.',
   },
@@ -85,6 +99,18 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Posibilidad de aislamiento con resclusa.',
       'Control de enfermeria, EPIs, POCT, limpio/sucio y soporte tecnico.',
     ],
+    components: [
+      component('box-criticos', 'Box de criticos', 10, 18, 'box'),
+      component('box-criticos-complejo', 'Box de criticos complejos', 2, 25, 'box complejo'),
+      component('avantsala', 'Avantsala / resclosa', 2, 6, 'aislamiento'),
+      component('rentamans-epis', 'Puntos rentamanos y EPIs', 2, 3, 'seguridad clinica'),
+      component('control-enfermeria', 'Control de enfermeria', 1, 25, 'clinico'),
+      component('zona-limpia', 'Zona limpia', 1, 10, 'logistica limpia'),
+      component('zona-bruta', 'Zona bruta', 1, 8, 'logistica sucia'),
+      component('bany-assistit', 'Bano asistido', 1, 18, 'soporte paciente'),
+      component('poct', 'Laboratorio POCT', 1, 6, 'diagnostico'),
+      component('procedimientos', 'Sala procedimientos especiales', 1, 35, 'clinico'),
+    ],
     notes: 'Modulo asistencial de alta intensidad con mucho soporte invisible para simulacion.',
   },
   {
@@ -124,6 +150,18 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Consultas medicas, multiprofesionales y gabinetes de exploracion.',
       'Educacion sanitaria, reuniones, trabajo profesional y almacenes.',
     ],
+    components: [
+      component('sala-espera-general', 'Sala de espera general', 1, 100, 'publico'),
+      component('lavabos-publicos', 'Lavabos publicos', 4, 5, 'publico'),
+      component('recepcion', 'Recepcion', 1, 16, 'administrativo'),
+      component('consulta-medica', 'Consulta medica', 12, 17, 'consulta'),
+      component('consulta-sin-exploracion', 'Consulta medica sin exploracion', 2, 10, 'consulta'),
+      component('consulta-multiprofesional', 'Consulta multiprofesional', 2, 22, 'consulta'),
+      component('gabinete-gran', 'Gabinete de exploracion grande', 2, 22, 'gabinete'),
+      component('gabinete-estandar', 'Gabinete de exploracion estandar', 6, 17, 'gabinete'),
+      component('educacion-sanitaria', 'Sala de educacion sanitaria', 1, 20, 'docencia paciente'),
+      component('magatzems', 'Almacenes fungible/equipos/lenceria', 3, 20, 'almacen'),
+    ],
     notes: 'El preset actual agrupa consultas y hospital de dia; conviene separarlo.',
   },
   {
@@ -142,6 +180,18 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Area de acceso y vestibulo.',
       'Extracciones con boxes, preparacion de muestras y TAO.',
       'Farmacia ambulatoria con consultas, dispensacion y almacen automatizado.',
+    ],
+    components: [
+      component('vestibulo', 'Area de acceso y vestibulo', 1, 120, 'publico'),
+      component('informacion-recepcion', 'Informacion y recepcion', 3, 20, 'administrativo'),
+      component('zona-recogida-transporte', 'Zona recogida ambulancia/transporte sanitario', 2, 100, 'transporte sanitario'),
+      component('espera-extracciones', 'Sala de espera de extracciones', 1, 60, 'espera'),
+      component('box-extracciones', 'Box de extracciones', 12, 6, 'extracciones'),
+      component('preclasificacion-muestras', 'Preclasificacion y preparacion de muestras', 1, 18, 'muestras'),
+      component('sala-tao', 'Sala TAO', 1, 8, 'consulta'),
+      component('espera-farmacia-ambulatoria', 'Espera farmacia ambulatoria', 1, 30, 'farmacia'),
+      component('consulta-farmaceutica', 'Consulta farmaceutica presencial', 4, 17, 'farmacia'),
+      component('almacen-automatizado', 'Almacen de medicacion automatizado', 1, 120, 'farmacia robotizada'),
     ],
     notes: 'Esta pagina conecta flujo ambulatorio, laboratorio y farmacia.',
   },
@@ -163,6 +213,18 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Controles de enfermeria, salas de curas, carros/AGV y catering.',
       'Aulas, videoconferencia, bascula de silla de ruedas y soporte familiar.',
     ],
+    components: [
+      component('vestibulo', 'Area de acceso y vestibulo', 1, 40, 'publico'),
+      component('informacion-recepcion', 'Informacion y recepcion', 4, 40, 'administrativo'),
+      component('sala-espera', 'Sala de espera', 5, 80, 'espera'),
+      component('vestidor-pacientes', 'Vestidor de pacientes', 2, 10, 'pacientes'),
+      component('control-enfermeria', 'Control de enfermeria', 1, 25, 'clinico'),
+      component('puesto-butaca', 'Puesto de tratamiento en butaca', 12, 8, 'tratamiento'),
+      component('puesto-cama', 'Puesto de tratamiento en cama', 3, 10, 'tratamiento'),
+      component('sala-curas', 'Sala de curas', 1, 20, 'clinico'),
+      component('carros-agv', 'Zona de carros / AGV', 1, 8, 'logistica'),
+      component('aula-planta', 'Aula de planta', 1, 40, 'docencia'),
+    ],
     notes: 'Debe alimentar casos de oncologia, hematologia, tratamientos programados y ensayos.',
   },
   {
@@ -180,6 +242,15 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Organizacion segun Model Andorra de Triage MAT 0 a 5.',
       'Violencia sexual, custodia policial, salud mental adultos e infanto juvenil.',
       'Observacion de 12 lugares y base SEM terrestre.',
+    ],
+    components: [
+      component('mat-0-5', 'Circuito de triaje MAT 0-5', 1, undefined, 'regla simulacion'),
+      component('violencia-sexual', 'Area especifica violencia sexual', 1, undefined, 'circuito protegido'),
+      component('custodia-policial', 'Area de custodia policial', 1, undefined, 'seguridad'),
+      component('salud-mental-adultos', 'Salud mental adultos', 1, undefined, 'salud mental'),
+      component('salud-mental-ij', 'Salud mental infanto juvenil', 1, undefined, 'salud mental'),
+      component('observacion', 'Modulo observacion 12 puestos', 1, undefined, 'observacion'),
+      component('base-sem', 'Base SEM terrestre', 1, undefined, 'emergencias'),
     ],
     notes: 'La pagina no trae tabla de superficies, pero si reglas de simulacion y cartera.',
   },
@@ -199,6 +270,18 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Farmacia ambulatoria, recepcion, elaboracion, dispensacion interna y logistica.',
       'Ensayos clinicos, salas blancas, robotizacion y almacenes especiales.',
       'Control de temperatura, inflamables, estupefacientes y residuos.',
+    ],
+    components: [
+      component('farmacia-ambulatoria', 'Farmacia ambulatoria', 1, 45, 'farmacia'),
+      component('consulta-farmaceutica', 'Consultas farmaceuticas', 8, 13.5, 'consulta'),
+      component('dispensacion', 'Area de dispensacion', 1, 24, 'dispensacion'),
+      component('almacen-automatizado', 'Almacen robotizado / medicacion automatizada', 1, 120, 'robotica'),
+      component('recepcion', 'Recepcion y espera', 1, 25, 'recepcion'),
+      component('sala-blanca', 'Salas blancas de preparacion', 4, 24, 'sala blanca'),
+      component('resclusas', 'Resclusas de acceso', 7, 5, 'control ambiental'),
+      component('ensayos-clinicos', 'Area ensayos clinicos', 1, 120, 'investigacion clinica'),
+      component('logistica-farmacia', 'Recepcion, envios y cuarentena', 3, 26, 'logistica'),
+      component('almacen-especial', 'Inflamables, estupefacientes y temperatura controlada', 5, 21, 'almacen especial'),
     ],
     notes: 'La extraccion automatica de esta pagina es compleja; cifra inicial revisable con la tabla original.',
   },
@@ -220,6 +303,15 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Convencional, urgencias, hibrido y soporte perioperatorio.',
       'Separacion limpio/sucio y conexion con esterilizacion, URPA, UCI y camas.',
     ],
+    components: [
+      component('quirofano-convencional', 'Quirofano convencional', 5, 45, 'quirofano'),
+      component('quirofano-urgencias', 'Quirofano urgencias', 1, 45, 'quirofano urgente'),
+      component('quirofano-hibrido', 'Quirofano hibrido', 2, 65, 'quirofano hibrido'),
+      component('apoyo-anestesia', 'Apoyo anestesia e induccion', 1, 80, 'perioperatorio'),
+      component('limpio-sucio', 'Circuito limpio/sucio', 1, undefined, 'regla flujo'),
+      component('conexion-cssd', 'Conexion con esterilizacion', 1, undefined, 'adyacencia critica'),
+      component('conexion-urpa-uci', 'Conexion con URPA, UCI y camas', 1, undefined, 'adyacencia critica'),
+    ],
     notes: 'La tabla se ha leido como modulo de quirófanos, no como total quirurgico.',
   },
   {
@@ -239,6 +331,16 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Modulos de 12 lugares en cama o butaca.',
       'Preparacion y recuperacion, control de enfermeria, medicacion, almacenes y residuos.',
     ],
+    components: [
+      component('llit-recuperacion', 'Cama de preparacion/recuperacion', 7, 10, 'recuperacion'),
+      component('butaca-recuperacion', 'Butaca de preparacion/recuperacion', 5, 8, 'recuperacion'),
+      component('lavabos-pacientes', 'Lavabos para pacientes', 2, 5, 'pacientes'),
+      component('control-enfermeria', 'Control de enfermeria', 1, 25, 'clinico'),
+      component('zona-limpia', 'Zona limpia', 1, 10, 'logistica limpia'),
+      component('zona-bruta', 'Zona bruta', 1, 8, 'logistica sucia'),
+      component('medicacion', 'Medicacion y material', 1, 12, 'farmacia satelite'),
+      component('local-residuos', 'Local de residuos', 1, 6, 'residuos'),
+    ],
     notes: 'Debe condicionar cancelaciones quirurgicas por bloqueo de salida.',
   },
   {
@@ -257,6 +359,16 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Recepcion de material usado, lavado, preparacion, esterilizacion y almacen.',
       'Flujos limpio/sucio estrictamente separados.',
       'Conexion directa con quirofanos, criticos y hospitalizacion.',
+    ],
+    components: [
+      component('recepcion-material-usado', 'Recepcion de material usado', 1, 14, 'sucio'),
+      component('lavado-carros', 'Lavado y limpieza automatica de carros', 1, 25, 'sucio'),
+      component('lavado-instrumental', 'Lavado instrumental', 1, 90, 'sucio'),
+      component('preparacion', 'Preparacion y empaquetado', 1, 180, 'preparacion'),
+      component('esterilizadores', 'Esterilizadores', 1, 150, 'esterilizacion'),
+      component('almacen-esteril', 'Almacen material esteril', 1, 220, 'limpio'),
+      component('expedicion', 'Expedicion y distribucion', 1, 80, 'limpio'),
+      component('limpio-sucio', 'Barrera limpio/sucio', 1, undefined, 'regla flujo'),
     ],
     notes: 'Pieza clave para simulacion de supply chain quirurgica.',
   },
@@ -455,6 +567,16 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Magatzems por asistencia, docencia y recerca.',
       'Muelle de carga, picking, AGV, neumatico y control logistico.',
     ],
+    components: [
+      component('muelle-carga', 'Muelle de carga y descarga', 1, 700, 'muelle'),
+      component('magatzem-general', 'Almacen general intermedio', 1, 600, 'almacen'),
+      component('picking', 'Zona de preparacion de pedidos / picking', 1, 50, 'picking'),
+      component('agv-central', 'Central de vehiculos AGV', 1, 40, 'agv'),
+      component('tubo-neumatico', 'Centro de control transporte neumatico', 1, 15, 'muestras'),
+      component('palets-carros', 'Estacionamiento de palets y carros', 1, 20, 'logistica'),
+      component('frio', 'Almacen temporal frio', 1, 40, 'frio'),
+      component('mantenimiento-agv', 'Sala mantenimiento de equipos', 1, 40, 'mantenimiento'),
+    ],
     notes: 'Debe traducirse en flujos de carros, AGV, muestras y suministros.',
   },
   {
@@ -578,6 +700,16 @@ export const CLINIC_SPACE_PROGRAM: ClinicSpaceProgramEntry[] = [
       'Zona CAU/SAU, salas LAN/WAN, generadores, extincion y CPD Tier III.',
       'Staging lab, operacion remota, microinformatica y almacenes tecnicos.',
     ],
+    components: [
+      component('cau-sau', 'Zona CAU / SAU', 1, 120, 'soporte usuarios'),
+      component('lan-wan', 'Salas LAN / WAN', 2, 20, 'red'),
+      component('cpd-tier-iii', 'Servidores y comunicaciones CPD Tier III', 1, 250, 'cpd'),
+      component('sais-cuadros', 'SAI y cuadros electricos', 1, 12, 'continuidad'),
+      component('sala-extincion', 'Sala de extincion', 1, 12, 'seguridad'),
+      component('generador', 'Sala de generador', 2, 30, 'continuidad'),
+      component('staging-lab', 'Staging Lab / Room', 1, 30, 'laboratorio tecnico'),
+      component('microinformatica', 'Reparaciones, montaje y almacenes', 3, 40, 'microinformatica'),
+    ],
     notes: 'Debe conectarse con command center, gemelo operacional y continuidad IT/OT.',
   },
 ]
@@ -586,3 +718,30 @@ export const CLINIC_SPACE_PROGRAM_TOTAL_USEFUL_SQM = CLINIC_SPACE_PROGRAM.reduce
   (sum, entry) => sum + (entry.usefulAreaSqm ?? 0),
   0,
 )
+
+export function clinicSpaceProgramById(id: string): ClinicSpaceProgramEntry | undefined {
+  return CLINIC_SPACE_PROGRAM.find((entry) => entry.id === id)
+}
+
+export function componentsForSpaceProgramEntry(entry: ClinicSpaceProgramEntry): RoomComponent[] {
+  if (entry.components?.length) {
+    return entry.components.map((item) => ({ ...item, source: item.source ?? `PDF paginas ${entry.sourcePages.join(', ')}` }))
+  }
+  return entry.requirements.map((requirement, index) => ({
+    id: `${entry.id}-requirement-${index + 1}`,
+    name: requirement,
+    quantity: 1,
+    category: 'requisito funcional',
+    source: `PDF paginas ${entry.sourcePages.join(', ')}`,
+  }))
+}
+
+function component(
+  id: string,
+  name: string,
+  quantity: number,
+  areaSqm?: number,
+  category?: string,
+): RoomComponent {
+  return { id, name, quantity, areaSqm, category, source: CLINIC_SPACE_PROGRAM_SOURCE.id }
+}

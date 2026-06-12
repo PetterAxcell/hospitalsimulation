@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { Metric } from '../../components/ui/Metric'
+import { Modal } from '../../components/ui/Modal'
+import { clinicSpaceProgramById } from '../../data/clinicSpaceProgram'
 import {
   disconnectedPassages,
   doorConnectsToCorridor,
@@ -7,7 +10,7 @@ import {
   requiresCorridorAccess,
 } from '../../engine/circulation'
 import { clampRoom, metersToWorldUnits, worldUnitsToMeters } from '../../engine/geometry'
-import type { PlacedRoom } from '../../types'
+import type { PlacedRoom, RoomComponent } from '../../types'
 import { floorLabel, formatNumber } from '../../utils/format'
 
 interface RoomInspectorProps {
@@ -35,6 +38,9 @@ export function RoomInspector({
   onRemoveDoor,
   onAutoConnect,
 }: RoomInspectorProps) {
+  const [isComponentsOpen, setComponentsOpen] = useState(false)
+  const [componentDraft, setComponentDraft] = useState({ name: '', quantity: 1, areaSqm: 0, category: '' })
+
   if (!room) {
     return (
       <section className="panel-section">
@@ -43,9 +49,40 @@ export function RoomInspector({
       </section>
     )
   }
-  const accessRequired = requiresCorridorAccess(room)
-  const hasCorridor = hasPassageAccess(allRooms, room)
-  const isDisconnectedPassage = isPassage(room) && disconnectedPassages(allRooms).some((item) => item.id === room.id)
+  const selectedRoom = room
+  const accessRequired = requiresCorridorAccess(selectedRoom)
+  const hasCorridor = hasPassageAccess(allRooms, selectedRoom)
+  const isDisconnectedPassage = isPassage(selectedRoom) && disconnectedPassages(allRooms).some((item) => item.id === selectedRoom.id)
+  const components = componentsForRoom(selectedRoom)
+  const componentArea = components.reduce((sum, component) => sum + (component.areaSqm ?? 0) * component.quantity, 0)
+  const sourceEntry = selectedRoom.spaceProgramEntryId ? clinicSpaceProgramById(selectedRoom.spaceProgramEntryId) : undefined
+
+  function addComponent() {
+    const name = componentDraft.name.trim()
+    if (!name) return
+    const nextIndex = components.filter((component) => component.id.includes('-custom-component-')).length + 1
+    const nextComponent: RoomComponent = {
+      id: `${selectedRoom.id}-custom-component-${nextIndex}`,
+      name,
+      quantity: Math.max(1, Math.round(componentDraft.quantity || 1)),
+      areaSqm: componentDraft.areaSqm > 0 ? componentDraft.areaSqm : undefined,
+      category: componentDraft.category.trim() || 'componente manual',
+      source: 'manual',
+    }
+    onChange({ ...selectedRoom, components: [...components, nextComponent] })
+    setComponentDraft({ name: '', quantity: 1, areaSqm: 0, category: '' })
+  }
+
+  function removeComponent(componentId: string) {
+    onChange({ ...selectedRoom, components: components.filter((component) => component.id !== componentId) })
+  }
+
+  function updateComponent(componentId: string, patch: Partial<RoomComponent>) {
+    onChange({
+      ...selectedRoom,
+      components: components.map((component) => (component.id === componentId ? { ...component, ...patch } : component)),
+    })
+  }
 
   return (
     <>
@@ -103,6 +140,23 @@ export function RoomInspector({
         <div className="tag-list">
           {room.equipment.map((item) => <span key={item}>{item}</span>)}
         </div>
+      </section>
+
+      <section className="panel-section">
+        <h2>Componentes internos</h2>
+        <div className="status-metrics">
+          <Metric label="Componentes" value={String(components.length)} />
+          <Metric label="m2 utiles comp." value={componentArea > 0 ? formatNumber(componentArea) : '-'} />
+        </div>
+        {sourceEntry && <p className="muted">Origen: PDF p.{sourceEntry.sourcePages.join(', ')} · {sourceEntry.sector}</p>}
+        <div className="tag-list">
+          {components.slice(0, 6).map((component) => (
+            <span key={component.id}>{component.quantity}x {component.name}</span>
+          ))}
+        </div>
+        <button type="button" className="secondary-action" onClick={() => setComponentsOpen(true)}>
+          Ver / editar componentes
+        </button>
       </section>
 
       {room.kind === 'vertical' && (
@@ -168,8 +222,128 @@ export function RoomInspector({
         <button type="button" onClick={onDuplicate}>Duplicar</button>
         <button type="button" onClick={onRemove}>Eliminar</button>
       </div>
+
+      {isComponentsOpen && (
+        <RoomComponentsModal
+          room={room}
+          components={components}
+          componentArea={componentArea}
+          draft={componentDraft}
+          onChangeDraft={setComponentDraft}
+          onAdd={addComponent}
+          onUpdate={updateComponent}
+          onRemove={removeComponent}
+          onClose={() => setComponentsOpen(false)}
+        />
+      )}
     </>
   )
+}
+
+function RoomComponentsModal({
+  room,
+  components,
+  componentArea,
+  draft,
+  onChangeDraft,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onClose,
+}: {
+  room: PlacedRoom
+  components: RoomComponent[]
+  componentArea: number
+  draft: { name: string; quantity: number; areaSqm: number; category: string }
+  onChangeDraft: (draft: { name: string; quantity: number; areaSqm: number; category: string }) => void
+  onAdd: () => void
+  onUpdate: (componentId: string, patch: Partial<RoomComponent>) => void
+  onRemove: (componentId: string) => void
+  onClose: () => void
+}) {
+  return (
+    <Modal
+      titleId="room-components-title"
+      title="Componentes internos"
+      subtitle={`${room.name} · ${components.length} componentes · ${componentArea > 0 ? `${formatNumber(componentArea)} m2 utiles` : 'sin m2 utiles definidos'}`}
+      className="section-modal"
+      onClose={onClose}
+    >
+      <div className="room-components-modal">
+        <section className="section-modal-card">
+          <h3>Añadir componente</h3>
+          <div className="component-form-grid">
+            <label>
+              Nombre
+              <input value={draft.name} onChange={(event) => onChangeDraft({ ...draft, name: event.target.value })} placeholder="Ej. Sala de curas" />
+            </label>
+            <label>
+              Cantidad
+              <input type="number" min={1} value={draft.quantity} onChange={(event) => onChangeDraft({ ...draft, quantity: Number(event.target.value) })} />
+            </label>
+            <label>
+              m2 utiles/unidad
+              <input type="number" min={0} value={draft.areaSqm} onChange={(event) => onChangeDraft({ ...draft, areaSqm: Number(event.target.value) })} />
+            </label>
+            <label>
+              Categoría
+              <input value={draft.category} onChange={(event) => onChangeDraft({ ...draft, category: event.target.value })} placeholder="clinico, logistica..." />
+            </label>
+          </div>
+          <button type="button" className="primary-action" onClick={onAdd}>Añadir componente</button>
+        </section>
+
+        <section className="section-modal-card">
+          <h3>Desglose de la sala</h3>
+          <div className="room-component-list">
+            {components.map((component) => (
+              <article key={component.id} className="room-component-row">
+                <div className="room-component-edit-grid">
+                  <label>
+                    Componente
+                    <input value={component.name} onChange={(event) => onUpdate(component.id, { name: event.target.value })} />
+                  </label>
+                  <label>
+                    Cant.
+                    <input
+                      type="number"
+                      min={0}
+                      value={component.quantity}
+                      onChange={(event) => onUpdate(component.id, { quantity: Math.max(0, Number(event.target.value)) })}
+                    />
+                  </label>
+                  <label>
+                    m2/u
+                    <input
+                      type="number"
+                      min={0}
+                      value={component.areaSqm ?? 0}
+                      onChange={(event) => onUpdate(component.id, { areaSqm: Number(event.target.value) || undefined })}
+                    />
+                  </label>
+                  <label>
+                    Categoria
+                    <input value={component.category ?? ''} onChange={(event) => onUpdate(component.id, { category: event.target.value })} />
+                  </label>
+                </div>
+                <button type="button" onClick={() => onRemove(component.id)}>Quitar</button>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </Modal>
+  )
+}
+
+function componentsForRoom(room: PlacedRoom): RoomComponent[] {
+  if (room.components?.length) return room.components
+  return room.equipment.map((equipment, index) => ({
+    id: `${room.id}-equipment-${index + 1}`,
+    name: equipment,
+    quantity: 1,
+    category: 'equipamiento',
+  }))
 }
 
 function FloorConnectionSelector({

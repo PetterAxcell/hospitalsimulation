@@ -36,6 +36,8 @@ function room(
     connectionIds: overrides.connectionIds,
     verticalGroupId: overrides.verticalGroupId,
     servesFloors: overrides.servesFloors,
+    spaceProgramEntryId: overrides.spaceProgramEntryId,
+    components: overrides.components,
     locked: overrides.locked ?? false,
   }
 }

@@ -66,6 +66,7 @@ function auditEntry(plan: HospitalPlan, entry: ClinicSpaceProgramEntry): ClinicP
 function matchingRooms(rooms: PlacedRoom[], entry: ClinicSpaceProgramEntry): PlacedRoom[] {
   const normalizedKeywords = entry.keywords.map(normalize)
   return rooms.filter((room) => {
+    if (room.spaceProgramEntryId === entry.id) return true
     if (entry.templateIds.includes(room.templateId)) return true
     if (entry.roomKinds.includes(room.kind)) return true
     const haystack = normalize(`${room.name} ${room.templateId} ${room.staffModel.join(' ')}`)

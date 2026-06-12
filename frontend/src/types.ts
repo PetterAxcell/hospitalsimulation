@@ -89,6 +89,15 @@ export interface RoomTemplate {
   notes: string
 }
 
+export interface RoomComponent {
+  id: string
+  name: string
+  quantity: number
+  areaSqm?: number
+  category?: string
+  source?: string
+}
+
 export interface PlacedRoom {
   id: string
   templateId: string
@@ -108,6 +117,8 @@ export interface PlacedRoom {
   connectionIds?: string[]
   verticalGroupId?: string
   servesFloors?: number[]
+  spaceProgramEntryId?: string
+  components?: RoomComponent[]
   locked?: boolean
 }
 

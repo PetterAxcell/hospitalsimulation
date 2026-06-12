@@ -23,6 +23,8 @@ La primera version vive en:
 - `frontend/src/data/clinicSpaceProgram.ts`: entradas funcionales extraidas del PDF, con paginas fuente, sector, alcance, m2 utiles, factor bruto, capacidad esperada y requisitos.
 - `frontend/src/engine/clinicSpaceProgramAudit.ts`: compara esas entradas contra el `HospitalPlan` activo.
 - `frontend/src/features/services/ClinicSpaceProgramPanel.tsx`: muestra sincronizacion, prioridades y detalle por entrada dentro de la pestaña `Servicios`.
+- `frontend/src/features/planning/RoomInspector.tsx`: muestra y permite editar los componentes internos de cada sala.
+- `frontend/src/features/planning/RoomInspector.tsx`: muestra y permite editar los componentes internos de cada sala.
 
 La vista calcula:
 
@@ -31,6 +33,43 @@ La vista calcula:
 - entradas cubiertas, parciales, faltantes o demasiado agregadas.
 - bloques actuales que estan sirviendo de equivalente en el simulador.
 - requisitos textuales que todavia deben convertirse en reglas, plantillas o agentes.
+- componentes internos por sala, por ejemplo habitaciones, boxes, controles de enfermeria, limpio/sucio, AGV, salas blancas, CPD o muelles.
+
+## Uso en el planificador
+
+El selector `Construir > Elemento` tiene dos grupos:
+
+- `Catalogo base`: piezas genericas del simulador.
+- `Pla d'Espais Nou Clinic`: entradas del PDF convertidas en bloques construibles.
+
+Cuando se anade una entrada del PDF a una planta, el planificador:
+
+1. Escoge una plantilla base equivalente.
+2. Calcula un tamano inicial desde m2 utiles y `grossingFactor`.
+3. Asigna capacidad esperada cuando el PDF la define.
+4. Guarda `spaceProgramEntryId` para mantener trazabilidad.
+5. Copia componentes internos a `room.components`.
+
+El bloque sigue siendo editable: se puede mover, redimensionar, conectar a pasillos y ajustar capacidad como cualquier otra sala.
+
+## Componentes internos de sala
+
+Cada `PlacedRoom` puede llevar `components`, una lista editable con:
+
+- nombre del componente,
+- cantidad,
+- m2 utiles por unidad,
+- categoria,
+- fuente.
+
+Esto permite que una sala grande no sea una caja opaca. Por ejemplo, una `Hospitalizacion convencional - modulo tipo` puede contener 18 habitaciones individuales, 4 dobles, 2 aislamientos, control de enfermeria, limpio/sucio, carros/AGV y locales tecnicos. En la siguiente fase estos componentes deben influir en simulacion fina, personal, limpieza, suministros y reglas.
+
+El planificador tambien permite anadir elementos desde dos fuentes en el selector `Elemento`:
+
+- `Catalogo base`: plantillas genericas del simulador.
+- `Pla d'Espais Nou Clinic`: entradas del PDF convertidas en bloques editables.
+
+Cuando se crea una sala desde el PDF, el bloque conserva `spaceProgramEntryId` y `components`. Esto permite saber que una "Hospitalizacion convencional - modulo tipo" no es solo un rectangulo, sino una sala compuesta por habitaciones dobles, individuales, aislamiento, control de enfermeria, zonas limpia/bruta, carros/AGV, almacenes y locales tecnicos.
 
 ## Estados de auditoria
 
@@ -71,8 +110,9 @@ La pestaña `Servicios` puede responder preguntas como:
 - La extraccion actual es una consolidacion manual asistida por tablas del PDF, no un importador generico de PDFs.
 - Algunas paginas complejas, especialmente farmacia/medicamento, deben revisarse con la tabla original.
 - Los m2 son utiles y se transforman con factores brutos iniciales.
-- El modelo todavia no tiene plantillas especificas para CRAI, cocina central, lenceria, seguridad, oficinas, CPD o varias plataformas de recerca.
+- El modelo todavia no tiene plantillas visuales especificas para CRAI, cocina central, lenceria, seguridad, oficinas, CPD o varias plataformas de recerca; de momento se crean con una plantilla equivalente y componentes internos.
 - La auditoria compara por `templateId`, tipo de sala y palabras clave; no entiende aun relaciones BIM/IFC ni geometria real de un plano.
+- Los componentes internos todavia no se dibujan dentro del canvas 2D como subhabitaciones; viven como desglose funcional editable en el inspector.
 
 ## Siguiente fase recomendada
 
@@ -82,3 +122,4 @@ La pestaña `Servicios` puede responder preguntas como:
 4. Generar YAML automaticamente desde el programa funcional, separando m2 utiles, m2 brutos y geometria propuesta.
 5. Convertir requisitos textuales en reglas ejecutables: MAT, limpio/sucio, AGV, CPD, residuos, seguridad y proximidades criticas.
 6. Calibrar los factores brutos con arquitectura.
+7. Dibujar subcomponentes dentro de salas grandes cuando el nivel de detalle lo justifique.
