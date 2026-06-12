@@ -893,6 +893,11 @@ output {
   gap: 12px;
 }
 
+.inspector-main-actions {
+  display: grid;
+  gap: 8px;
+}
+
 .component-source-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

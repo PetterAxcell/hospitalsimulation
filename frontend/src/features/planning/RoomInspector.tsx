@@ -153,6 +153,11 @@ export function RoomInspector({
             value={isPassage(room) ? (isDisconnectedPassage ? 'Aislado' : 'Conectado') : accessRequired ? (hasCorridor ? 'Conectado' : 'Sin pasillo') : 'Opcional'}
           />
         </div>
+        <div className="inspector-main-actions">
+          <button type="button" className="primary-action" onClick={() => setComponentsOpen(true)}>
+            Editar contenido
+          </button>
+        </div>
       </section>
 
       <section className="panel-section">
@@ -163,7 +168,7 @@ export function RoomInspector({
       </section>
 
       <section className="panel-section">
-        <h2>Componentes internos</h2>
+        <h2>Contenido del bloque</h2>
         <div className="status-metrics">
           <Metric label="Componentes" value={String(components.length)} />
           <Metric label="m2 utiles comp." value={componentArea > 0 ? formatNumber(componentArea) : '-'} />
@@ -183,7 +188,7 @@ export function RoomInspector({
           ))}
         </div>
         <button type="button" className="secondary-action" onClick={() => setComponentsOpen(true)}>
-          Ver / editar componentes
+          Editar contenido
         </button>
       </section>
 
@@ -292,7 +297,7 @@ function RoomComponentsModal({
   return (
     <Modal
       titleId="room-components-title"
-      title="Componentes internos"
+      title="Contenido del bloque"
       subtitle={`${room.name} · ${components.length} componentes · ${componentArea > 0 ? `${formatNumber(componentArea)} m2 utiles` : 'sin m2 utiles definidos'}`}
       className="section-modal"
       onClose={onClose}

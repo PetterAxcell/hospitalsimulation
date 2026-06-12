@@ -54,11 +54,11 @@ Cuando se anade una entrada del PDF a una planta, el planificador:
 2. Calcula un tamano inicial desde m2 utiles y `grossingFactor`.
 3. Asigna capacidad esperada cuando el PDF la define.
 4. Guarda `spaceProgramEntryId` para mantener trazabilidad.
-5. Copia componentes internos a `room.components`.
+5. Copia el contenido del bloque a `room.components`.
 
 El bloque sigue siendo editable: se puede mover, redimensionar, conectar a pasillos y ajustar capacidad como cualquier otra sala.
 
-## Componentes internos de sala
+## Contenido del bloque
 
 Cada `PlacedRoom` puede llevar `components`, una lista editable con:
 
@@ -70,7 +70,7 @@ Cada `PlacedRoom` puede llevar `components`, una lista editable con:
 
 Esto permite que una sala grande no sea una caja opaca. Por ejemplo, una `Hospitalizacion convencional - modulo tipo` puede contener 18 habitaciones individuales, 4 dobles, 2 aislamientos, control de enfermeria, limpio/sucio, carros/AGV y locales tecnicos. En la siguiente fase estos componentes deben influir en simulacion fina, personal, limpieza, suministros y reglas.
 
-Desde el inspector de una sala se puede cambiar una sala ya creada entre `Usar Nou Clinic` y `Usar por defecto`, sin tener que borrar el bloque.
+Desde el inspector de una sala, la accion `Editar contenido` abre el modal donde se pueden anadir, editar o quitar componentes. Tambien se puede cambiar una sala ya creada entre `Usar Nou Clinic` y `Usar por defecto`, sin tener que borrar el bloque.
 
 ## Estados de auditoria
 
