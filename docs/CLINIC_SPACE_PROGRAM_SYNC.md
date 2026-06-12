@@ -24,7 +24,6 @@ La primera version vive en:
 - `frontend/src/engine/clinicSpaceProgramAudit.ts`: compara esas entradas contra el `HospitalPlan` activo.
 - `frontend/src/features/services/ClinicSpaceProgramPanel.tsx`: muestra sincronizacion, prioridades y detalle por entrada dentro de la pestaña `Servicios`.
 - `frontend/src/features/planning/RoomInspector.tsx`: muestra y permite editar los componentes internos de cada sala.
-- `frontend/src/features/planning/RoomInspector.tsx`: muestra y permite editar los componentes internos de cada sala.
 
 La vista calcula:
 
@@ -63,13 +62,6 @@ Cada `PlacedRoom` puede llevar `components`, una lista editable con:
 - fuente.
 
 Esto permite que una sala grande no sea una caja opaca. Por ejemplo, una `Hospitalizacion convencional - modulo tipo` puede contener 18 habitaciones individuales, 4 dobles, 2 aislamientos, control de enfermeria, limpio/sucio, carros/AGV y locales tecnicos. En la siguiente fase estos componentes deben influir en simulacion fina, personal, limpieza, suministros y reglas.
-
-El planificador tambien permite anadir elementos desde dos fuentes en el selector `Elemento`:
-
-- `Catalogo base`: plantillas genericas del simulador.
-- `Pla d'Espais Nou Clinic`: entradas del PDF convertidas en bloques editables.
-
-Cuando se crea una sala desde el PDF, el bloque conserva `spaceProgramEntryId` y `components`. Esto permite saber que una "Hospitalizacion convencional - modulo tipo" no es solo un rectangulo, sino una sala compuesta por habitaciones dobles, individuales, aislamiento, control de enfermeria, zonas limpia/bruta, carros/AGV, almacenes y locales tecnicos.
 
 ## Estados de auditoria
 
