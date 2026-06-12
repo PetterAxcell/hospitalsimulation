@@ -683,6 +683,211 @@ output {
   box-shadow: 0 12px 28px rgba(55, 81, 113, 0.1);
 }
 
+.services-dashboard {
+  height: calc(100vh - 156px);
+  display: grid;
+  grid-template-rows: minmax(0, 1.8fr) minmax(220px, 0.8fr);
+  gap: 12px;
+  overflow: hidden;
+}
+
+.services-dashboard .table-panel {
+  height: auto;
+  min-height: 0;
+}
+
+.clinic-program-panel {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-cyan-1);
+  border-radius: 8px;
+  background: var(--clinic-surface);
+  box-shadow: 0 12px 28px rgba(55, 81, 113, 0.1);
+}
+
+.clinic-program-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid var(--clinic-border);
+  background:
+    linear-gradient(90deg, rgba(74, 204, 211, 0.12), rgba(133, 222, 118, 0.08)),
+    var(--clinic-surface);
+}
+
+.clinic-program-hero span,
+.clinic-program-table-head p {
+  color: var(--clinic-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.clinic-program-hero h2,
+.clinic-program-table-head h3 {
+  margin: 4px 0;
+  color: var(--clinic-blue);
+}
+
+.clinic-program-hero p,
+.clinic-program-table-head p {
+  margin: 0;
+}
+
+.clinic-program-kpis,
+.clinic-program-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.clinic-program-status-grid {
+  padding: 12px 18px 0;
+}
+
+.clinic-program-status-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-green);
+  border-radius: 8px;
+  background: var(--clinic-blue-wash);
+}
+
+.clinic-program-status-card.warn {
+  border-top-color: var(--clinic-yellow);
+}
+
+.clinic-program-status-card.fail {
+  border-top-color: var(--clinic-red-1);
+}
+
+.clinic-program-status-card span {
+  color: var(--clinic-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.clinic-program-status-card strong {
+  color: var(--clinic-blue);
+  font-size: 24px;
+}
+
+.clinic-program-table-card {
+  margin: 12px 18px 18px;
+  overflow: hidden;
+  border: 1px solid var(--clinic-border);
+  border-radius: 8px;
+  background: var(--clinic-surface);
+}
+
+.clinic-program-table-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid var(--clinic-border);
+  background: var(--clinic-blue-wash);
+}
+
+.clinic-program-list {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.clinic-program-row {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 0.75fr) minmax(120px, 0.35fr) minmax(240px, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--clinic-border);
+  border-left: 4px solid var(--clinic-green);
+  border-radius: 7px;
+  background: var(--clinic-surface);
+  color: var(--clinic-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.clinic-program-row:hover {
+  border-color: var(--clinic-cyan-1);
+  box-shadow: 0 8px 20px rgba(55, 81, 113, 0.08);
+}
+
+.clinic-program-row.missing,
+.clinic-program-row.weak {
+  border-left-color: var(--clinic-red-1);
+}
+
+.clinic-program-row.partial,
+.clinic-program-row.broad {
+  border-left-color: var(--clinic-yellow);
+}
+
+.clinic-program-row span {
+  color: var(--clinic-muted);
+  font-size: 12px;
+}
+
+.clinic-program-status,
+.status-pill {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 74px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: var(--clinic-success-bg);
+  color: var(--clinic-blue);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.status-pill.missing,
+.status-pill.weak,
+.clinic-program-row.missing .clinic-program-status,
+.clinic-program-row.weak .clinic-program-status {
+  background: var(--clinic-danger-bg);
+  color: var(--clinic-red-1);
+}
+
+.status-pill.partial,
+.status-pill.broad,
+.clinic-program-row.partial .clinic-program-status,
+.clinic-program-row.broad .clinic-program-status {
+  background: var(--clinic-warning-bg);
+  color: #7a5200;
+}
+
+.status-pill.config {
+  background: var(--clinic-info-bg);
+  color: var(--clinic-blue-1);
+}
+
+.clinic-program-table-wrap {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.clinic-program-table tbody tr {
+  cursor: pointer;
+}
+
+.clinic-program-table tbody tr:hover {
+  background: var(--clinic-info-bg);
+}
+
+.clinic-program-detail {
+  display: grid;
+  gap: 12px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -2315,6 +2520,20 @@ th {
   .sim-time-label {
     min-width: 144px;
   }
+
+  .services-dashboard {
+    grid-template-rows: minmax(460px, 1.5fr) minmax(220px, 0.8fr);
+  }
+
+  .clinic-program-hero,
+  .clinic-program-row {
+    grid-template-columns: 1fr;
+  }
+
+  .clinic-program-kpis,
+  .clinic-program-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 820px) {
@@ -2405,10 +2624,37 @@ th {
   .hospital-canvas,
   .simulation-stage,
   .table-panel,
+  .services-dashboard,
   .saturation-panel,
   .top-panel {
     height: clamp(430px, calc(100dvh - 176px), 740px);
     min-height: 430px;
+  }
+
+  .services-dashboard {
+    grid-template-rows: minmax(0, 1fr);
+    overflow: auto;
+  }
+
+  .clinic-program-panel {
+    min-height: 540px;
+  }
+
+  .clinic-program-hero,
+  .clinic-program-kpis,
+  .clinic-program-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .clinic-program-hero,
+  .clinic-program-status-grid,
+  .clinic-program-table-card {
+    margin-left: 8px;
+    margin-right: 8px;
+  }
+
+  .clinic-program-hero {
+    padding: 12px;
   }
 
   .saturation-hero,

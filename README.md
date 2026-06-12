@@ -61,6 +61,7 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Barra de replay responsive: los controles de tiempo, velocidad, capa de agentes y caso clínico se adaptan en varias líneas para evitar solapes en anchos pequeños.
 - Catálogo de hospital terciario: urgencias, diagnóstico, quirófanos, PACU, UCI, wards, maternidad, neonatal, oncología, farmacia, laboratorio, logística, investigación y command center.
 - Preset Hospital Clinic: primera visión del Nou Campus Clinic-UB con asistencia, docencia, investigación, infraestructuras, campus, sótanos técnicos/logísticos, urgencias, quirófanos, UCI, institutos clínicos, consultas, hospital de día y reservas de crecimiento.
+- Sincronizacion Pla d'Espais Clinic: la pestaña Servicios compara el preset actual con una primera capa estructurada desde `260608-SESSIO3-ESPAIS-Presentacio.pdf`, mostrando entradas cubiertas, parciales, faltantes y bloques demasiado agregados antes de simular.
 - Identidad visual Clinic: paleta azul/verde/rojo/amarillo/cian aplicada a shell, controles, planificador, simulacion y estados de saturacion, manteniendo blanco como base; la cabecera usa logotipo Clinic destacado y nombre del campus en blanco.
 - Elementos de seguridad arquitectonica: ascensores, escaleras, montacargas, escaleras protegidas/emergencia, refugios de evacuacion horizontal, sectorizacion PCI, central MEP critica y reserva de expansion.
 - Circulacion editable: pasillos publicos, pasillos clinicos para camas y pasillos logisticos limpio/sucio se anaden desde el selector `Elemento`, igual que cualquier otro bloque. En la UI, `Asc/Mont` significa ascensores publicos, ascensores clinicos y montacargas; las escaleras son componentes independientes.
@@ -84,6 +85,7 @@ La documentacion tecnica vive en [docs/](docs/):
 - [Backend propuesto](docs/BACKEND.md)
 - [Despliegue](docs/DEPLOYMENT.md)
 - [Modelo funcional Hospital Clinic](docs/HOSPITAL_CLINIC_MODEL.md)
+- [Sincronizacion Pla d'Espais Clinic](docs/CLINIC_SPACE_PROGRAM_SYNC.md)
 - [Paleta visual Clinic Barcelona](docs/BRAND_COLORS.md)
 - [Requisitos arquitectonicos y seguridad](docs/SAFETY_REQUIREMENTS.md)
 
@@ -125,7 +127,7 @@ frontend/
   src/engine/      Geometria, circulacion, casos clinicos, simulacion, staff y reglas
   src/components/  Shell de marca, tabs, canvas editable, escena Phaser y controles de replay
   src/components/ui/ Primitivas compartidas como métricas y modales
-  src/features/    Funcionalidades de producto separadas: planning, top, saturacion y simulacion
+  src/features/    Funcionalidades de producto separadas: planning, top, servicios, saturacion y simulacion
   src/utils/       Formato compartido de numeros y plantas
 hospital_sim/      Prototipo Python/SimPy inicial, mantenido como referencia
 docs/              Arquitectura, backend y requisitos

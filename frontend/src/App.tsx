@@ -37,6 +37,7 @@ import { DEFAULT_SIMULATION_SETTINGS, runHospitalSimulation, type SimulationSett
 import { TopControls, TopPanel } from './features/top/TopDashboard'
 import { RoomInspector } from './features/planning/RoomInspector'
 import { SaturationPanel } from './features/saturation/SaturationPanel'
+import { ClinicSpaceProgramPanel } from './features/services/ClinicSpaceProgramPanel'
 import { SimulationCaseSelector } from './features/simulation/SimulationCaseSelector'
 import { SimulationControlsPanel } from './features/simulation/SimulationControlsPanel'
 import {
@@ -646,7 +647,7 @@ function App() {
           )}
 
           {activeTab === 'top' && <TopPanel proposals={topProposals} />}
-          {activeTab === 'services' && <ServiceMatrix plan={plan} />}
+          {activeTab === 'services' && <ServicesDashboard plan={plan} />}
           {activeTab === 'analysis' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" />}
         </section>
 
@@ -871,7 +872,7 @@ function ServicesModalContent({ plan }: { plan: HospitalPlan }) {
       </section>
 
       <section className="section-modal-card">
-        <h3>Mayores bolsas de superficie</h3>
+        <h3>Mayores bolsas de superficie modelada</h3>
         <div className="rule-list compact">
           {rows.slice(0, 6).map((row) => (
             <article key={row.label} className="rule-item ok">
@@ -881,6 +882,15 @@ function ServicesModalContent({ plan }: { plan: HospitalPlan }) {
           ))}
         </div>
       </section>
+    </div>
+  )
+}
+
+function ServicesDashboard({ plan }: { plan: HospitalPlan }) {
+  return (
+    <div className="services-dashboard">
+      <ClinicSpaceProgramPanel plan={plan} />
+      <ServiceMatrix plan={plan} />
     </div>
   )
 }

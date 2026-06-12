@@ -9,6 +9,7 @@ Fecha de contraste de fuentes: 2026-06-04.
 - [Hospital Clinic Barcelona - Sobre el Clinic](https://www.clinicbarcelona.org/asistencia/sobre-el-clinic): rol asistencial, hospital comunitario de Barcelona Esquerra, hospital terciario de alta complejidad, institutos/centros/areas y cifras publicas 2024.
 - [Nou Campus de Salut Clinic - Universitat de Barcelona](https://www.clinicbarcelona.org/ca/asistencia/nou-campus-de-salut-clinic-universitat-de-barcelona): campus sanitario, docente e investigador de aproximadamente 300.000 m2 e integracion de Hospital Clinic, IDIBAPS, ISGlobal, Facultad de Medicina y Ciencias de la Salud UB y otros centros de referencia.
 - [Que es el Pla Funcional del Nou Campus Clinic-UB](https://www.clinicbarcelona.org/ca/asistencia/nou-campus-de-salut-clinic-universitat-de-barcelona/que-es-el-pla-funcional): dimensiones del plan funcional, definicion de servicios, organizacion, espacios y recursos antes del concurso arquitectonico.
+- `260608-SESSIO3-ESPAIS-Presentacio.pdf`: presentacion interna de la sesion 3 del Pla d'Espais. Se ha usado como primera fuente estructurada para crear `frontend/src/data/clinicSpaceProgram.ts` y auditar el preset actual en la pestaña `Servicios`.
 
 ## Que significa modelo bien definido
 
@@ -52,6 +53,16 @@ El preset `createHospitalClinicCampusPlan()` define una primera vision para 300.
 - Planta 9: reserva de crecimiento clinico, tecnologia y nuevos modelos asistenciales.
 
 Todas las plantas arrancan con tres redes de circulacion: publica, clinica y logistica. Tambien incluyen escaleras de emergencia, refugio horizontal, sector PCI y un nucleo vertical central alineado en todas las plantas.
+
+## Sincronizacion con el Pla d'Espais
+
+La rama ya incorpora una primera capa `PDF -> programa funcional -> auditoria`:
+
+- `clinicSpaceProgram.ts` guarda entradas trazables del PDF con paginas fuente, ambito, sector, alcance, m2 utiles, factor bruto, capacidad esperada, plantillas equivalentes y requisitos funcionales.
+- `clinicSpaceProgramAudit.ts` compara cada entrada con el `HospitalPlan` activo y marca `Falta`, `Debil`, `Parcial`, `Cubierto`, `Agregado` o `Regla`.
+- `ClinicSpaceProgramPanel.tsx` muestra esa auditoria en la pestaña `Servicios`, junto a la matriz actual por familias.
+
+Esta capa no genera aun planos automaticamente. Su objetivo es decir si el plan visual representa suficientemente el programa antes de usarlo como base de simulacion o generacion IA. La documentacion completa esta en [Sincronizacion Pla d'Espais Clinic](CLINIC_SPACE_PROGRAM_SYNC.md).
 
 ## Clusters que debe simular la rama
 
