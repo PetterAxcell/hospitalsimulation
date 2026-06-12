@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Metric } from '../../components/ui/Metric'
 import { Modal } from '../../components/ui/Modal'
-import { clinicSpaceProgramById } from '../../data/clinicSpaceProgram'
+import { CLINIC_SPACE_PROGRAM, clinicSpaceProgramById, componentsForSpaceProgramEntry } from '../../data/clinicSpaceProgram'
 import {
   disconnectedPassages,
   doorConnectsToCorridor,
@@ -55,7 +55,7 @@ export function RoomInspector({
   const isDisconnectedPassage = isPassage(selectedRoom) && disconnectedPassages(allRooms).some((item) => item.id === selectedRoom.id)
   const components = componentsForRoom(selectedRoom)
   const componentArea = components.reduce((sum, component) => sum + (component.areaSqm ?? 0) * component.quantity, 0)
-  const sourceEntry = selectedRoom.spaceProgramEntryId ? clinicSpaceProgramById(selectedRoom.spaceProgramEntryId) : undefined
+  const sourceEntry = clinicEntryForRoom(selectedRoom)
 
   function addComponent() {
     const name = componentDraft.name.trim()
@@ -81,6 +81,26 @@ export function RoomInspector({
     onChange({
       ...selectedRoom,
       components: components.map((component) => (component.id === componentId ? { ...component, ...patch } : component)),
+    })
+  }
+
+  function applyClinicComponents() {
+    if (!sourceEntry) return
+    onChange({
+      ...selectedRoom,
+      spaceProgramEntryId: sourceEntry.id,
+      components: componentsForSpaceProgramEntry(sourceEntry).map((component) => ({
+        ...component,
+        id: `${selectedRoom.id}-${component.id}`,
+      })),
+    })
+  }
+
+  function applyDefaultComponents() {
+    onChange({
+      ...selectedRoom,
+      spaceProgramEntryId: undefined,
+      components: defaultComponentsForRoom(selectedRoom),
     })
   }
 
@@ -149,6 +169,14 @@ export function RoomInspector({
           <Metric label="m2 utiles comp." value={componentArea > 0 ? formatNumber(componentArea) : '-'} />
         </div>
         {sourceEntry && <p className="muted">Origen: PDF p.{sourceEntry.sourcePages.join(', ')} · {sourceEntry.sector}</p>}
+        <div className="component-source-actions">
+          <button type="button" className="secondary-action" onClick={applyClinicComponents} disabled={!sourceEntry}>
+            Usar Nou Clínic
+          </button>
+          <button type="button" className="secondary-action" onClick={applyDefaultComponents}>
+            Usar por defecto
+          </button>
+        </div>
         <div className="tag-list">
           {components.slice(0, 6).map((component) => (
             <span key={component.id}>{component.quantity}x {component.name}</span>
@@ -338,11 +366,22 @@ function RoomComponentsModal({
 
 function componentsForRoom(room: PlacedRoom): RoomComponent[] {
   if (room.components?.length) return room.components
+  return defaultComponentsForRoom(room)
+}
+
+function clinicEntryForRoom(room: PlacedRoom) {
+  return room.spaceProgramEntryId
+    ? clinicSpaceProgramById(room.spaceProgramEntryId)
+    : CLINIC_SPACE_PROGRAM.find((entry) => entry.templateIds.includes(room.templateId))
+}
+
+function defaultComponentsForRoom(room: PlacedRoom): RoomComponent[] {
   return room.equipment.map((equipment, index) => ({
-    id: `${room.id}-equipment-${index + 1}`,
+    id: `${room.id}-default-component-${index + 1}`,
     name: equipment,
     quantity: 1,
-    category: 'equipamiento',
+    category: 'equipamiento por defecto',
+    source: 'catalogo base',
   }))
 }
 

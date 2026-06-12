@@ -41,6 +41,13 @@ El selector `Construir > Elemento` tiene dos grupos:
 - `Catalogo base`: piezas genericas del simulador.
 - `Pla d'Espais Nou Clinic`: entradas del PDF convertidas en bloques construibles.
 
+El selector `Componentes` decide que desglose interno se aplica al crear nuevas salas:
+
+- `Nou Clinic`: usa componentes del Pla d'Espais cuando existe una equivalencia con la plantilla o la entrada PDF.
+- `Por defecto`: usa componentes genericos derivados del equipamiento base de la plantilla.
+
+En esta rama el valor inicial es `Nou Clinic`, porque el objetivo es modelar el Nou Campus Clinic-UB.
+
 Cuando se anade una entrada del PDF a una planta, el planificador:
 
 1. Escoge una plantilla base equivalente.
@@ -62,6 +69,8 @@ Cada `PlacedRoom` puede llevar `components`, una lista editable con:
 - fuente.
 
 Esto permite que una sala grande no sea una caja opaca. Por ejemplo, una `Hospitalizacion convencional - modulo tipo` puede contener 18 habitaciones individuales, 4 dobles, 2 aislamientos, control de enfermeria, limpio/sucio, carros/AGV y locales tecnicos. En la siguiente fase estos componentes deben influir en simulacion fina, personal, limpieza, suministros y reglas.
+
+Desde el inspector de una sala se puede cambiar una sala ya creada entre `Usar Nou Clinic` y `Usar por defecto`, sin tener que borrar el bloque.
 
 ## Estados de auditoria
 

@@ -49,11 +49,12 @@ import {
   scoreArchitecture,
 } from './features/top/scoring'
 import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
-import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
+import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomComponent, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
 import { floorLabel, formatNumber } from './utils/format'
 
 const INITIAL_PLAN = createHospitalClinicCampusPlan()
 const DOOR_MAGNET_DISTANCE = 6
+type ComponentSourceMode = 'clinic' | 'default'
 const SimulationCanvas = lazy(() =>
   import('./components/SimulationCanvas').then((module) => ({ default: module.SimulationCanvas })),
 )
@@ -65,6 +66,7 @@ function App() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(plan.rooms[0]?.id)
   const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
   const [elementToAdd, setElementToAdd] = useState('template:edBoxes')
+  const [componentSourceMode, setComponentSourceMode] = useState<ComponentSourceMode>('clinic')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
   const [patientCases, setPatientCases] = useState<PatientCaseDefinition[]>(DEFAULT_PATIENT_CASES)
   const [clinicalCaseLibrarySource, setClinicalCaseLibrarySource] = useState(DEFAULT_CLINICAL_CASES_YAML)
@@ -143,6 +145,8 @@ function App() {
       simulationNode: template.simulationNode,
       verticalGroupId: template.kind === 'vertical' ? `${template.id}-${selectedFloor}` : undefined,
       servesFloors: template.kind === 'vertical' ? [selectedFloor] : undefined,
+      spaceProgramEntryId: componentSourceMode === 'clinic' ? clinicEntryForTemplate(template.id)?.id : undefined,
+      components: componentsForTemplate(nextId, template.id, componentSourceMode),
     }
     setPlan((current) => {
       const door = defaultDoorForRoom(nextRoom, current.rooms)
@@ -177,11 +181,10 @@ function App() {
       simulationNode: template.simulationNode,
       verticalGroupId: template.kind === 'vertical' ? `${template.id}-${selectedFloor}` : undefined,
       servesFloors: template.kind === 'vertical' ? [selectedFloor] : undefined,
-      spaceProgramEntryId: entry.id,
-      components: componentsForSpaceProgramEntry(entry).map((component) => ({
-        ...component,
-        id: `${nextId}-${component.id}`,
-      })),
+      spaceProgramEntryId: componentSourceMode === 'clinic' ? entry.id : undefined,
+      components: componentSourceMode === 'clinic'
+        ? componentsForSpaceProgramEntry(entry).map((component) => ({ ...component, id: `${nextId}-${component.id}` }))
+        : defaultComponentsForTemplate(nextId, template.id),
     }
     setPlan((current) => {
       const door = defaultDoorForRoom(nextRoom, current.rooms)
@@ -492,6 +495,13 @@ function App() {
                 </option>
               ))}
             </optgroup>
+          </select>
+        </label>
+        <label>
+          Componentes
+          <select value={componentSourceMode} onChange={(event) => setComponentSourceMode(event.target.value as ComponentSourceMode)}>
+            <option value="clinic">Nou Clínic</option>
+            <option value="default">Por defecto</option>
           </select>
         </label>
         <button type="button" className="primary-action" onClick={addRoom}>Añadir a planta {floorLabel(selectedFloor)}</button>
@@ -1471,6 +1481,31 @@ function serviceRowsForPlan(plan: HospitalPlan): ServiceRow[] {
   )
     .map(([label, value]) => ({ label, ...value }))
     .sort((a, b) => b.area - a.area)
+}
+
+function componentsForTemplate(roomId: string, templateId: string, source: ComponentSourceMode): RoomComponent[] {
+  if (source === 'clinic') {
+    const entry = clinicEntryForTemplate(templateId)
+    if (entry) {
+      return componentsForSpaceProgramEntry(entry).map((component) => ({ ...component, id: `${roomId}-${component.id}` }))
+    }
+  }
+  return defaultComponentsForTemplate(roomId, templateId)
+}
+
+function clinicEntryForTemplate(templateId: string) {
+  return CLINIC_SPACE_PROGRAM.find((entry) => entry.templateIds.includes(templateId))
+}
+
+function defaultComponentsForTemplate(roomId: string, templateId: string): RoomComponent[] {
+  const template = templateById(templateId)
+  return template.equipment.map((equipment, index) => ({
+    id: `${roomId}-default-component-${index + 1}`,
+    name: equipment,
+    quantity: 1,
+    category: 'equipamiento por defecto',
+    source: 'catalogo base',
+  }))
 }
 
 function dimensionsForTargetArea(areaSqm: number, kind: PlacedRoom['kind']): { w: number; h: number } {

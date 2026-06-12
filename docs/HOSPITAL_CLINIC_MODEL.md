@@ -62,7 +62,7 @@ La rama ya incorpora una primera capa `PDF -> programa funcional -> auditoria`:
 - `clinicSpaceProgramAudit.ts` compara cada entrada con el `HospitalPlan` activo y marca `Falta`, `Debil`, `Parcial`, `Cubierto`, `Agregado` o `Regla`.
 - `ClinicSpaceProgramPanel.tsx` muestra esa auditoria en la pestaña `Servicios`, junto a la matriz actual por familias.
 - El selector `Elemento` del planificador incluye entradas del `Pla d'Espais Nou Clinic`, por lo que ya se pueden anadir bloques directamente desde el PDF.
-- Cada bloque puede llevar `components`: un desglose interno editable para declarar habitaciones, boxes, controles de enfermeria, zonas limpio/sucio, almacenes, AGV, CPD, salas blancas u otros componentes funcionales.
+- Cada bloque puede llevar `components`: un desglose interno editable para declarar habitaciones, boxes, controles de enfermeria, zonas limpio/sucio, almacenes, AGV, CPD, salas blancas u otros componentes funcionales. En esta rama el selector de componentes arranca en `Nou Clinic`, aunque el inspector permite cambiar una sala a componentes por defecto.
 
 Esta capa no genera aun planos automaticamente. Su objetivo es decir si el plan visual representa suficientemente el programa antes de usarlo como base de simulacion o generacion IA. La documentacion completa esta en [Sincronizacion Pla d'Espais Clinic](CLINIC_SPACE_PROGRAM_SYNC.md).
 

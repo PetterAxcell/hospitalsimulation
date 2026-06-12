@@ -893,6 +893,12 @@ output {
   gap: 12px;
 }
 
+.component-source-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .component-form-grid {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(120px, 0.45fr));
@@ -2774,6 +2780,7 @@ th {
   .section-modal-grid,
   .section-modal-grid-wide,
   .section-metric-grid,
+  .component-source-actions,
   .component-form-grid,
   .room-component-edit-grid,
   .room-component-row {
