@@ -3491,3 +3491,10 @@ th {
 .scenario-save.primary-action {
   width: auto;
 }
+
+.saturation-save.primary-action {
+  width: auto;
+  margin-top: 0;
+  min-height: 32px;
+  padding: 0 14px;
+}

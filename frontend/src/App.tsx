@@ -127,6 +127,7 @@ function App() {
   const [isClinicalCaseModalOpen, setClinicalCaseModalOpen] = useState(false)
   const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
   const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
+  const [proposalTitle, setProposalTitle] = useState('')
   const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>(SEEDED_DESIGN_PROPOSALS)
   const [adjacencyRules, setAdjacencyRules] = useState<AdjacencyRule[]>(DEFAULT_ADJACENCY_RULES)
   const [isLeftPanelHidden, setLeftPanelHidden] = useState(false)
@@ -487,6 +488,11 @@ function App() {
   }
 
   function submitCurrentArchitecture() {
+    const fallbackName = proposalTitle.trim() || `Arquitectura ${submittedProposals.length + 1}`
+    const chosen = window.prompt('Nombre de la arquitectura', fallbackName)
+    if (chosen === null) return
+    const title = chosen.trim() || fallbackName
+    setProposalTitle(title)
     const nextProposal = architectureProposalFromCurrentPlan({
       owner: proposalOwner.trim() || 'Autor sin nombre',
       plan,
@@ -494,6 +500,7 @@ function App() {
       rules,
       totalArea,
       index: submittedProposals.length + 1,
+      title,
       adjacency: {
         total: adjacencyResults.length,
         noComplies: adjacencyResults.filter((res) => !adjacencyComplies(res.status)).length,
@@ -789,7 +796,14 @@ function App() {
             />
           )}
           {activeTab === 'analysis' && (
-            <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" adjacencyResults={adjacencyResults} />
+            <SaturationPanel
+              plan={plan}
+              result={simulationResult}
+              selectedCaseId="all"
+              adjacencyResults={adjacencyResults}
+              score={currentScore.value}
+              onSaveToTop={submitCurrentArchitecture}
+            />
           )}
         </section>
 

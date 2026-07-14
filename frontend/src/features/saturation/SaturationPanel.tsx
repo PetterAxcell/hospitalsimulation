@@ -31,11 +31,15 @@ export function SaturationPanel({
   result,
   selectedCaseId,
   adjacencyResults = [],
+  score,
+  onSaveToTop,
 }: {
   plan: HospitalPlan
   result: SimulationResult | null
   selectedCaseId: PatientCaseFilter
   adjacencyResults?: AdjacencyRuleResult[]
+  score?: number
+  onSaveToTop?: () => void
 }) {
   const [isReadingOpen, setReadingOpen] = useState(false)
 
@@ -81,12 +85,15 @@ export function SaturationPanel({
           <h2>{selectedCase ? selectedCase.label : 'Todos los casos clínicos'}</h2>
           <div className="top-hero-actions">
             <button type="button" className="ghost-action" onClick={() => setReadingOpen(true)}>Lectura operativa</button>
+            {onSaveToTop && (
+              <button type="button" className="primary-action saturation-save" onClick={onSaveToTop}>Guardar en Top</button>
+            )}
           </div>
         </div>
         <div className="saturation-kpis">
+          <Metric label="Nota" value={score !== undefined ? score.toFixed(1) : '-'} />
           <Metric label="Adyacencia" value={adjacencyVerdict.label} />
           <Metric label="Pasos/paciente" value={String(stepStats.overallAvg)} />
-          <Metric label="Saturados" value={String(saturated)} />
           <Metric label="Bloqueados" value={String(result.kpis.blockedPatients)} />
         </div>
       </section>
