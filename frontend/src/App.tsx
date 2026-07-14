@@ -10,6 +10,13 @@ import { CLINIC_SPACE_PROGRAM, clinicSpaceProgramById, componentsForSpaceProgram
 import { createHospitalClinicCampusPlan } from './data/presets'
 import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
+  DEFAULT_ADJACENCY_RULES,
+  cycleRule,
+  evaluateAdjacencyRules,
+  type AdjacencyRule,
+  type AdjacencyRuleResult,
+} from './engine/adjacencyMatrix'
+import {
   defaultDoorForRoom,
   disconnectedPassages,
   disconnectedPatientRooms,
@@ -39,6 +46,7 @@ import { TopControls, TopPanel } from './features/top/TopDashboard'
 import { RoomInspector } from './features/planning/RoomInspector'
 import { SaturationPanel } from './features/saturation/SaturationPanel'
 import { ClinicSpaceProgramPanel } from './features/services/ClinicSpaceProgramPanel'
+import { AdjacencyMatrixPanel } from './features/services/AdjacencyMatrixPanel'
 import { SimulationCaseSelector } from './features/simulation/SimulationCaseSelector'
 import { SimulationControlsPanel } from './features/simulation/SimulationControlsPanel'
 import {
@@ -49,7 +57,7 @@ import {
   scoreArchitecture,
 } from './features/top/scoring'
 import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
-import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomComponent, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
+import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomComponent, RoomDoor, RoomKind, SimulationAgentLayer, SimulationResult } from './types'
 import { floorLabel, formatNumber } from './utils/format'
 
 const INITIAL_PLAN = createHospitalClinicCampusPlan()
@@ -85,6 +93,7 @@ function App() {
   const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
   const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
   const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
+  const [adjacencyRules, setAdjacencyRules] = useState<AdjacencyRule[]>(DEFAULT_ADJACENCY_RULES)
   const [isLeftPanelHidden, setLeftPanelHidden] = useState(false)
   const [isRightPanelHidden, setRightPanelHidden] = useState(false)
   const [sectionModalTab, setSectionModalTab] = useState<WorkspaceTab | null>(null)
@@ -94,6 +103,7 @@ function App() {
   const floorArea = activeFloorRooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const totalArea = plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
+  const adjacencyResults = useMemo(() => evaluateAdjacencyRules(plan, adjacencyRules), [plan, adjacencyRules])
   const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings, patientCases), [patientCases, plan, simulationSettings])
   const topProposals = useMemo(
     () => rankArchitectureProposals([
@@ -710,8 +720,19 @@ function App() {
           )}
 
           {activeTab === 'top' && <TopPanel proposals={topProposals} />}
-          {activeTab === 'services' && <ServicesDashboard plan={plan} />}
-          {activeTab === 'analysis' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" />}
+          {activeTab === 'services' && (
+            <ServicesDashboard
+              plan={plan}
+              adjacencyRules={adjacencyRules}
+              adjacencyResults={adjacencyResults}
+              onCycleAdjacency={(a, b) => setAdjacencyRules((current) => cycleRule(current, a, b))}
+              onResetAdjacency={() => setAdjacencyRules(DEFAULT_ADJACENCY_RULES)}
+              onClearAdjacency={() => setAdjacencyRules([])}
+            />
+          )}
+          {activeTab === 'analysis' && (
+            <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" adjacencyResults={adjacencyResults} />
+          )}
         </section>
 
         {showRightPanel && (
@@ -949,10 +970,31 @@ function ServicesModalContent({ plan }: { plan: HospitalPlan }) {
   )
 }
 
-function ServicesDashboard({ plan }: { plan: HospitalPlan }) {
+function ServicesDashboard({
+  plan,
+  adjacencyRules,
+  adjacencyResults,
+  onCycleAdjacency,
+  onResetAdjacency,
+  onClearAdjacency,
+}: {
+  plan: HospitalPlan
+  adjacencyRules: AdjacencyRule[]
+  adjacencyResults: AdjacencyRuleResult[]
+  onCycleAdjacency: (a: RoomKind, b: RoomKind) => void
+  onResetAdjacency: () => void
+  onClearAdjacency: () => void
+}) {
   return (
     <div className="services-dashboard">
       <ClinicSpaceProgramPanel plan={plan} />
+      <AdjacencyMatrixPanel
+        rules={adjacencyRules}
+        results={adjacencyResults}
+        onCycle={onCycleAdjacency}
+        onReset={onResetAdjacency}
+        onClear={onClearAdjacency}
+      />
       <ServiceMatrix plan={plan} />
     </div>
   )

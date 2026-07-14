@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { KIND_LABELS } from '../../data/catalog'
 import { isPassage } from '../../engine/circulation'
+import type { AdjacencyRuleResult, AdjacencyStatus } from '../../engine/adjacencyMatrix'
 import { Metric } from '../../components/ui/Metric'
 import { Modal } from '../../components/ui/Modal'
 import type { HospitalPlan, PatientCaseFilter, PlacedRoom, SimulationResult } from '../../types'
@@ -15,10 +16,12 @@ export function SaturationPanel({
   plan,
   result,
   selectedCaseId,
+  adjacencyResults = [],
 }: {
   plan: HospitalPlan
   result: SimulationResult | null
   selectedCaseId: PatientCaseFilter
+  adjacencyResults?: AdjacencyRuleResult[]
 }) {
   const [isReadingOpen, setReadingOpen] = useState(false)
 
@@ -115,6 +118,13 @@ export function SaturationPanel({
           <Metric label="Caso activo" value={selectedCase?.id ?? 'Todos'} />
           <button type="button" className="secondary-action" onClick={() => setReadingOpen(true)}>Abrir lectura</button>
         </section>
+
+        {adjacencyResults.length > 0 && (
+          <section className="saturation-block wide">
+            <h3>Matriz de adyacencia</h3>
+            <AdjacencyAnalysis results={adjacencyResults} />
+          </section>
+        )}
       </div>
 
       {isReadingOpen && (
@@ -180,6 +190,60 @@ function bottleneckRows(plan: HospitalPlan, pressure: Record<string, number>): B
 
 function formatDemandRatio(score: number): string {
   return `${Math.round(score * 100)}%`
+}
+
+const ADJACENCY_STATUS_LABELS: Record<AdjacencyStatus, string> = {
+  ok: 'Cumple',
+  warn: 'En tensión',
+  fail: 'Incumple',
+  missing: 'Falta bloque',
+}
+
+function AdjacencyAnalysis({ results }: { results: AdjacencyRuleResult[] }) {
+  const okCount = results.filter((result) => result.status === 'ok').length
+  const warnCount = results.filter((result) => result.status === 'warn').length
+  const failCount = results.filter((result) => result.status === 'fail' || result.status === 'missing').length
+  const openResults = results
+    .filter((result) => result.status !== 'ok')
+    .sort((a, b) => adjacencyWeight(b.status) - adjacencyWeight(a.status))
+
+  return (
+    <div className="adjacency-analysis">
+      <div className="chart-chips adjacency-analysis-chips">
+        <span>{results.length} reglas</span>
+        <span>{okCount} cumplen</span>
+        <span>{warnCount} en tensión</span>
+        <span>{failCount} incumplen</span>
+      </div>
+      <div className="rule-list compact">
+        {openResults.length > 0 ? (
+          openResults.map((result) => (
+            <article key={result.id} className={`rule-item ${adjacencyTone(result.status)}`}>
+              <strong>{result.label} · {ADJACENCY_STATUS_LABELS[result.status]}</strong>
+              <span>{result.evidence}</span>
+            </article>
+          ))
+        ) : (
+          <article className="rule-item ok">
+            <strong>Todas las adyacencias se cumplen</strong>
+            <span>El plano actual respeta las reglas de proximidad definidas.</span>
+          </article>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function adjacencyWeight(status: AdjacencyStatus): number {
+  if (status === 'fail' || status === 'missing') return 3
+  if (status === 'warn') return 2
+  return 1
+}
+
+function adjacencyTone(status: AdjacencyStatus): 'ok' | 'warn' | 'fail' {
+  if (status === 'ok') return 'ok'
+  if (status === 'warn') return 'warn'
+  return 'fail'
 }
 
 function floorLabel(floor: number) {
