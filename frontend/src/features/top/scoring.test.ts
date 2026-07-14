@@ -13,6 +13,11 @@ const metrics = {
   averageTravel: 5,
   verticalMoves: 0,
   hottestRoomName: '-',
+  staffOnShift: 20,
+  staffInMotion: 8,
+  safetyWarnings: 0,
+  activeCases: 4,
+  staffRoles: 4,
 }
 
 describe('scoreArchitecture: factor de adyacencia', () => {

@@ -141,6 +141,11 @@ function architectureProposalFromMetrics({
     edP90: metrics.edP90,
     averageTravel: metrics.averageTravel,
     verticalMoves: metrics.verticalMoves,
+    staffOnShift: metrics.staffOnShift,
+    staffInMotion: metrics.staffInMotion,
+    activeCases: metrics.activeCases,
+    staffRoles: metrics.staffRoles,
+    safetyWarnings: metrics.safetyWarnings,
     ruleIssues: rules.filter((rule) => rule.status !== 'ok').length,
     modeledArea: totalArea,
     roomCount: plan.rooms.length,
@@ -156,6 +161,11 @@ function metricsFromSimulation(result: SimulationResult | null) {
     averageTravel: result?.kpis.averageTravelMinutes ?? 0,
     verticalMoves: result?.kpis.verticalMoves ?? 0,
     hottestRoomName: result?.kpis.hottestRoomName ?? '-',
+    staffOnShift: result?.kpis.staffOnShift ?? 0,
+    staffInMotion: result?.kpis.staffInMotion ?? 0,
+    safetyWarnings: result?.kpis.safetyWarnings ?? 0,
+    activeCases: result?.caseStats.filter((stat) => stat.attempted > 0).length ?? 0,
+    staffRoles: result?.staffStats.length ?? 0,
   }
 }
 

@@ -144,16 +144,23 @@ function ProposalDetailModal({ proposal, onClose, onRestore }: { proposal: Archi
       subtitle={`${proposal.owner} · score ${formatScore(proposal.score.value)}`}
       onClose={onClose}
     >
-      <div className="top-modal-grid">
-        <Metric label="Completados" value={String(proposal.completed)} />
-        <Metric label="Bloqueados" value={String(proposal.blocked)} />
-        <Metric label="ED P90" value={`${proposal.edP90} min`} />
-        <Metric label="Traslado" value={`${proposal.averageTravel} min`} />
-        <Metric label="Cambios planta" value={String(proposal.verticalMoves)} />
-        <Metric label="Reglas abiertas" value={String(proposal.ruleIssues)} />
-        <Metric label="m2 modelados" value={formatInteger(proposal.modeledArea)} />
-        <Metric label="Estancias" value={String(proposal.roomCount)} />
-      </div>
+      <section className="top-modal-section">
+        <h3>Simulación</h3>
+        <div className="top-modal-grid">
+          <Metric label="Pacientes atendidos" value={String(proposal.completed)} />
+          <Metric label="Bloqueados" value={String(proposal.blocked)} />
+          <Metric label="Espera ED P90" value={`${proposal.edP90} min`} />
+          <Metric label="Traslado medio" value={`${proposal.averageTravel} min`} />
+          <Metric label="Personal en turno" value={String(proposal.staffOnShift)} />
+          <Metric label="Personal en movimiento" value={String(proposal.staffInMotion)} />
+          <Metric label="Recorridos clínicos" value={String(proposal.activeCases)} />
+          <Metric label="Roles de personal" value={String(proposal.staffRoles)} />
+          <Metric label="Cambios de planta" value={String(proposal.verticalMoves)} />
+          <Metric label="Avisos de seguridad" value={String(proposal.safetyWarnings)} />
+          <Metric label="Reglas abiertas" value={String(proposal.ruleIssues)} />
+          <Metric label="Zona más cargada" value={proposal.hottestRoomName} />
+        </div>
+      </section>
 
       {proposal.scenario && (
         <section className="top-modal-section">
@@ -168,8 +175,11 @@ function ProposalDetailModal({ proposal, onClose, onRestore }: { proposal: Archi
       )}
 
       <section className="top-modal-section">
-        <h3>Zona caliente</h3>
-        <p>{proposal.hottestRoomName}</p>
+        <h3>Arquitectura</h3>
+        <div className="proposal-chips">
+          <span>{formatInteger(proposal.modeledArea)} m² modelados</span>
+          <span>{proposal.roomCount} estancias</span>
+        </div>
       </section>
 
       {proposal.snapshot && onRestore && (

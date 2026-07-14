@@ -25,6 +25,11 @@ export interface ArchitectureProposal {
   edP90: number
   averageTravel: number
   verticalMoves: number
+  staffOnShift: number
+  staffInMotion: number
+  activeCases: number
+  staffRoles: number
+  safetyWarnings: number
   ruleIssues: number
   modeledArea: number
   roomCount: number
