@@ -45,7 +45,6 @@ import { DEFAULT_SIMULATION_SETTINGS, runHospitalSimulation, type SimulationSett
 import { TopControls, TopPanel } from './features/top/TopDashboard'
 import { RoomInspector } from './features/planning/RoomInspector'
 import { SaturationPanel } from './features/saturation/SaturationPanel'
-import { ClinicSpaceProgramPanel } from './features/services/ClinicSpaceProgramPanel'
 import { SimulationCaseSelector } from './features/simulation/SimulationCaseSelector'
 import { SimulationControlsPanel } from './features/simulation/SimulationControlsPanel'
 import { ScenarioPanel } from './features/scenario/ScenarioPanel'
@@ -667,7 +666,7 @@ function App() {
       return <AnalysisModalContent result={simulationResult} rules={rules} />
     }
 
-    return <ServicesModalContent plan={plan} />
+    return null
   }
 
   return (
@@ -757,7 +756,6 @@ function App() {
               onSaveToTop={submitCurrentArchitecture}
             />
           )}
-          {activeTab === 'services' && <ServicesDashboard plan={plan} />}
           {activeTab === 'analysis' && (
             <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" adjacencyResults={adjacencyResults} />
           )}
@@ -962,47 +960,6 @@ function AnalysisModalContent({
           )}
         </div>
       </section>
-    </div>
-  )
-}
-
-function ServicesModalContent({ plan }: { plan: HospitalPlan }) {
-  const rows = serviceRowsForPlan(plan)
-  const totalArea = rows.reduce((sum, row) => sum + row.area, 0)
-  const totalCapacity = rows.reduce((sum, row) => sum + row.capacity, 0)
-
-  return (
-    <div className="section-modal-grid">
-      <section className="section-modal-card">
-        <h3>Programa funcional</h3>
-        <div className="section-metric-grid">
-          <Metric label="Familias" value={String(rows.length)} />
-          <Metric label="Bloques" value={String(plan.rooms.length)} />
-          <Metric label="m2" value={formatNumber(totalArea)} />
-          <Metric label="Capacidad" value={String(totalCapacity)} />
-        </div>
-      </section>
-
-      <section className="section-modal-card">
-        <h3>Mayores bolsas de superficie modelada</h3>
-        <div className="rule-list compact">
-          {rows.slice(0, 6).map((row) => (
-            <article key={row.label} className="rule-item ok">
-              <strong>{row.label}</strong>
-              <span>{row.count} bloques · {formatNumber(row.area)} m2 · capacidad {row.capacity}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function ServicesDashboard({ plan }: { plan: HospitalPlan }) {
-  return (
-    <div className="services-dashboard">
-      <ClinicSpaceProgramPanel plan={plan} />
-      <ServiceMatrix plan={plan} />
     </div>
   )
 }
@@ -1480,56 +1437,6 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
       </section>
     </div>
   )
-}
-
-function ServiceMatrix({ plan }: { plan: HospitalPlan }) {
-  const rows = serviceRowsForPlan(plan)
-  return (
-    <div className="table-panel">
-      <table>
-        <thead>
-          <tr>
-            <th>Servicio</th>
-            <th>Bloques</th>
-            <th>m2</th>
-            <th>Capacidad</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label}>
-              <td>{row.label}</td>
-              <td>{row.count}</td>
-              <td>{formatNumber(row.area)}</td>
-              <td>{row.capacity}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-interface ServiceRow {
-  label: string
-  count: number
-  area: number
-  capacity: number
-}
-
-function serviceRowsForPlan(plan: HospitalPlan): ServiceRow[] {
-  return Object.entries(
-    plan.rooms.reduce<Record<string, Omit<ServiceRow, 'label'>>>((acc, room) => {
-      const label = KIND_LABELS[room.kind]
-      acc[label] ??= { count: 0, area: 0, capacity: 0 }
-      acc[label].count += 1
-      acc[label].area += room.areaSqm
-      acc[label].capacity += room.capacity
-      return acc
-    }, {}),
-  )
-    .map(([label, value]) => ({ label, ...value }))
-    .sort((a, b) => b.area - a.area)
 }
 
 function componentsForTemplate(roomId: string, templateId: string, source: ComponentSourceMode): RoomComponent[] {

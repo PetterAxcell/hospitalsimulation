@@ -51,6 +51,9 @@ export function TopPanel({ proposals, onRestore }: { proposals: ArchitectureProp
                   <span>ED {proposal.edP90}m</span>
                   <span>{proposal.blocked} bloqueados</span>
                   <span>{proposal.verticalMoves} verticales</span>
+                  {proposal.snapshot && onRestore && (
+                    <button type="button" onClick={() => onRestore(proposal)}>Montar</button>
+                  )}
                   <button type="button" onClick={() => setDetailProposalId(proposal.id)}>Ver detalle</button>
                 </div>
               </article>

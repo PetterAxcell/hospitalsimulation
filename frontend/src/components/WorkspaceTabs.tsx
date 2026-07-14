@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type WorkspaceTab = 'plan' | 'simulation' | 'top' | 'services' | 'analysis' | 'scenario'
+export type WorkspaceTab = 'plan' | 'simulation' | 'top' | 'analysis' | 'scenario'
 
 interface WorkspaceTabsProps {
   active: WorkspaceTab
@@ -14,7 +14,6 @@ const WORKSPACE_TABS: Array<{ id: WorkspaceTab; label: string }> = [
   { id: 'plan', label: 'Planificador' },
   { id: 'simulation', label: 'Simulación' },
   { id: 'analysis', label: 'Análisis' },
-  { id: 'services', label: 'Servicios' },
 ]
 
 export function WorkspaceTabs({ active, onChange, actions }: WorkspaceTabsProps) {
