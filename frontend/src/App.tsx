@@ -554,7 +554,7 @@ function App() {
           <select value={elementToAdd} onChange={(event) => setElementToAdd(event.target.value)}>
             {CLINIC_SPACE_PROGRAM.map((entry) => (
               <option key={entry.id} value={`program:${entry.id}`}>
-                PDF p.{entry.sourcePages.join('/')} · {entry.label}
+                {entry.label}
               </option>
             ))}
           </select>

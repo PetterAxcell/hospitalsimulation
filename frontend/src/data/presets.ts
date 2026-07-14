@@ -292,77 +292,111 @@ function programRoom(
   }
 }
 
+// Rejilla de circulacion para los disenos PDF: dos pasillos horizontales (clinico
+// arriba, servicios abajo) cruzados por dos pasillos verticales, formando una malla
+// conectada. Deja tres columnas de estancias (izquierda, centro, derecha).
+const GRID_CLINICAL_Y = 30
+const GRID_CLINICAL_H = 4
+const GRID_SERVICE_Y = 54
+
+function pdfCirculationGrid(floors: number[]): PlacedRoom[] {
+  return floors.flatMap((floor) => [
+    room('clinicalCorridor', floor, 0, GRID_CLINICAL_Y, 100, GRID_CLINICAL_H, { name: `Pasillo clínico ${floor}` }),
+    room('logisticsCorridor', floor, 0, GRID_SERVICE_Y, 100, 3, { name: `Pasillo de servicios ${floor}` }),
+    room('publicCorridor', floor, 31, 4, 4, 53, { name: `Pasillo vertical oeste ${floor}` }),
+    room('publicCorridor', floor, 65, 4, 4, 53, { name: `Pasillo vertical este ${floor}` }),
+  ])
+}
+
+function pdfVerticalCores(floors: number[]): PlacedRoom[] {
+  return floors.map((floor) => room('verticalCore', floor, 31, 20, 4, 8, { name: `Ascensores clínicos ${floor}` }))
+}
+
+// Escaleras protegidas, refugios y sectores PCI alineados con la rejilla de pasillos
+// (tocan el pasillo clinico o el de servicios) para que queden conectados.
+function pdfSafetyBackbone(floors: number[]): PlacedRoom[] {
+  return floors.flatMap((floor) => [
+    room('emergencyStairCore', floor, 4, 22, 5, 10, { name: `Escalera emergencia oeste ${floor}` }),
+    room('emergencyStairCore', floor, 95, 22, 4, 10, { name: `Escalera emergencia este ${floor}` }),
+    room('fireCompartment', floor, 10, GRID_SERVICE_Y + 3, 8, 5, { name: `Sector PCI ${floor}` }),
+    room('horizontalRefuge', floor, 86, GRID_SERVICE_Y + 3, 8, 5, { name: `Refugio horizontal ${floor}` }),
+  ])
+}
+
+// Columnas cuyo borde toca el pasillo clinico (y=30) para garantizar conexion.
+const COL = { left: 10, center: 37, right: 71 } as const
+const upperY = (h: number) => GRID_CLINICAL_Y - h
+const LOWER_Y = GRID_CLINICAL_Y + GRID_CLINICAL_H
+
 // La entrada 'a4-emergency-configuration' del PDF agrupa varios tipos de sala.
-// La expandimos para que urgencias tenga nodos de flujo reales (triaje, boxes...).
-// Fila A pega su borde inferior al pasillo clinico (y=31); fila B pega su borde
-// superior por debajo, de modo que todas tocan el pasillo y son alcanzables.
-function emergencyClusterFromProgram(floor: number): PlacedRoom[] {
-  const layout: Array<{ tpl: string; x: number; y: number; w: number; h: number }> = [
-    { tpl: 'ambulanceBay', x: 64, y: 22, w: 12, h: 9 },
-    { tpl: 'triage', x: 77, y: 23, w: 9, h: 8 },
-    { tpl: 'resus', x: 87, y: 22, w: 6, h: 9 },
-    { tpl: 'edBoxes', x: 64, y: 37, w: 20, h: 12 },
-    { tpl: 'edObservation', x: 86, y: 37, w: 7, h: 8 },
+// La expandimos para que urgencias tenga nodos de flujo reales. Incluye DOS triajes:
+// asi la demo de eliminar un triaje concentra toda la cola en el que queda.
+function emergencyClusterFromProgram(floor: number, capacityScale = 1): PlacedRoom[] {
+  const layout: Array<{ tpl: string; x: number; y: number; w: number; h: number; name: string }> = [
+    { tpl: 'ambulanceBay', x: 37, y: upperY(9), w: 16, h: 9, name: 'Bahía de ambulancias' },
+    { tpl: 'triage', x: 55, y: upperY(8), w: 9, h: 8, name: 'Triaje urgencias 1' },
+    { tpl: 'triage', x: 71, y: upperY(8), w: 9, h: 8, name: 'Triaje urgencias 2' },
+    { tpl: 'resus', x: 82, y: upperY(9), w: 11, h: 9, name: 'Shock rooms' },
+    { tpl: 'edBoxes', x: 71, y: LOWER_Y, w: 22, h: 18, name: 'Boxes de urgencias adultos' },
+    { tpl: 'edObservation', x: 37, y: LOWER_Y, w: 26, h: 14, name: 'Observación de urgencias' },
   ]
-  return layout.map(({ tpl, x, y, w, h }) => programRoom('a4-emergency-configuration', floor, x, y, { templateId: tpl, w, h }))
+  return layout.map(({ tpl, x, y, w, h, name }) => programRoom('a4-emergency-configuration', floor, x, y, {
+    templateId: tpl,
+    w,
+    h,
+    name,
+    capacity: Math.max(1, Math.round(templateById(tpl).defaultCapacity * capacityScale)),
+  }))
 }
 
 export function createClinicPdfDesignVertical(): HospitalPlan {
   sequence = 0
-  const floors = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+  const floors = [-1, 0, 1, 2, 3, 4]
   const rooms: PlacedRoom[] = [
-    ...circulationBackbone(floors, { clinicalWidth: 5, publicWidth: 7, logisticsWidth: 4 }),
-    ...safetyBackbone(floors),
+    ...pdfCirculationGrid(floors),
+    ...pdfSafetyBackbone(floors),
 
-    programRoom('st6-mep-maintenance', -2, 10, 15, { w: 32, h: 16 }),
-    programRoom('st1-waste', -2, 64, 18, { w: 22, h: 13 }),
-    programRoom('st1-logistics-stores', -2, 10, 36, { w: 30, h: 14 }),
+    // -1 soporte y logistica agrupados
+    programRoom('st1-logistics-stores', -1, COL.left, upperY(14), { w: 20, h: 14 }),
+    programRoom('st1-kitchen-food', -1, COL.center, upperY(14), { w: 27, h: 14 }),
+    programRoom('st21-sterilization', -1, COL.right, upperY(13), { w: 22, h: 13 }),
+    programRoom('st6-mep-maintenance', -1, COL.left, LOWER_Y, { w: 20, h: 13 }),
+    programRoom('st1-waste', -1, COL.right, LOWER_Y, { w: 20, h: 12 }),
 
-    programRoom('st21-sterilization', -1, 10, 18, { w: 24, h: 13 }),
-    programRoom('st22-medication-area', -1, 64, 18, { w: 22, h: 13 }),
-    programRoom('a2-consultes-shared', -1, 10, 36, { w: 32, h: 14 }),
-    programRoom('st1-linen', -1, 64, 36, { w: 20, h: 12 }),
+    // 0 acceso + urgencias (2 triajes) + area del medicamento contigua
+    programRoom('t2-common-meeting', 0, COL.left, upperY(16), { w: 20, h: 16 }),
+    ...emergencyClusterFromProgram(0, 2),
+    programRoom('st22-medication-area', 0, COL.left, LOWER_Y, { w: 20, h: 13 }),
 
-    programRoom('t2-common-meeting', 0, 10, 15, { w: 34, h: 16 }),
-    ...emergencyClusterFromProgram(0),
-    programRoom('st1-kitchen-food', 0, 10, 36, { w: 28, h: 13 }),
+    // 1 nucleo clinico co-localizado: quirofano + PACU + criticos + laboratorio
+    programRoom('a1-critical-module', 1, COL.left, upperY(15), { w: 20, h: 15 }),
+    programRoom('a3-surgery-module', 1, COL.center, upperY(16), { w: 27, h: 16 }),
+    programRoom('a3-pacu-module', 1, COL.right, upperY(14), { w: 22, h: 14 }),
+    programRoom('a1-critical-shared', 1, COL.left, LOWER_Y, { w: 20, h: 14 }),
+    programRoom('a2-consultes-shared', 1, COL.center, LOWER_Y, { w: 27, h: 14, templateId: 'coreLab', name: 'Laboratorio / core lab' }),
 
-    programRoom('a1-critical-module', 1, 10, 17, { w: 22, h: 14 }),
-    programRoom('a3-surgery-module', 1, 64, 15, { w: 24, h: 16 }),
-    programRoom('a1-critical-shared', 1, 10, 36, { w: 30, h: 13 }),
-    programRoom('a3-pacu-module', 1, 64, 36, { w: 22, h: 13 }),
+    // 2 hospitalizacion en placa
+    programRoom('a1-hospitalitzacio-module', 2, COL.left, upperY(18), { w: 20, h: 18 }),
+    programRoom('a1-hospitalitzacio-module', 2, COL.center, upperY(18), { w: 27, h: 18 }),
+    programRoom('a1-hospitalitzacio-shared', 2, COL.right, upperY(16), { w: 22, h: 16 }),
 
-    programRoom('a1-hospitalitzacio-module', 2, 10, 13, { w: 34, h: 18 }),
-    programRoom('a1-hospitalitzacio-module', 2, 64, 13, { w: 28, h: 18 }),
-    programRoom('a1-hospitalitzacio-shared', 2, 10, 36, { w: 32, h: 14 }),
+    // 3 ambulatorio: consultas y hospital de dia
+    programRoom('a2-consultes-module', 3, COL.left, upperY(16), { w: 20, h: 16 }),
+    programRoom('a2-day-hospital', 3, COL.center, upperY(15), { w: 27, h: 15 }),
+    programRoom('a2-day-hospital', 3, COL.right, upperY(15), { w: 22, h: 15 }),
+    programRoom('a2-consultes-module', 3, COL.left, LOWER_Y, { w: 20, h: 14 }),
 
-    programRoom('a2-consultes-module', 3, 10, 15, { w: 30, h: 16 }),
-    programRoom('a2-day-hospital', 3, 64, 16, { w: 26, h: 15 }),
-    programRoom('a1-hospitalitzacio-module', 3, 10, 36, { w: 30, h: 14 }),
+    // 4 academia y gestion en corona superior
+    programRoom('d-simulation-center', 4, COL.left, upperY(18), { w: 20, h: 18 }),
+    programRoom('r1-basic-research-unit', 4, COL.center, upperY(18), { w: 27, h: 18 }),
+    programRoom('t1-management-office-module', 4, COL.right, upperY(16), { w: 22, h: 16 }),
+    programRoom('d1-theory-teaching', 4, COL.left, LOWER_Y, { w: 20, h: 14 }),
 
-    programRoom('a2-day-hospital', 4, 10, 15, { w: 28, h: 16 }),
-    programRoom('a2-consultes-module', 4, 64, 16, { w: 26, h: 15 }),
-    programRoom('t3-innovation', 4, 10, 36, { w: 30, h: 13 }),
-
-    programRoom('r1-basic-research-unit', 5, 10, 13, { w: 32, h: 18 }),
-    programRoom('r2-scientific-platforms', 5, 64, 15, { w: 26, h: 16 }),
-
-    programRoom('d2-crai-library', 6, 10, 13, { w: 32, h: 18 }),
-    programRoom('d-simulation-center', 6, 64, 13, { w: 28, h: 18 }),
-    programRoom('d-xr-audiovisual', 6, 10, 36, { w: 20, h: 12 }),
-
-    programRoom('d1-theory-teaching', 7, 10, 13, { w: 34, h: 18 }),
-    programRoom('d1-insitu-teaching', 7, 64, 15, { w: 26, h: 16 }),
-
-    programRoom('t1-management-office-module', 8, 10, 15, { w: 28, h: 16 }),
-    programRoom('st7-it', 8, 64, 17, { w: 24, h: 14 }),
-    programRoom('st1-security', 8, 10, 36, { w: 12, h: 8 }),
-
-    ...upperVerticalCores(floors),
+    ...pdfVerticalCores(floors),
   ]
   const plan: HospitalPlan = {
     id: 'clinic-pdf-vertical',
-    name: 'Nou Clínic PDF · torre asistencial compacta',
+    name: 'Nou Clínic · torre asistencial compacta',
     targetAreaSqm: HOSPITAL_CLINIC_FACTS.newCampus.targetAreaSqm,
     siteAreaSqm: HOSPITAL_CLINIC_FACTS.newCampus.targetAreaSqm,
     floors,
@@ -373,55 +407,53 @@ export function createClinicPdfDesignVertical(): HospitalPlan {
 
 export function createClinicPdfDesignInstitutes(): HospitalPlan {
   sequence = 0
-  const floors = [-2, -1, 0, 1, 2, 3, 4, 5, 6]
+  const floors = [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8]
   const rooms: PlacedRoom[] = [
-    ...circulationBackbone(floors, { clinicalWidth: 5, publicWidth: 8, logisticsWidth: 4 }),
-    ...safetyBackbone(floors),
+    ...pdfCirculationGrid(floors),
+    ...pdfSafetyBackbone(floors),
 
-    programRoom('st1-logistics-stores', -2, 10, 17, { w: 28, h: 14 }),
-    programRoom('st1-kitchen-food', -2, 64, 18, { w: 26, h: 13 }),
-    programRoom('st6-mep-maintenance', -2, 10, 36, { w: 26, h: 13 }),
-    programRoom('st1-waste', -2, 64, 36, { w: 18, h: 12 }),
+    programRoom('st6-mep-maintenance', -2, COL.left, upperY(14), { w: 20, h: 14 }),
+    programRoom('st1-waste', -2, COL.center, upperY(13), { w: 27, h: 13 }),
+    programRoom('st1-cleaning', -2, COL.right, upperY(12), { w: 20, h: 12 }),
 
-    programRoom('st21-sterilization', -1, 10, 18, { w: 22, h: 13 }),
-    programRoom('a2-consultes-shared', -1, 64, 16, { w: 28, h: 15 }),
-    programRoom('st22-medication-area', -1, 10, 36, { w: 22, h: 13 }),
-    programRoom('st7-it', -1, 64, 36, { w: 20, h: 12 }),
+    programRoom('st1-logistics-stores', -1, COL.left, upperY(14), { w: 20, h: 14 }),
+    programRoom('st1-kitchen-food', -1, COL.center, upperY(14), { w: 27, h: 14 }),
+    programRoom('st21-sterilization', -1, COL.right, upperY(13), { w: 22, h: 13 }),
 
-    programRoom('t2-common-meeting', 0, 10, 15, { w: 30, h: 16 }),
+    programRoom('t2-common-meeting', 0, COL.left, upperY(16), { w: 20, h: 16 }),
     ...emergencyClusterFromProgram(0),
-    programRoom('a2-day-hospital', 0, 10, 36, { w: 26, h: 13 }),
 
-    programRoom('a3-surgery-module', 1, 10, 15, { w: 24, h: 16 }),
-    programRoom('a3-pacu-module', 1, 64, 17, { w: 22, h: 14 }),
-    programRoom('a1-critical-module', 1, 10, 36, { w: 22, h: 13 }),
-    programRoom('a1-critical-shared', 1, 64, 36, { w: 28, h: 13 }),
+    programRoom('a3-surgery-module', 1, COL.left, upperY(16), { w: 20, h: 16 }),
+    programRoom('a3-pacu-module', 1, COL.center, upperY(14), { w: 27, h: 14 }),
+    programRoom('st22-medication-area', 1, COL.right, upperY(13), { w: 22, h: 13 }),
 
-    programRoom('a1-hospitalitzacio-module', 2, 10, 13, { w: 32, h: 18 }),
-    programRoom('a2-consultes-module', 2, 64, 15, { w: 28, h: 16 }),
-    programRoom('a1-hospitalitzacio-shared', 2, 10, 36, { w: 30, h: 14 }),
+    programRoom('a1-critical-module', 2, COL.left, upperY(14), { w: 20, h: 14 }),
+    programRoom('a1-critical-shared', 2, COL.center, upperY(13), { w: 27, h: 13 }),
+    programRoom('a2-consultes-shared', 2, COL.right, upperY(15), { w: 22, h: 15, templateId: 'coreLab', name: 'Laboratorio / core lab' }),
 
-    programRoom('a1-hospitalitzacio-module', 3, 10, 13, { w: 32, h: 18 }),
-    programRoom('a2-consultes-module', 3, 64, 15, { w: 28, h: 16 }),
-    programRoom('a2-day-hospital', 3, 10, 36, { w: 28, h: 13 }),
+    programRoom('a1-hospitalitzacio-module', 3, COL.left, upperY(18), { w: 20, h: 18 }),
+    programRoom('a1-hospitalitzacio-shared', 3, COL.center, upperY(16), { w: 27, h: 16 }),
 
-    programRoom('r1-basic-research-unit', 4, 10, 13, { w: 30, h: 18 }),
-    programRoom('r2-scientific-platforms', 4, 64, 15, { w: 26, h: 16 }),
-    programRoom('t3-innovation', 4, 10, 36, { w: 30, h: 13 }),
+    programRoom('a1-hospitalitzacio-module', 4, COL.left, upperY(18), { w: 20, h: 18 }),
+    programRoom('a2-consultes-module', 4, COL.center, upperY(16), { w: 27, h: 16 }),
 
-    programRoom('d1-theory-teaching', 5, 10, 13, { w: 34, h: 18 }),
-    programRoom('d-simulation-center', 5, 64, 13, { w: 28, h: 18 }),
-    programRoom('d-xr-audiovisual', 5, 10, 36, { w: 20, h: 12 }),
+    programRoom('a2-day-hospital', 5, COL.left, upperY(15), { w: 20, h: 15 }),
+    programRoom('a2-consultes-module', 5, COL.center, upperY(16), { w: 27, h: 16 }),
 
-    programRoom('d2-crai-library', 6, 10, 13, { w: 32, h: 18 }),
-    programRoom('d1-insitu-teaching', 6, 64, 15, { w: 26, h: 16 }),
-    programRoom('t1-management-office-module', 6, 10, 36, { w: 26, h: 13 }),
+    programRoom('r1-basic-research-unit', 6, COL.left, upperY(18), { w: 20, h: 18 }),
+    programRoom('r2-scientific-platforms', 6, COL.center, upperY(16), { w: 27, h: 16 }),
 
-    ...upperVerticalCores(floors),
+    programRoom('d1-theory-teaching', 7, COL.left, upperY(18), { w: 20, h: 18 }),
+    programRoom('d-simulation-center', 7, COL.center, upperY(18), { w: 27, h: 18 }),
+
+    programRoom('t1-management-office-module', 8, COL.left, upperY(16), { w: 20, h: 16 }),
+    programRoom('t3-innovation', 8, COL.center, upperY(14), { w: 27, h: 14 }),
+
+    ...pdfVerticalCores(floors),
   ]
   const plan: HospitalPlan = {
     id: 'clinic-pdf-institutes',
-    name: 'Nou Clínic PDF · institutos distribuidos',
+    name: 'Nou Clínic · campus distribuido',
     targetAreaSqm: HOSPITAL_CLINIC_FACTS.newCampus.targetAreaSqm,
     siteAreaSqm: HOSPITAL_CLINIC_FACTS.newCampus.targetAreaSqm,
     floors,

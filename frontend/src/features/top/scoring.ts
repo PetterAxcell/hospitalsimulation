@@ -184,12 +184,12 @@ export function scoreArchitecture(
   const warnCount = rules.filter((rule) => rule.status === 'warn').length
   const areaDrift = Math.abs(totalArea - plan.targetAreaSqm) / Math.max(1, plan.targetAreaSqm)
   const blockedPenalty = metrics.blocked * 2.4
-  const waitPenalty = Math.max(0, metrics.edP90 - 120) * 0.055
-  const travelPenalty = metrics.averageTravel * 0.35
-  const verticalPenalty = metrics.verticalMoves * 0.012
-  const rulePenalty = failCount * 8 + warnCount * 2.5
+  const waitPenalty = Math.min(16, Math.max(0, metrics.edP90 - 120) * 0.025)
+  const travelPenalty = Math.min(16, metrics.averageTravel * 0.22)
+  const verticalPenalty = Math.min(8, metrics.verticalMoves * 0.008)
+  const rulePenalty = Math.min(24, failCount * 3 + warnCount * 1)
   const areaPenalty = Math.min(12, areaDrift * 40)
-  const adjacencyPenalty = Math.min(24, (adjacency?.noComplies ?? 0) * 5)
+  const adjacencyPenalty = Math.min(18, (adjacency?.noComplies ?? 0) * 4)
   const value = clampScore(100 - blockedPenalty - waitPenalty - travelPenalty - verticalPenalty - rulePenalty - areaPenalty - adjacencyPenalty)
 
   return {
