@@ -1,9 +1,16 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { KIND_LABELS } from '../../data/catalog'
 import { isPassage } from '../../engine/circulation'
+import { adjacencyComplies, summarizeAdjacency, type AdjacencyRuleResult, type AdjacencyStatus } from '../../engine/adjacencyMatrix'
+import { METERS_PER_WORLD_UNIT } from '../../engine/geometry'
+import { CollapsibleSection } from '../../components/ui/CollapsibleSection'
 import { Metric } from '../../components/ui/Metric'
 import { Modal } from '../../components/ui/Modal'
 import type { HospitalPlan, PatientCaseFilter, PlacedRoom, SimulationResult } from '../../types'
+
+// Longitud media de un paso humano al caminar (m). Se usa para convertir la
+// distancia recorrida por el plano (en metros) a numero de pasos fisicos.
+const STEP_METERS = 0.75
 
 interface BottleneckRow {
   room: PlacedRoom
@@ -11,16 +18,32 @@ interface BottleneckRow {
   score: number
 }
 
+interface StepRow {
+  id: string
+  label: string
+  color: string
+  avgSteps: number
+  patients: number
+}
+
 export function SaturationPanel({
   plan,
   result,
   selectedCaseId,
+  adjacencyResults = [],
 }: {
   plan: HospitalPlan
   result: SimulationResult | null
   selectedCaseId: PatientCaseFilter
+  adjacencyResults?: AdjacencyRuleResult[]
 }) {
   const [isReadingOpen, setReadingOpen] = useState(false)
+
+  const adjacencySummary = useMemo(() => summarizeAdjacency(adjacencyResults), [adjacencyResults])
+  const sortedAdjacency = useMemo(
+    () => [...adjacencyResults].sort((a, b) => adjStatusWeight(b.status) - adjStatusWeight(a.status)),
+    [adjacencyResults],
+  )
 
   if (!result) {
     return (
@@ -36,32 +59,77 @@ export function SaturationPanel({
   const pressure = pressureForCase(plan, result, selectedCaseId)
   const bottlenecks = bottleneckRows(plan, pressure).slice(0, 12)
   const maxScore = Math.max(1, ...bottlenecks.map((row) => row.score))
+  const stepStats = stepStatsByCase(plan, result)
+  const maxSteps = Math.max(1, ...stepStats.rows.map((row) => row.avgSteps))
   const activeCases = result.caseStats.filter((stat) => stat.attempted > 0).sort((a, b) => b.attempted - a.attempted).slice(0, 5)
   const maxCaseLoad = Math.max(1, ...activeCases.map((stat) => stat.attempted))
   const saturated = bottlenecks.filter((row) => row.score >= 1).length
-  const warning = bottlenecks.filter((row) => row.score >= 0.6 && row.score < 1).length
+
+  const cumplen = adjacencySummary.ok + adjacencySummary.warn
+  const noCumplen = adjacencySummary.fail + adjacencySummary.missing
+  const adjacencyVerdict = adjacencyResults.length === 0
+    ? { tone: 'ok' as const, label: 'Sin reglas' }
+    : noCumplen > 0
+      ? { tone: 'fail' as const, label: 'No cumple' }
+      : { tone: 'ok' as const, label: 'Cumple' }
 
   return (
-    <div className="saturation-panel">
+    <div className="saturation-panel analysis-panel">
       <section className="saturation-hero">
         <div className="saturation-hero-main">
-          <span>Análisis de cuellos de botella</span>
+          <span>Análisis de escenario</span>
           <h2>{selectedCase ? selectedCase.label : 'Todos los casos clínicos'}</h2>
           <div className="top-hero-actions">
             <button type="button" className="ghost-action" onClick={() => setReadingOpen(true)}>Lectura operativa</button>
           </div>
         </div>
         <div className="saturation-kpis">
-          <Metric label="Bloque critico" value={bottlenecks[0]?.room.name ?? '-'} />
+          <Metric label="Adyacencia" value={adjacencyVerdict.label} />
+          <Metric label="Pasos/paciente" value={String(stepStats.overallAvg)} />
           <Metric label="Saturados" value={String(saturated)} />
-          <Metric label="En tension" value={String(warning)} />
           <Metric label="Bloqueados" value={String(result.kpis.blockedPatients)} />
         </div>
       </section>
 
-      <div className="saturation-grid saturation-grid-compact">
-        <section className="saturation-block wide">
-          <h3>Presion por estancia</h3>
+      <div className="analysis-sections">
+        {/* 1. Cumplimiento de la matriz de adyacencia (arriba) */}
+        <CollapsibleSection
+          title="Matriz de adyacencia"
+          badge={adjacencyResults.length === 0 ? undefined : adjacencyVerdict}
+          summary={adjacencyResults.length === 0 ? 'Sin reglas definidas' : `${cumplen}/${adjacencySummary.total} reglas cumplen`}
+        >
+          <p className="analysis-block-hint">Cada regla de proximidad definida en Escenario cumple o no cumple frente al plano actual.</p>
+          <div className="analysis-adjacency-kpis">
+            <Metric label="Reglas" value={String(adjacencySummary.total)} />
+            <Metric label="Cumplen" value={String(cumplen)} />
+            <Metric label="No cumplen" value={String(noCumplen)} />
+          </div>
+          <div className="rule-list compact">
+            {sortedAdjacency.length > 0 ? (
+              sortedAdjacency.map((res) => {
+                const ok = adjacencyComplies(res.status)
+                return (
+                  <article key={res.id} className={`rule-item ${ok ? 'ok' : 'fail'}`}>
+                    <strong>{res.label} · {ok ? 'Cumple' : 'No cumple'}</strong>
+                    <span>{res.evidence}</span>
+                  </article>
+                )
+              })
+            ) : (
+              <article className="rule-item ok">
+                <strong>Sin reglas de adyacencia</strong>
+                <span>Define reglas en la matriz del tab Escenario para evaluarlas aquí.</span>
+              </article>
+            )}
+          </div>
+        </CollapsibleSection>
+
+        {/* 2. Presión por estancia */}
+        <CollapsibleSection
+          title="Presión por estancia"
+          summary={bottlenecks[0] ? `Máx ${formatDemandRatio(bottlenecks[0].score)} · ${saturated} saturados` : 'Sin demanda'}
+        >
+          <p className="analysis-block-hint">Pacientes que pasan por cada estancia frente a su capacidad. Añadir más bloques del mismo servicio reparte la carga.</p>
           <div className="chart-list">
             {bottlenecks.length > 0 ? (
               bottlenecks.map((row) => (
@@ -77,7 +145,7 @@ export function SaturationPanel({
                     />
                   </div>
                   <div className="chart-chips">
-                    <span>{row.count} pasos</span>
+                    <span>{row.count} pacientes</span>
                     <span>Cap {row.room.capacity}</span>
                     <span>{KIND_LABELS[row.room.kind]}</span>
                   </div>
@@ -87,34 +155,62 @@ export function SaturationPanel({
               <p className="muted">Sin demanda suficiente.</p>
             )}
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="saturation-block">
-          <h3>Casos bloqueados</h3>
+        {/* 3. Pasos físicos por paciente (media ponderada) */}
+        <CollapsibleSection
+          title="Pasos por paciente"
+          summary={`Media ${stepStats.overallAvg} pasos/paciente`}
+        >
+          <p className="analysis-block-hint">Media ponderada de pasos físicos que camina un paciente por el hospital (estimado a {STEP_METERS} m/paso; {METERS_PER_WORLD_UNIT} m por unidad de plano). Objetivo a optimizar.</p>
           <div className="chart-list">
-            {activeCases.map((stat) => (
-              <article key={stat.id} className="chart-row compact">
-                <div className="chart-row-head">
-                  <strong>{stat.label}</strong>
-                  <span>{stat.completed}/{stat.attempted}</span>
-                </div>
-                <div className="bar-track" aria-hidden="true">
-                  <span className="bar-fill case" style={{ width: `${Math.max(5, (stat.attempted / maxCaseLoad) * 100)}%`, backgroundColor: stat.color }} />
-                </div>
-                <div className="chart-chips">
-                  <span>{stat.blocked} bloqueados</span>
-                </div>
-              </article>
-            ))}
+            {stepStats.rows.length > 0 ? (
+              stepStats.rows.map((row) => (
+                <article key={row.id} className="chart-row compact">
+                  <div className="chart-row-head">
+                    <strong>{row.label}</strong>
+                    <span>{row.avgSteps} pasos</span>
+                  </div>
+                  <div className="bar-track" aria-hidden="true">
+                    <span className="bar-fill case" style={{ width: `${Math.max(6, (row.avgSteps / maxSteps) * 100)}%`, backgroundColor: row.color }} />
+                  </div>
+                  <div className="chart-chips">
+                    <span>{row.patients} pacientes</span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="muted">Sin recorridos completados.</p>
+            )}
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="saturation-block saturation-summary">
-          <h3>Estado operativo</h3>
-          <Metric label="Mayor presion" value={bottlenecks[0] ? formatDemandRatio(bottlenecks[0].score) : '-'} />
-          <Metric label="Caso activo" value={selectedCase?.id ?? 'Todos'} />
-          <button type="button" className="secondary-action" onClick={() => setReadingOpen(true)}>Abrir lectura</button>
-        </section>
+        {/* 4. Casos bloqueados */}
+        <CollapsibleSection
+          title="Casos bloqueados"
+          summary={`${result.kpis.blockedPatients} pacientes bloqueados`}
+        >
+          <div className="chart-list">
+            {activeCases.length > 0 ? (
+              activeCases.map((stat) => (
+                <article key={stat.id} className="chart-row compact">
+                  <div className="chart-row-head">
+                    <strong>{stat.label}</strong>
+                    <span>{stat.completed}/{stat.attempted}</span>
+                  </div>
+                  <div className="bar-track" aria-hidden="true">
+                    <span className="bar-fill case" style={{ width: `${Math.max(5, (stat.attempted / maxCaseLoad) * 100)}%`, backgroundColor: stat.color }} />
+                  </div>
+                  <div className="chart-chips">
+                    <span>{stat.blocked} bloqueados</span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="muted">Sin casos activos.</p>
+            )}
+          </div>
+        </CollapsibleSection>
       </div>
 
       {isReadingOpen && (
@@ -176,6 +272,62 @@ function bottleneckRows(plan: HospitalPlan, pressure: Record<string, number>): B
     })
     .filter((row): row is BottleneckRow => row !== null)
     .sort((a, b) => b.score - a.score)
+}
+
+// Media ponderada de pasos fisicos por paciente. Para cada paciente se suma la
+// distancia horizontal recorrida entre estancias consecutivas de su ruta (incluidos
+// pasillos), se pasa a metros y se divide por la longitud de paso. Los cambios de
+// planta (ascensores) no suman pasos porque no se caminan.
+function stepStatsByCase(plan: HospitalPlan, result: SimulationResult): { rows: StepRow[]; overallAvg: number } {
+  const roomById = new Map(plan.rooms.map((room) => [room.id, room]))
+  const statById = new Map(result.caseStats.map((stat) => [stat.id, stat]))
+  const acc = new Map<string, { steps: number; patients: number }>()
+  let totalSteps = 0
+  let totalPatients = 0
+
+  for (const agent of result.agents) {
+    if (agent.role !== 'patient' || !agent.caseId) continue
+    let worldDistance = 0
+    for (let i = 1; i < agent.route.length; i += 1) {
+      const from = roomById.get(agent.route[i - 1].roomId)
+      const to = roomById.get(agent.route[i].roomId)
+      if (!from || !to) continue
+      const fromX = from.x + from.w / 2
+      const fromY = from.y + from.h / 2
+      const toX = to.x + to.w / 2
+      const toY = to.y + to.h / 2
+      worldDistance += Math.hypot(fromX - toX, fromY - toY)
+    }
+    const steps = (worldDistance * METERS_PER_WORLD_UNIT) / STEP_METERS
+    const entry = acc.get(agent.caseId) ?? { steps: 0, patients: 0 }
+    entry.steps += steps
+    entry.patients += 1
+    acc.set(agent.caseId, entry)
+    totalSteps += steps
+    totalPatients += 1
+  }
+
+  const rows: StepRow[] = [...acc.entries()]
+    .map(([id, entry]) => {
+      const stat = statById.get(id)
+      return {
+        id,
+        label: stat?.label ?? id,
+        color: stat?.color ?? '#375171',
+        avgSteps: Math.round(entry.steps / Math.max(1, entry.patients)),
+        patients: entry.patients,
+      }
+    })
+    .sort((a, b) => b.avgSteps - a.avgSteps)
+
+  const overallAvg = totalPatients ? Math.round(totalSteps / totalPatients) : 0
+  return { rows, overallAvg }
+}
+
+function adjStatusWeight(status: AdjacencyStatus): number {
+  if (status === 'fail' || status === 'missing') return 3
+  if (status === 'warn') return 2
+  return 1
 }
 
 function formatDemandRatio(score: number): string {

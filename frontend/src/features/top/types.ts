@@ -1,3 +1,7 @@
+import type { HospitalPlan } from '../../types'
+import type { SimulationSettings } from '../../engine/simulation'
+import type { AdjacencyRule } from '../../engine/adjacencyMatrix'
+
 export type ProposalOwner = string
 
 export interface ArchitectureScore {
@@ -26,4 +30,20 @@ export interface ArchitectureProposal {
   hottestRoomName: string
   createdAt: string
   source: 'demo' | 'submitted'
+  scenario?: ProposalScenario
+  snapshot?: ProposalSnapshot
+}
+
+export interface ProposalScenario {
+  arrivalsPerHour: number
+  horizonYears: number
+  durationHours: number
+  adjacencyTotal: number
+  adjacencyComplies: number
+}
+
+export interface ProposalSnapshot {
+  plan: HospitalPlan
+  settings: SimulationSettings
+  adjacencyRules: AdjacencyRule[]
 }

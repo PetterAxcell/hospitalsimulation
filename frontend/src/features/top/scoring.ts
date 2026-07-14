@@ -1,6 +1,6 @@
 import type { ArchitectureRuleResult } from '../../engine/architectureRules'
 import type { HospitalPlan, SimulationResult } from '../../types'
-import type { ArchitectureProposal, ArchitectureScore, ProposalOwner } from './types'
+import type { ArchitectureProposal, ArchitectureScore, ProposalOwner, ProposalScenario, ProposalSnapshot } from './types'
 
 type ArchitectureMetrics = ReturnType<typeof metricsFromSimulation>
 
@@ -67,6 +67,8 @@ export function architectureProposalFromCurrentPlan({
   rules,
   totalArea,
   index,
+  scenario,
+  snapshot,
 }: {
   owner: ProposalOwner
   plan: HospitalPlan
@@ -74,9 +76,11 @@ export function architectureProposalFromCurrentPlan({
   rules: ArchitectureRuleResult[]
   totalArea: number
   index: number
+  scenario?: ProposalScenario
+  snapshot?: ProposalSnapshot
 }): ArchitectureProposal {
   const now = new Date()
-  return architectureProposalFromMetrics({
+  const base = architectureProposalFromMetrics({
     id: `submitted-${now.getTime()}`,
     owner,
     title: `Arquitectura ${index}`,
@@ -87,6 +91,7 @@ export function architectureProposalFromCurrentPlan({
     totalArea,
     metrics: metricsFromSimulation(result),
   })
+  return { ...base, scenario, snapshot }
 }
 
 function architectureProposalFromMetrics({

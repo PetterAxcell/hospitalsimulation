@@ -11,6 +11,7 @@ import { createHospitalClinicCampusPlan } from './data/presets'
 import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
   DEFAULT_ADJACENCY_RULES,
+  adjacencyComplies,
   cycleRule,
   evaluateAdjacencyRules,
   type AdjacencyRule,
@@ -458,9 +459,31 @@ function App() {
       rules,
       totalArea,
       index: submittedProposals.length + 1,
+      scenario: {
+        arrivalsPerHour: simulationSettings.arrivalsPerHour,
+        horizonYears: simulationSettings.horizonYears,
+        durationHours: simulationSettings.durationHours,
+        adjacencyTotal: adjacencyResults.length,
+        adjacencyComplies: adjacencyResults.filter((res) => adjacencyComplies(res.status)).length,
+      },
+      snapshot: {
+        plan: structuredClone(plan),
+        settings: { ...simulationSettings },
+        adjacencyRules: adjacencyRules.map((rule) => ({ ...rule })),
+      },
     })
     setSubmittedProposals((current) => [nextProposal, ...current])
     setActiveTab('top')
+  }
+
+  function restoreProposal(proposal: ArchitectureProposal) {
+    if (!proposal.snapshot) return
+    setPlan(structuredClone(proposal.snapshot.plan))
+    setSimulationSettings({ ...proposal.snapshot.settings })
+    setAdjacencyRules(proposal.snapshot.adjacencyRules.map((rule) => ({ ...rule })))
+    setSelectedRoomId(proposal.snapshot.plan.rooms[0]?.id)
+    setSelectedFloor(0)
+    setActiveTab('plan')
   }
 
   function renderFloorPicker() {
@@ -527,6 +550,8 @@ function App() {
         <Metric label="m2 planta" value={formatNumber(floorArea)} />
         <Metric label="Bloques" value={String(activeFloorRooms.length)} />
         <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
+        <Metric label="Score actual" value={formatScore(currentScore.value)} />
+        <button type="button" className="primary-action" onClick={submitCurrentArchitecture}>Guardar en Top</button>
       </section>
     )
   }
@@ -718,7 +743,7 @@ function App() {
             </Suspense>
           )}
 
-          {activeTab === 'top' && <TopPanel proposals={topProposals} />}
+          {activeTab === 'top' && <TopPanel proposals={topProposals} onRestore={restoreProposal} />}
           {activeTab === 'scenario' && (
             <ScenarioPanel
               settings={simulationSettings}
@@ -729,10 +754,13 @@ function App() {
               onCycleAdjacency={(a, b) => setAdjacencyRules((current) => cycleRule(current, a, b))}
               onResetAdjacency={() => setAdjacencyRules(DEFAULT_ADJACENCY_RULES)}
               onClearAdjacency={() => setAdjacencyRules([])}
+              onSaveToTop={submitCurrentArchitecture}
             />
           )}
           {activeTab === 'services' && <ServicesDashboard plan={plan} />}
-          {activeTab === 'analysis' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" />}
+          {activeTab === 'analysis' && (
+            <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" adjacencyResults={adjacencyResults} />
+          )}
         </section>
 
         {showRightPanel && (

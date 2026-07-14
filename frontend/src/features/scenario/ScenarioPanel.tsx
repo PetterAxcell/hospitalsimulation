@@ -15,6 +15,7 @@ interface ScenarioPanelProps {
   onCycleAdjacency: (a: RoomKind, b: RoomKind) => void
   onResetAdjacency: () => void
   onClearAdjacency: () => void
+  onSaveToTop: () => void
 }
 
 export function ScenarioPanel({
@@ -26,6 +27,7 @@ export function ScenarioPanel({
   onCycleAdjacency,
   onResetAdjacency,
   onClearAdjacency,
+  onSaveToTop,
 }: ScenarioPanelProps) {
   const arrivalsPerDay = settings.arrivalsPerHour * 24
   const isDefaultSettings =
@@ -47,6 +49,9 @@ export function ScenarioPanel({
             Configura los supuestos de la simulación y las adyacencias objetivo entre servicios. Los cambios se
             aplican al instante al resto de módulos (Simulación y Análisis).
           </p>
+          <div className="scenario-hero-actions">
+            <button type="button" className="primary-action scenario-save" onClick={onSaveToTop}>Guardar en Top</button>
+          </div>
         </div>
         <div className="scenario-hero-kpis">
           <Metric label="Llegadas/día" value={String(arrivalsPerDay)} />

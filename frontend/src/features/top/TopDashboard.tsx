@@ -4,7 +4,7 @@ import { Modal } from '../../components/ui/Modal'
 import { bestProposalByOwner, formatScore } from './scoring'
 import type { ArchitectureProposal, ArchitectureScore, ProposalOwner } from './types'
 
-export function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
+export function TopPanel({ proposals, onRestore }: { proposals: ArchitectureProposal[]; onRestore?: (proposal: ArchitectureProposal) => void }) {
   const [detailProposalId, setDetailProposalId] = useState<string | undefined>()
   const [isScoreModalOpen, setScoreModalOpen] = useState(false)
   const userRows = bestProposalByOwner(proposals).slice(0, 5)
@@ -83,7 +83,7 @@ export function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
       </div>
 
       {detailProposal && (
-        <ProposalDetailModal proposal={detailProposal} onClose={() => setDetailProposalId(undefined)} />
+        <ProposalDetailModal proposal={detailProposal} onClose={() => setDetailProposalId(undefined)} onRestore={onRestore} />
       )}
       {isScoreModalOpen && (
         <ScoreFormulaModal proposal={best} onClose={() => setScoreModalOpen(false)} />
@@ -128,7 +128,7 @@ export function TopControls({
   )
 }
 
-function ProposalDetailModal({ proposal, onClose }: { proposal: ArchitectureProposal; onClose: () => void }) {
+function ProposalDetailModal({ proposal, onClose, onRestore }: { proposal: ArchitectureProposal; onClose: () => void; onRestore?: (proposal: ArchitectureProposal) => void }) {
   return (
     <Modal
       titleId="proposal-detail-title"
@@ -147,10 +147,35 @@ function ProposalDetailModal({ proposal, onClose }: { proposal: ArchitectureProp
         <Metric label="Estancias" value={String(proposal.roomCount)} />
       </div>
 
+      {proposal.scenario && (
+        <section className="top-modal-section">
+          <h3>Escenario simulado</h3>
+          <div className="proposal-chips">
+            <span>{proposal.scenario.arrivalsPerHour} llegadas/h</span>
+            <span>{proposal.scenario.horizonYears} años</span>
+            <span>Ciclo {proposal.scenario.durationHours}h</span>
+            <span>Adyacencia {proposal.scenario.adjacencyComplies}/{proposal.scenario.adjacencyTotal}</span>
+          </div>
+        </section>
+      )}
+
       <section className="top-modal-section">
         <h3>Zona caliente</h3>
         <p>{proposal.hottestRoomName}</p>
       </section>
+
+      {proposal.snapshot && onRestore && (
+        <button
+          type="button"
+          className="primary-action"
+          onClick={() => {
+            onRestore(proposal)
+            onClose()
+          }}
+        >
+          Restaurar escenario y plano
+        </button>
+      )}
     </Modal>
   )
 }
