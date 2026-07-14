@@ -1,5 +1,5 @@
 import { buildAccessiblePatientRoute, isPassage } from './circulation'
-import { distance, roomByNode } from './geometry'
+import { distance } from './geometry'
 import { addStaffAgents, createStaffStats } from './staffSimulation'
 import {
   DEFAULT_PATIENT_CASES,
@@ -66,7 +66,7 @@ export function runHospitalSimulation(plan: HospitalPlan, settings: SimulationSe
     if (caseStat) caseStat.attempted += 1
     const caseSteps = patientCase.build(rng)
     const start = Math.floor((i / totalArrivals) * motionCycleMinutes + rng() * 18)
-    const serviceStops = resolveCaseStops(plan.rooms, caseSteps)
+    const serviceStops = resolveCaseStops(plan.rooms, caseSteps, rng)
     const serviceRooms = serviceStops.map((stop) => stop.room)
     if (serviceRooms.length < 2) {
       blockedPatients += 1
@@ -307,15 +307,44 @@ function routeTravel(routeRooms: PlacedRoom[]): number {
   return total
 }
 
-function resolveCaseStops(rooms: PlacedRoom[], steps: PatientCaseStep[]): Array<{ room: PlacedRoom; phase: string }> {
+function resolveCaseStops(
+  rooms: PlacedRoom[],
+  steps: PatientCaseStep[],
+  rng: () => number,
+): Array<{ room: PlacedRoom; phase: string }> {
+  // Cada paciente elige una sala por nodo y la mantiene durante todo su recorrido,
+  // pero distintos pacientes se reparten entre las salas que sirven ese nodo. Asi,
+  // anadir mas bloques del mismo servicio (p.ej. triaje) reparte la carga y baja
+  // la presion por estancia en lugar de concentrarla siempre en la primera sala.
+  const chosenByNode = new Map<SimulationNode, PlacedRoom>()
   const stops: Array<{ room: PlacedRoom; phase: string }> = []
   steps.forEach((step) => {
-    const room = roomByNode(rooms, step.node)
-    if (!room) return
+    let room = chosenByNode.get(step.node)
+    if (!room) {
+      const picked = pickRoomForNode(rooms, step.node, rng)
+      if (!picked) return
+      room = picked
+      chosenByNode.set(step.node, room)
+    }
     if (stops[stops.length - 1]?.room.id === room.id) return
     stops.push({ room, phase: step.phase })
   })
   return stops
+}
+
+// Reparte pacientes entre todas las salas que sirven un nodo, ponderando por
+// capacidad para que las salas mas grandes absorban proporcionalmente mas carga.
+export function pickRoomForNode(rooms: PlacedRoom[], node: SimulationNode, rng: () => number): PlacedRoom | undefined {
+  const candidates = rooms.filter((room) => room.simulationNode === node)
+  if (candidates.length <= 1) return candidates[0]
+  const weights = candidates.map((room) => Math.max(1, room.capacity))
+  const total = weights.reduce((sum, weight) => sum + weight, 0)
+  let ticket = rng() * total
+  for (let i = 0; i < candidates.length; i += 1) {
+    ticket -= weights[i]
+    if (ticket <= 0) return candidates[i]
+  }
+  return candidates[candidates.length - 1]
 }
 
 function samplePath(serviceStops: Array<{ room: PlacedRoom; phase: string }>): string[] {

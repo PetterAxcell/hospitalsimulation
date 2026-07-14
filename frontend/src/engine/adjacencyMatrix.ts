@@ -205,3 +205,12 @@ export function summarizeAdjacency(results: AdjacencyRuleResult[]): AdjacencySum
     { total: 0, ok: 0, warn: 0, fail: 0, missing: 0 },
   )
 }
+
+/**
+ * Veredicto binario por regla. Una regla "cumple" mientras no cruce el umbral de
+ * incumplimiento (fail) y el bloque exista; la zona "en tension" (warn) sigue dentro
+ * del limite tolerado, por lo que tambien cuenta como cumple.
+ */
+export function adjacencyComplies(status: AdjacencyStatus): boolean {
+  return status !== 'fail' && status !== 'missing'
+}
