@@ -5,9 +5,9 @@ import { HospitalCanvas } from './components/HospitalCanvas'
 import { WorkspaceTabs, type WorkspaceTab } from './components/WorkspaceTabs'
 import { Metric } from './components/ui/Metric'
 import { Modal } from './components/ui/Modal'
-import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
+import { templateById } from './data/catalog'
 import { CLINIC_SPACE_PROGRAM, clinicSpaceProgramById, componentsForSpaceProgramEntry } from './data/clinicSpaceProgram'
-import { createHospitalClinicCampusPlan } from './data/presets'
+import { createClinicPdfDesignInstitutes, createClinicPdfDesignVertical } from './data/presets'
 import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
   DEFAULT_ADJACENCY_RULES,
@@ -58,12 +58,49 @@ import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
 import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomComponent, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
 import { floorLabel, formatNumber } from './utils/format'
 
-const INITIAL_PLAN = createHospitalClinicCampusPlan()
+const INITIAL_PLAN = createClinicPdfDesignVertical()
 const DOOR_MAGNET_DISTANCE = 6
 type ComponentSourceMode = 'clinic' | 'default'
 const SimulationCanvas = lazy(() =>
   import('./components/SimulationCanvas').then((module) => ({ default: module.SimulationCanvas })),
 )
+
+// Construye una propuesta montable a partir de un diseno PDF, con su simulacion y score.
+function buildDesignProposal(designPlan: HospitalPlan, title: string, id: string): ArchitectureProposal {
+  const designRules = evaluateArchitectureRules(designPlan)
+  const designAdjacency = evaluateAdjacencyRules(designPlan, DEFAULT_ADJACENCY_RULES)
+  const designResult = runHospitalSimulation(designPlan, DEFAULT_SIMULATION_SETTINGS)
+  const designArea = designPlan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
+  const noComplies = designAdjacency.filter((res) => !adjacencyComplies(res.status)).length
+  return architectureProposalFromCurrentPlan({
+    owner: 'Diseño PDF',
+    plan: designPlan,
+    result: designResult,
+    rules: designRules,
+    totalArea: designArea,
+    index: 1,
+    title,
+    id,
+    adjacency: { total: designAdjacency.length, noComplies },
+    scenario: {
+      arrivalsPerHour: DEFAULT_SIMULATION_SETTINGS.arrivalsPerHour,
+      horizonYears: DEFAULT_SIMULATION_SETTINGS.horizonYears,
+      durationHours: DEFAULT_SIMULATION_SETTINGS.durationHours,
+      adjacencyTotal: designAdjacency.length,
+      adjacencyComplies: designAdjacency.length - noComplies,
+    },
+    snapshot: {
+      plan: structuredClone(designPlan),
+      settings: { ...DEFAULT_SIMULATION_SETTINGS },
+      adjacencyRules: DEFAULT_ADJACENCY_RULES.map((rule) => ({ ...rule })),
+    },
+  })
+}
+
+const SEEDED_DESIGN_PROPOSALS: ArchitectureProposal[] = [
+  buildDesignProposal(createClinicPdfDesignVertical(), 'Nou Clínic PDF · torre asistencial', 'design-pdf-vertical'),
+  buildDesignProposal(createClinicPdfDesignInstitutes(), 'Nou Clínic PDF · institutos distribuidos', 'design-pdf-institutes'),
+]
 
 function App() {
   const [plan, setPlan] = useState<HospitalPlan>(INITIAL_PLAN)
@@ -71,7 +108,7 @@ function App() {
   const [selectedFloor, setSelectedFloor] = useState(0)
   const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(plan.rooms[0]?.id)
   const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
-  const [elementToAdd, setElementToAdd] = useState('template:edBoxes')
+  const [elementToAdd, setElementToAdd] = useState('program:a1-hospitalitzacio-module')
   const [componentSourceMode, setComponentSourceMode] = useState<ComponentSourceMode>('clinic')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
   const [patientCases, setPatientCases] = useState<PatientCaseDefinition[]>(DEFAULT_PATIENT_CASES)
@@ -90,7 +127,7 @@ function App() {
   const [isClinicalCaseModalOpen, setClinicalCaseModalOpen] = useState(false)
   const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
   const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
-  const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
+  const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>(SEEDED_DESIGN_PROPOSALS)
   const [adjacencyRules, setAdjacencyRules] = useState<AdjacencyRule[]>(DEFAULT_ADJACENCY_RULES)
   const [isLeftPanelHidden, setLeftPanelHidden] = useState(false)
   const [isRightPanelHidden, setRightPanelHidden] = useState(false)
@@ -515,20 +552,11 @@ function App() {
         <label>
           Elemento
           <select value={elementToAdd} onChange={(event) => setElementToAdd(event.target.value)}>
-            <optgroup label="Catálogo base">
-              {ROOM_TEMPLATES.map((template) => (
-                <option key={template.id} value={`template:${template.id}`}>
-                  {template.shortName} · {KIND_LABELS[template.kind]}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Pla d'Espais Nou Clínic">
-              {CLINIC_SPACE_PROGRAM.map((entry) => (
-                <option key={entry.id} value={`program:${entry.id}`}>
-                  PDF p.{entry.sourcePages.join('/')} · {entry.label}
-                </option>
-              ))}
-            </optgroup>
+            {CLINIC_SPACE_PROGRAM.map((entry) => (
+              <option key={entry.id} value={`program:${entry.id}`}>
+                PDF p.{entry.sourcePages.join('/')} · {entry.label}
+              </option>
+            ))}
           </select>
         </label>
         <label>

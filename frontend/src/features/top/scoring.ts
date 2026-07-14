@@ -75,6 +75,8 @@ export function architectureProposalFromCurrentPlan({
   scenario,
   snapshot,
   adjacency,
+  title,
+  id,
 }: {
   owner: ProposalOwner
   plan: HospitalPlan
@@ -85,12 +87,14 @@ export function architectureProposalFromCurrentPlan({
   scenario?: ProposalScenario
   snapshot?: ProposalSnapshot
   adjacency?: AdjacencyScoreInput
+  title?: string
+  id?: string
 }): ArchitectureProposal {
   const now = new Date()
   const base = architectureProposalFromMetrics({
-    id: `submitted-${now.getTime()}`,
+    id: id ?? `submitted-${now.getTime()}`,
     owner,
-    title: `Arquitectura ${index}`,
+    title: title ?? `Arquitectura ${index}`,
     createdAt: new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(now),
     source: 'submitted',
     plan,
