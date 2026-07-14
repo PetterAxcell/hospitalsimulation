@@ -10,6 +10,12 @@ import { CLINIC_SPACE_PROGRAM, clinicSpaceProgramById, componentsForSpaceProgram
 import { createHospitalClinicCampusPlan } from './data/presets'
 import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
+  DEFAULT_ADJACENCY_RULES,
+  cycleRule,
+  evaluateAdjacencyRules,
+  type AdjacencyRule,
+} from './engine/adjacencyMatrix'
+import {
   defaultDoorForRoom,
   disconnectedPassages,
   disconnectedPatientRooms,
@@ -41,6 +47,7 @@ import { SaturationPanel } from './features/saturation/SaturationPanel'
 import { ClinicSpaceProgramPanel } from './features/services/ClinicSpaceProgramPanel'
 import { SimulationCaseSelector } from './features/simulation/SimulationCaseSelector'
 import { SimulationControlsPanel } from './features/simulation/SimulationControlsPanel'
+import { ScenarioPanel } from './features/scenario/ScenarioPanel'
 import {
   architectureProposalFromCurrentPlan,
   demoArchitectureProposals,
@@ -85,6 +92,7 @@ function App() {
   const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
   const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
   const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
+  const [adjacencyRules, setAdjacencyRules] = useState<AdjacencyRule[]>(DEFAULT_ADJACENCY_RULES)
   const [isLeftPanelHidden, setLeftPanelHidden] = useState(false)
   const [isRightPanelHidden, setRightPanelHidden] = useState(false)
   const [sectionModalTab, setSectionModalTab] = useState<WorkspaceTab | null>(null)
@@ -94,6 +102,7 @@ function App() {
   const floorArea = activeFloorRooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const totalArea = plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
+  const adjacencyResults = useMemo(() => evaluateAdjacencyRules(plan, adjacencyRules), [plan, adjacencyRules])
   const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings, patientCases), [patientCases, plan, simulationSettings])
   const topProposals = useMemo(
     () => rankArchitectureProposals([
@@ -710,6 +719,18 @@ function App() {
           )}
 
           {activeTab === 'top' && <TopPanel proposals={topProposals} />}
+          {activeTab === 'scenario' && (
+            <ScenarioPanel
+              settings={simulationSettings}
+              result={simulationResult}
+              adjacencyRules={adjacencyRules}
+              adjacencyResults={adjacencyResults}
+              onChangeSettings={setSimulationSettings}
+              onCycleAdjacency={(a, b) => setAdjacencyRules((current) => cycleRule(current, a, b))}
+              onResetAdjacency={() => setAdjacencyRules(DEFAULT_ADJACENCY_RULES)}
+              onClearAdjacency={() => setAdjacencyRules([])}
+            />
+          )}
           {activeTab === 'services' && <ServicesDashboard plan={plan} />}
           {activeTab === 'analysis' && <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" />}
         </section>
@@ -794,7 +815,7 @@ function WorkspaceSectionActions({
   onToggleLeft: () => void
   onToggleRight: () => void
 }) {
-  const showSectionModalTrigger = !panelToggleAvailable
+  const showSectionModalTrigger = !panelToggleAvailable && activeTab !== 'scenario'
   return (
     <div className="section-action-controls">
       {showSectionModalTrigger && (

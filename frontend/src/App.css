@@ -2847,3 +2847,423 @@ th {
   }
 
 }
+
+/* Matriz de adyacencia */
+.adjacency-panel {
+  border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-blue-1);
+  border-radius: 8px;
+  background: var(--clinic-surface);
+  box-shadow: 0 12px 28px rgba(55, 81, 113, 0.1);
+  overflow: hidden;
+}
+
+.adjacency-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 0.7fr);
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 1px solid var(--clinic-border);
+  background:
+    linear-gradient(90deg, rgba(55, 81, 113, 0.12), rgba(74, 204, 211, 0.08)),
+    var(--clinic-surface);
+}
+
+.adjacency-hero span {
+  color: var(--clinic-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.adjacency-hero h2 {
+  margin: 4px 0;
+  color: var(--clinic-blue);
+  font-size: 20px;
+}
+
+.adjacency-hero p {
+  margin: 0;
+  color: var(--clinic-muted);
+  font-size: 13px;
+}
+
+.adjacency-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.adjacency-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--clinic-border);
+  background: var(--clinic-blue-wash);
+}
+
+.adjacency-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.adjacency-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--clinic-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.adjacency-legend-item .adj-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--clinic-border-strong);
+}
+
+.adj-swatch.near { background: var(--clinic-green-1); border-color: var(--clinic-green-1); }
+.adj-swatch.far { background: var(--clinic-red-1); border-color: var(--clinic-red-1); }
+.adj-swatch.ok { background: rgba(51, 181, 120, 0.6); }
+.adj-swatch.warn { background: rgba(251, 195, 68, 0.8); }
+.adj-swatch.fail { background: rgba(237, 115, 105, 0.8); }
+
+.adjacency-toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.adjacency-toolbar-actions .secondary-action {
+  width: auto;
+  margin-top: 0;
+}
+
+.adjacency-matrix-card {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--clinic-border);
+}
+
+.adjacency-matrix-wrap {
+  max-height: 520px;
+  overflow: auto;
+  border: 1px solid var(--clinic-border);
+  border-radius: 8px;
+}
+
+.adjacency-matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+}
+
+.adjacency-matrix th,
+.adjacency-matrix td {
+  padding: 0;
+  text-align: center;
+}
+
+.adjacency-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 34px;
+  min-width: 34px;
+  background: var(--clinic-blue-wash);
+  color: var(--clinic-blue);
+  font-weight: 800;
+  border-bottom: 1px solid var(--clinic-border);
+}
+
+.adjacency-matrix tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 132px;
+  max-width: 132px;
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--clinic-surface);
+  color: var(--clinic-blue);
+  font-weight: 700;
+  border-right: 1px solid var(--clinic-border);
+  border-bottom: 1px solid var(--clinic-border-soft, var(--clinic-border));
+}
+
+.adjacency-matrix thead th.adjacency-corner {
+  left: 0;
+  z-index: 3;
+  min-width: 132px;
+  max-width: 132px;
+  text-align: left;
+  padding-left: 8px;
+}
+
+.adjacency-col-label {
+  display: inline-block;
+}
+
+.adjacency-cell {
+  width: 34px;
+  height: 34px;
+  border-right: 1px solid rgba(55, 81, 113, 0.08);
+  border-bottom: 1px solid rgba(55, 81, 113, 0.08);
+}
+
+.adjacency-cell.diagonal {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(55, 81, 113, 0.06),
+    rgba(55, 81, 113, 0.06) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.adjacency-dot {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--clinic-border);
+  border-radius: 6px;
+  background: var(--clinic-surface);
+  color: var(--clinic-surface);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.adjacency-dot:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(55, 81, 113, 0.18);
+}
+
+.adjacency-dot.empty {
+  color: transparent;
+  background: var(--clinic-surface);
+}
+
+.adjacency-dot.near { background: var(--clinic-green-1); border-color: var(--clinic-green-1); }
+.adjacency-dot.far { background: var(--clinic-red-1); border-color: var(--clinic-red-1); }
+
+.adjacency-dot.near.ok,
+.adjacency-dot.far.ok {
+  box-shadow: inset 0 0 0 2px rgba(51, 181, 120, 0.9);
+}
+
+.adjacency-dot.warn {
+  box-shadow: inset 0 0 0 2px rgba(251, 195, 68, 1);
+}
+
+.adjacency-dot.fail,
+.adjacency-dot.missing {
+  box-shadow: inset 0 0 0 2px rgba(237, 115, 105, 1);
+}
+
+.adjacency-results-card {
+  padding: 14px 18px 18px;
+}
+
+.adjacency-results-head h3 {
+  margin: 0 0 2px;
+  color: var(--clinic-blue);
+}
+
+.adjacency-results-head p {
+  margin: 0 0 10px;
+  color: var(--clinic-muted);
+  font-size: 12px;
+}
+
+.adjacency-analysis-chips {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+  .adjacency-hero {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .adjacency-matrix tbody th,
+  .adjacency-matrix thead th.adjacency-corner {
+    min-width: 96px;
+    max-width: 96px;
+  }
+}
+
+/* Escenario: parametros de simulacion */
+.scenario-dashboard {
+  height: calc(100vh - 156px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.scenario-dashboard > * {
+  flex-shrink: 0;
+}
+
+.scenario-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(300px, 0.8fr);
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-blue-1);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(55, 81, 113, 0.12), rgba(74, 204, 211, 0.08)),
+    var(--clinic-surface);
+  box-shadow: 0 12px 28px rgba(55, 81, 113, 0.1);
+}
+
+.scenario-hero-intro span {
+  color: var(--clinic-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scenario-hero-intro h2 {
+  margin: 4px 0;
+  color: var(--clinic-blue);
+  font-size: 20px;
+}
+
+.scenario-hero-intro p {
+  margin: 0;
+  color: var(--clinic-muted);
+  font-size: 13px;
+  max-width: 54ch;
+}
+
+.scenario-hero-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+
+.scenario-params-card {
+  padding: 16px 18px 18px;
+  border: 1px solid var(--clinic-border);
+  border-top: 4px solid var(--clinic-green-1);
+  border-radius: 8px;
+  background: var(--clinic-surface);
+  box-shadow: 0 12px 28px rgba(55, 81, 113, 0.1);
+}
+
+.scenario-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.scenario-card-head h3 {
+  margin: 0 0 2px;
+  color: var(--clinic-blue);
+}
+
+.scenario-card-head p {
+  margin: 0;
+  color: var(--clinic-muted);
+  font-size: 12px;
+}
+
+.scenario-reset.secondary-action {
+  width: auto;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.scenario-params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.scenario-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--clinic-border);
+  border-radius: 8px;
+  background: var(--clinic-blue-wash);
+}
+
+.scenario-field-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--clinic-text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scenario-field-label b {
+  color: var(--clinic-blue);
+  font-size: 15px;
+}
+
+.scenario-field input[type='range'] {
+  width: 100%;
+}
+
+.scenario-field-hint {
+  color: var(--clinic-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.scenario-seed-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.scenario-seed-row input[type='number'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--clinic-border-strong);
+  border-radius: 6px;
+  background: var(--clinic-surface);
+  color: var(--clinic-text);
+  font-size: 14px;
+}
+
+.scenario-seed-row .ghost-action {
+  flex-shrink: 0;
+}
+
+.scenario-field-speed .speed-preset-grid {
+  margin-top: 0;
+}
+
+@media (max-width: 900px) {
+  .scenario-hero {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .scenario-dashboard {
+    height: auto;
+  }
+}
