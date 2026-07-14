@@ -12,6 +12,7 @@ export interface ArchitectureScore {
   verticalPenalty: number
   rulePenalty: number
   areaPenalty: number
+  adjacencyPenalty: number
 }
 
 export interface ArchitectureProposal {

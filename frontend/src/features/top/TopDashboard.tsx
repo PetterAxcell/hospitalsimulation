@@ -34,6 +34,11 @@ export function TopPanel({ proposals, onRestore }: { proposals: ArchitectureProp
         <section className="top-block wide">
           <h3>Arquitecturas</h3>
           <div className="proposal-list">
+            {proposals.length === 0 && (
+              <article className="proposal-card is-compact">
+                <p className="modal-empty">Aún no has guardado ninguna arquitectura. Ajusta el escenario o el plano y pulsa «Guardar en Top» para registrarla y poder montarla desde aquí.</p>
+              </article>
+            )}
             {proposals.map((proposal, index) => (
               <article key={proposal.id} className="proposal-card is-compact">
                 <header>
@@ -198,6 +203,7 @@ function ScoreFormulaModal({ proposal, onClose }: { proposal?: ArchitecturePropo
           <Penalty label="Traslado" value={proposal.score.travelPenalty} />
           <Penalty label="Vertical" value={proposal.score.verticalPenalty} />
           <Penalty label="Reglas" value={proposal.score.rulePenalty} />
+          <Penalty label="Adyacencia" value={proposal.score.adjacencyPenalty} />
           <Penalty label="m2" value={proposal.score.areaPenalty} />
         </div>
       ) : (

@@ -50,7 +50,6 @@ import { SimulationControlsPanel } from './features/simulation/SimulationControl
 import { ScenarioPanel } from './features/scenario/ScenarioPanel'
 import {
   architectureProposalFromCurrentPlan,
-  demoArchitectureProposals,
   formatScore,
   rankArchitectureProposals,
   scoreArchitecture,
@@ -104,14 +103,14 @@ function App() {
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
   const adjacencyResults = useMemo(() => evaluateAdjacencyRules(plan, adjacencyRules), [plan, adjacencyRules])
   const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings, patientCases), [patientCases, plan, simulationSettings])
-  const topProposals = useMemo(
-    () => rankArchitectureProposals([
-      ...submittedProposals,
-      ...demoArchitectureProposals(plan, simulationResult, rules, totalArea),
-    ]),
-    [plan, rules, simulationResult, submittedProposals, totalArea],
+  const topProposals = useMemo(() => rankArchitectureProposals(submittedProposals), [submittedProposals])
+  const currentScore = useMemo(
+    () => scoreArchitecture(plan, simulationResult, rules, totalArea, {
+      total: adjacencyResults.length,
+      noComplies: adjacencyResults.filter((res) => !adjacencyComplies(res.status)).length,
+    }),
+    [adjacencyResults, plan, rules, simulationResult, totalArea],
   )
-  const currentScore = useMemo(() => scoreArchitecture(plan, simulationResult, rules, totalArea), [plan, rules, simulationResult, totalArea])
   const panelToggleAvailable = activeTab === 'plan' || activeTab === 'simulation'
   const simulationWorkspace = activeTab === 'simulation'
   const showLeftPanel = panelToggleAvailable && !isLeftPanelHidden
@@ -458,6 +457,10 @@ function App() {
       rules,
       totalArea,
       index: submittedProposals.length + 1,
+      adjacency: {
+        total: adjacencyResults.length,
+        noComplies: adjacencyResults.filter((res) => !adjacencyComplies(res.status)).length,
+      },
       scenario: {
         arrivalsPerHour: simulationSettings.arrivalsPerHour,
         horizonYears: simulationSettings.horizonYears,
@@ -626,6 +629,7 @@ function App() {
               <Metric label="Bloqueos" value={`-${formatScore(currentScore.blockedPenalty)}`} />
               <Metric label="Espera ED" value={`-${formatScore(currentScore.waitPenalty)}`} />
               <Metric label="Reglas" value={`-${formatScore(currentScore.rulePenalty)}`} />
+              <Metric label="Adyacencia" value={`-${formatScore(currentScore.adjacencyPenalty)}`} />
             </div>
           </section>
         </div>
