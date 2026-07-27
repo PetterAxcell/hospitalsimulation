@@ -441,6 +441,12 @@ output {
   min-height: 560px;
 }
 
+.phaser-stage-wrapper {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+}
+
 .phaser-stage {
   width: 100%;
   height: 100%;
@@ -450,6 +456,16 @@ output {
   border-radius: 8px;
   background: var(--clinic-text);
   touch-action: none;
+  cursor: grab;
+}
+
+.phaser-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.phaser-stage:focus-visible {
+  outline: 2px solid var(--clinic-green-1);
+  outline-offset: 2px;
 }
 
 .phaser-stage canvas {
@@ -457,6 +473,197 @@ output {
   width: 100%;
   height: 100%;
   image-rendering: auto;
+}
+
+.stage-hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  gap: 2px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(23, 41, 56, 0.76);
+  color: #ffffff;
+  pointer-events: none;
+}
+
+.stage-hud-clock {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 19px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-hud-icon {
+  font-size: 15px;
+  opacity: 0.92;
+}
+
+.stage-hud[data-phase='night'] .stage-hud-icon,
+.stage-hud[data-phase='dusk'] .stage-hud-icon {
+  color: #cfe0ff;
+}
+
+.stage-hud[data-phase='day'] .stage-hud-icon,
+.stage-hud[data-phase='morning'] .stage-hud-icon {
+  color: #ffd569;
+}
+
+.stage-hud-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.88;
+}
+
+.stage-camera-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  gap: 5px;
+}
+
+.stage-camera-controls button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 8px;
+  background: rgba(23, 41, 56, 0.76);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stage-camera-controls button:hover {
+  background: rgba(1, 183, 193, 0.88);
+}
+
+.stage-camera-controls button.is-active {
+  border-color: var(--clinic-green-1);
+  background: rgba(51, 181, 120, 0.9);
+}
+
+.stage-legend {
+  position: absolute;
+  top: 10px;
+  right: 52px;
+  display: grid;
+  gap: 10px;
+  max-width: 264px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(23, 41, 56, 0.9);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.stage-legend h4 {
+  margin: 0 0 5px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+}
+
+.stage-legend ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stage-legend em {
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0.66;
+}
+
+.stage-legend-dot {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 50%;
+}
+
+.stage-legend-keys kbd {
+  min-width: 54px;
+  padding: 1px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.stage-tooltip {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  max-width: 232px;
+  padding: 8px 10px;
+  border: 1px solid var(--clinic-border);
+  border-top: 3px solid var(--clinic-blue);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 10px 24px rgba(23, 41, 56, 0.28);
+  color: var(--clinic-text);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.stage-tooltip strong {
+  font-size: 13px;
+}
+
+.stage-tooltip-subtitle {
+  color: var(--clinic-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stage-tooltip ul {
+  display: grid;
+  gap: 1px;
+  margin: 3px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--clinic-text-soft);
+}
+
+@media (max-width: 720px) {
+  .stage-legend {
+    top: 50px;
+    right: 10px;
+    max-width: calc(100% - 20px);
+  }
+
+  .stage-hud-meta {
+    display: none;
+  }
 }
 
 .simulation-loading {

@@ -1,11 +1,20 @@
 import Phaser from 'phaser'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { KIND_COLORS } from '../data/catalog'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { KIND_COLORS, KIND_LABELS } from '../data/catalog'
 import { connectedCorridorGroups, disconnectedPassages, doorConnectsToCorridor, doorWorldPosition } from '../engine/circulation'
 import type { PatientCaseDefinition } from '../engine/clinicalCases'
 import { positionAt, runHospitalSimulation, type SimulationSettings } from '../engine/simulation'
 import type { AgentRole, EquipmentKind, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomKind, SimAgent, SimulationAgentLayer, SimulationResult } from '../types'
 import { SimulationControlsBar, type SimulationViewMode } from './SimulationControlsBar'
+import { SimulationStageOverlay, type StageProbe } from './SimulationStageOverlay'
+import {
+  agentUniform,
+  ambientForHour,
+  floorTexture,
+  hourOfDay,
+  interiorLightStrength,
+  SEVERITY_RING,
+} from './simulationVisuals'
 
 interface SimulationCanvasProps {
   plan: HospitalPlan
@@ -35,6 +44,7 @@ interface SceneLayers {
   occupancyLayer: Phaser.GameObjects.Container
   agentLayer: Phaser.GameObjects.Container
   careLayer: Phaser.GameObjects.Container
+  lightingLayer: Phaser.GameObjects.Container
 }
 
 interface RoomOccupancy {
@@ -59,6 +69,8 @@ const ISO_ORIGIN_X = WORLD_H * ISO_TILE_X + 150
 const ISO_ORIGIN_Y = 330
 const HORIZON_SECONDS_AT_1X = 3600
 const MOTION_MINUTES_PER_SECOND_AT_1X = 1
+/** Zoom para el que se disenaron los rotulos; por encima se compensa la escala. */
+const LABEL_REFERENCE_ZOOM = 0.62
 
 const CARE_ROOM_KINDS = new Set<RoomKind>([
   'emergency',
@@ -122,10 +134,14 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
   const hostRef = useRef<HTMLDivElement | null>(null)
   const gameRef = useRef<Phaser.Game | null>(null)
   const sceneRef = useRef<HospitalGameScene | null>(null)
+  const dragRef = useRef<{ pointerId: number; x: number; y: number; moved: boolean } | null>(null)
   const [minute, setMinute] = useState(0)
   const [motionMinute, setMotionMinute] = useState(0)
   const [playing, setPlaying] = useState(true)
   const [viewMode, setViewMode] = useState<SimulationViewMode>('topDown')
+  const [probe, setProbe] = useState<StageProbe | null>(null)
+  const [legendOpen, setLegendOpen] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const result = useMemo(() => runHospitalSimulation(plan, settings, patientCases), [patientCases, plan, settings])
 
   useEffect(() => {
@@ -154,7 +170,7 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
     gameRef.current = new Phaser.Game({
       type: Phaser.AUTO,
       parent: hostRef.current,
-      backgroundColor: '#1d2f42',
+      backgroundColor: '#101d2c',
       pixelArt: false,
       roundPixels: false,
       scale: {
@@ -181,6 +197,117 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
     sceneRef.current?.setSnapshot({ plan, selectedFloor, result, minute, motionMinute, selectedCaseId, agentLayer, viewMode })
   }, [agentLayer, minute, motionMinute, plan, result, selectedCaseId, selectedFloor, viewMode])
 
+  const fitView = useCallback(() => {
+    sceneRef.current?.fitView()
+  }, [])
+
+  const zoomBy = useCallback((factor: number) => {
+    sceneRef.current?.zoomBy(factor)
+  }, [])
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+
+    function onWheel(event: WheelEvent) {
+      event.preventDefault()
+      sceneRef.current?.zoomBy(event.deltaY < 0 ? 1.12 : 1 / 1.12)
+    }
+
+    host.addEventListener('wheel', onWheel, { passive: false })
+    return () => host.removeEventListener('wheel', onWheel)
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      const host = hostRef.current
+      if (!host || !host.isConnected) return
+
+      // Se respetan los controles nativos: campos de texto, selects, botones y
+      // el propio slider de tiempo mantienen su comportamiento de teclado.
+      const tag = target?.tagName ?? ''
+      const inputType = target instanceof HTMLInputElement ? target.type : ''
+      const isTextField = tag === 'TEXTAREA'
+        || target?.isContentEditable === true
+        || (tag === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit'].includes(inputType))
+      if (isTextField || tag === 'SELECT') return
+      const isRange = tag === 'INPUT' && inputType === 'range'
+      const isButton = tag === 'BUTTON' || (tag === 'INPUT' && ['button', 'submit', 'checkbox', 'radio'].includes(inputType))
+      const isArrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+      const isSpace = event.key === ' ' || event.key === 'Spacebar'
+      if (isRange && isArrow) return
+      if (isButton && (isSpace || event.key === 'Enter')) return
+
+      switch (event.key) {
+        case ' ':
+        case 'Spacebar':
+          event.preventDefault()
+          setPlaying((value) => !value)
+          break
+        case 'ArrowLeft':
+        case 'ArrowRight': {
+          event.preventDefault()
+          const direction = event.key === 'ArrowRight' ? 1 : -1
+          const step = event.shiftKey ? 60 : 15
+          setPlaying(false)
+          setMotionMinute((value) => wrapMinute(value + direction * step, result.motionCycleMinutes))
+          setMinute((value) => wrapMinute(value + direction * step * (result.durationMinutes / Math.max(1, result.motionCycleMinutes)), result.durationMinutes))
+          break
+        }
+        case '1':
+          onChangeSpeed(1)
+          break
+        case '2':
+          onChangeSpeed(2)
+          break
+        case '3':
+          onChangeSpeed(10)
+          break
+        case '4':
+          onChangeSpeed(20)
+          break
+        case 'v':
+        case 'V':
+          setViewMode((value) => (value === 'topDown' ? 'isometric' : 'topDown'))
+          break
+        case 'f':
+        case 'F':
+          fitView()
+          break
+        case 'l':
+        case 'L':
+          setLegendOpen((value) => !value)
+          break
+        default:
+          break
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [fitView, onChangeSpeed, result.durationMinutes, result.motionCycleMinutes])
+
+  const updateProbe = useCallback((clientX: number, clientY: number) => {
+    const host = hostRef.current
+    const scene = sceneRef.current
+    if (!host || !scene) return
+    const rect = host.getBoundingClientRect()
+    const localX = clientX - rect.left
+    const localY = clientY - rect.top
+    const found = scene.probeAt(localX, localY, rect.width, rect.height)
+    if (!found) {
+      setProbe(null)
+      return
+    }
+    setProbe({
+      ...found,
+      x: Math.min(Math.max(12, localX + 16), Math.max(12, rect.width - 232)),
+      y: Math.min(Math.max(12, localY + 16), Math.max(12, rect.height - 132)),
+    })
+  }, [])
+
   return (
     <div className="simulation-stage">
       <SimulationControlsBar
@@ -203,12 +330,66 @@ export function SimulationCanvas({ plan, selectedFloor, settings, patientCases, 
         onChangeAgentLayer={onChangeAgentLayer}
         onSelectCase={onSelectCase}
       />
-      <div
-        ref={hostRef}
-        className={`phaser-stage ${viewMode === 'isometric' ? 'is-isometric' : ''}`}
-        role="img"
-        aria-label={viewMode === 'isometric' ? 'Simulación isométrica 3D del hospital completo' : 'Simulación top-down del hospital'}
-      />
+      <div className="phaser-stage-wrapper">
+        <div
+          ref={hostRef}
+          className={`phaser-stage ${viewMode === 'isometric' ? 'is-isometric' : ''} ${dragging ? 'is-dragging' : ''}`}
+          role="application"
+          tabIndex={0}
+          aria-keyshortcuts="Space ArrowLeft ArrowRight V F L"
+          aria-label={viewMode === 'isometric' ? 'Simulación isométrica 3D del hospital completo' : 'Simulación top-down del hospital'}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return
+            event.currentTarget.focus()
+            dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false }
+            event.currentTarget.setPointerCapture(event.pointerId)
+          }}
+          onPointerMove={(event) => {
+            const drag = dragRef.current
+            if (drag && drag.pointerId === event.pointerId) {
+              const dx = event.clientX - drag.x
+              const dy = event.clientY - drag.y
+              if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+                if (!drag.moved) setDragging(true)
+                drag.moved = true
+                drag.x = event.clientX
+                drag.y = event.clientY
+                sceneRef.current?.panByScreen(dx, dy)
+                setProbe(null)
+              }
+              return
+            }
+            updateProbe(event.clientX, event.clientY)
+          }}
+          onPointerUp={(event) => {
+            if (dragRef.current?.pointerId === event.pointerId) {
+              event.currentTarget.releasePointerCapture(event.pointerId)
+              dragRef.current = null
+              setDragging(false)
+            }
+          }}
+          onPointerCancel={() => {
+            dragRef.current = null
+            setDragging(false)
+          }}
+          onPointerLeave={() => {
+            dragRef.current = null
+            setDragging(false)
+            setProbe(null)
+          }}
+          onDoubleClick={fitView}
+        />
+        <SimulationStageOverlay
+          motionMinute={motionMinute}
+          floorLabel={viewMode === 'isometric' ? 'Todas las plantas' : `Planta ${floorName(selectedFloor)}`}
+          probe={probe}
+          legendOpen={legendOpen}
+          onToggleLegend={() => setLegendOpen((value) => !value)}
+          onZoomIn={() => zoomBy(1.18)}
+          onZoomOut={() => zoomBy(1 / 1.18)}
+          onFitView={fitView}
+        />
+      </div>
     </div>
   )
 }
@@ -220,6 +401,12 @@ class HospitalGameScene extends Phaser.Scene {
   private agentSprites = new Map<string, Phaser.GameObjects.Container>()
   private occupancyBadges = new Map<string, Phaser.GameObjects.Container>()
   private careIndicators = new Map<string, Phaser.GameObjects.Container>()
+  private ambientRect: Phaser.GameObjects.Rectangle | null = null
+  private interiorGlow: Phaser.GameObjects.Container | null = null
+  private cameraOverride = false
+  private viewSignature = ''
+  private zoomLabels: Phaser.GameObjects.Container[] = []
+  private activeAgents: ActiveAgent[] = []
 
   constructor() {
     super('hospital-game-scene')
@@ -231,6 +418,7 @@ class HospitalGameScene extends Phaser.Scene {
     if (this.snapshot) {
       this.drawStatic(this.snapshot)
       this.updateAgents(this.snapshot)
+      this.updateLighting(this.snapshot)
     }
   }
 
@@ -238,13 +426,76 @@ class HospitalGameScene extends Phaser.Scene {
     this.snapshot = snapshot
     if (!this.sys.settings.active) return
 
+    // Al cambiar de planta o de modo de vista se recupera el encuadre automatico.
+    const viewSignature = `${snapshot.viewMode}:${snapshot.selectedFloor}`
+    if (viewSignature !== this.viewSignature) {
+      this.viewSignature = viewSignature
+      this.cameraOverride = false
+    }
+
     const key = staticSceneKey(snapshot)
     if (key !== this.staticKey) {
       this.staticKey = key
       this.drawStatic(snapshot)
     }
     this.updateAgents(snapshot)
+    this.updateLighting(snapshot)
     this.layoutCamera()
+    this.applyLabelScale()
+  }
+
+  /** Reencaja la vista y devuelve el control de camara al encuadre automatico. */
+  fitView() {
+    this.cameraOverride = false
+    this.layoutCamera()
+    this.applyLabelScale()
+  }
+
+  zoomBy(factor: number) {
+    if (!this.cameras.main) return
+    this.cameraOverride = true
+    const next = clamp(this.cameras.main.zoom * factor, 0.12, 6)
+    this.cameras.main.setZoom(next)
+    this.applyLabelScale()
+  }
+
+  panByScreen(dx: number, dy: number) {
+    const camera = this.cameras.main
+    if (!camera) return
+    this.cameraOverride = true
+    camera.setScroll(camera.scrollX - dx / camera.zoom, camera.scrollY - dy / camera.zoom)
+  }
+
+  /** Devuelve la sala o el agente bajo el puntero para alimentar el tooltip. */
+  probeAt(localX: number, localY: number, hostWidth: number, hostHeight: number): Omit<StageProbe, 'x' | 'y'> | null {
+    const snapshot = this.snapshot
+    const camera = this.cameras.main
+    if (!snapshot || !camera || hostWidth <= 0 || hostHeight <= 0) return null
+
+    const gameX = (localX / hostWidth) * this.scale.width
+    const gameY = (localY / hostHeight) * this.scale.height
+    const point = camera.getWorldPoint(gameX, gameY)
+
+    if (snapshot.viewMode === 'topDown') {
+      const agent = this.activeAgents
+        .map((item) => ({ item, distance: Math.hypot(tileX(item.pos.x) - point.x, tileY(item.pos.y) - point.y) }))
+        .filter((entry) => entry.distance < 13)
+        .sort((a, b) => a.distance - b.distance)[0]
+      if (agent) return agentProbe(agent.item)
+
+      const worldX = point.x / TILE
+      const worldY = point.y / TILE
+      const room = snapshot.plan.rooms
+        .filter((candidate) => candidate.floor === snapshot.selectedFloor)
+        .filter((candidate) => worldX >= candidate.x && worldX <= candidate.x + candidate.w && worldY >= candidate.y && worldY <= candidate.y + candidate.h)
+        .sort((a, b) => a.w * a.h - b.w * b.h)[0]
+      return room ? roomProbe(room, snapshot, occupancyForRoom(this.activeAgents, room.id)) : null
+    }
+
+    const room = snapshot.plan.rooms
+      .filter((candidate) => pointInPolygon(point, isoTopFace(candidate)))
+      .sort((a, b) => isoDepth(b.x, b.y, b.floor) - isoDepth(a.x, a.y, a.floor))[0]
+    return room ? roomProbe(room, snapshot, occupancyForRoom(this.activeAgents, room.id)) : null
   }
 
   private drawStatic(snapshot: SimulationSnapshot) {
@@ -252,8 +503,14 @@ class HospitalGameScene extends Phaser.Scene {
     this.agentSprites.clear()
     this.occupancyBadges.clear()
     this.careIndicators.clear()
+    this.zoomLabels = []
+    this.ambientRect = null
+    this.interiorGlow = null
     this.layers = {
       staticLayer: this.add.container(0, 0).setDepth(0),
+      // La iluminacion tinta la arquitectura pero queda por debajo de rotulos,
+      // contadores y agentes para no perder legibilidad de datos de noche.
+      lightingLayer: this.add.container(0, 0).setDepth(40),
       occupancyLayer: this.add.container(0, 0).setDepth(62),
       agentLayer: this.add.container(0, 0).setDepth(80),
       careLayer: this.add.container(0, 0).setDepth(96),
@@ -261,6 +518,7 @@ class HospitalGameScene extends Phaser.Scene {
 
     if (snapshot.viewMode === 'isometric') {
       this.drawIsometricStatic(snapshot)
+      this.buildLighting(snapshot)
       return
     }
 
@@ -275,6 +533,62 @@ class HospitalGameScene extends Phaser.Scene {
     rooms.filter((room) => room.kind !== 'circulation').forEach((room) => {
       this.drawRoom(room, snapshot.result, disconnectedIds.has(room.id), snapshot.plan.rooms)
     })
+    this.buildLighting(snapshot)
+  }
+
+  /**
+   * Construye el filtro ambiental (multiply) y las luces interiores (additivas).
+   * Se crea una sola vez por escena estatica y luego solo se animan color/alpha.
+   */
+  private buildLighting(snapshot: SimulationSnapshot) {
+    if (!this.layers) return
+
+    const ambient = this.add.rectangle(0, 0, WORLD_PX_W * 4, WORLD_PX_H * 4, 0x000000, 0)
+      .setOrigin(0.5, 0.5)
+      .setPosition(WORLD_PX_W / 2, WORLD_PX_H / 2)
+    if (snapshot.viewMode === 'isometric') {
+      const bounds = isometricSceneBounds(snapshot.plan.rooms)
+      ambient.setPosition(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2)
+      ambient.setSize(Math.max(bounds.w, WORLD_PX_W) * 4, Math.max(bounds.h, WORLD_PX_H) * 4)
+    }
+    this.layers.lightingLayer.add(ambient)
+    this.ambientRect = ambient
+
+    const glow = this.add.container(0, 0)
+    glow.setAlpha(0)
+    this.layers.lightingLayer.add(glow)
+    this.interiorGlow = glow
+
+    if (snapshot.viewMode === 'isometric') return
+
+    const graphics = this.add.graphics()
+    graphics.setBlendMode(Phaser.BlendModes.ADD)
+    glow.add(graphics)
+    snapshot.plan.rooms
+      .filter((room) => room.floor === snapshot.selectedFloor)
+      .filter((room) => room.kind !== 'green' && room.kind !== 'future')
+      .forEach((room) => {
+        const pressure = Math.min(1, (snapshot.result.roomPressure[room.id] ?? 0) / Math.max(1, room.capacity * 1.6))
+        const strength = interiorLightStrength(room.kind, pressure)
+        if (strength <= 0) return
+        const warm = room.kind === 'surgery' || room.kind === 'critical' || room.kind === 'laboratory' ? 0x9fd7ff : 0xffe0a8
+        graphics.fillStyle(warm, 0.09 + strength * 0.13)
+        graphics.fillRect(tileX(room.x) + 3, tileY(room.y) + 3, room.w * TILE - 6, room.h * TILE - 6)
+        // El halo exterior solo en salas pequenas: en bloques grandes se acumula
+        // y quema la imagen al superponerse con vecinos.
+        if (room.w * room.h <= 320) {
+          graphics.fillStyle(warm, 0.05 + strength * 0.07)
+          graphics.fillRect(tileX(room.x) - 6, tileY(room.y) - 6, room.w * TILE + 12, room.h * TILE + 12)
+        }
+      })
+  }
+
+  /** Anima el ciclo dia/noche en cada frame segun la hora del replay. */
+  private updateLighting(snapshot: SimulationSnapshot) {
+    const hour = hourOfDay(wrapMinute(snapshot.motionMinute, snapshot.result.motionCycleMinutes))
+    const ambient = ambientForHour(hour)
+    this.ambientRect?.setFillStyle(toColor(ambient.tint), ambient.tintAlpha)
+    this.interiorGlow?.setAlpha(ambient.interiorLight)
   }
 
   private drawIsometricStatic(snapshot: SimulationSnapshot) {
@@ -387,10 +701,25 @@ class HospitalGameScene extends Phaser.Scene {
       if (!cells.has(cellKey(x - 1, y))) g.lineBetween(tileX(x), tileY(y), tileX(x), tileY(y + 1))
     })
 
-    g.lineStyle(1, toColor('#afc6c3'), 0.3)
+    g.lineStyle(1, toColor('#afc6c3'), 0.26)
     const bounds = boundsForRooms(rooms)
-    for (let x = Math.ceil(bounds.x); x < bounds.x + bounds.w + bounds.h; x += 2) {
-      g.lineBetween(tileX(x), tileY(bounds.y), tileX(x - bounds.h), tileY(bounds.y + bounds.h))
+    for (let x = Math.ceil(bounds.x); x <= bounds.x + bounds.w; x += 2) {
+      g.lineBetween(tileX(x), tileY(bounds.y), tileX(x), tileY(bounds.y + bounds.h))
+    }
+    for (let y = Math.ceil(bounds.y); y <= bounds.y + bounds.h; y += 2) {
+      g.lineBetween(tileX(bounds.x), tileY(y), tileX(bounds.x + bounds.w), tileY(y))
+    }
+
+    // Banda guia de wayfinding sobre el eje mayor de la red de pasillos.
+    g.fillStyle(toColor('#01b7c1'), 0.16)
+    if (bounds.w >= bounds.h) {
+      for (let x = bounds.x + 0.5; x < bounds.x + bounds.w - 0.5; x += 1.4) {
+        g.fillRect(tileX(x), tileY(bounds.y + bounds.h / 2) - 2, TILE * 0.8, 4)
+      }
+    } else {
+      for (let y = bounds.y + 0.5; y < bounds.y + bounds.h - 0.5; y += 1.4) {
+        g.fillRect(tileX(bounds.x + bounds.w / 2) - 2, tileY(y), 4, TILE * 0.8)
+      }
     }
 
     if (bounds.w >= 12 || bounds.h >= 12) {
@@ -403,10 +732,22 @@ class HospitalGameScene extends Phaser.Scene {
     if (!this.layers) return
     const g = this.add.graphics()
     this.layers.staticLayer.add(g)
-    const base = snapshot.selectedFloor === 0 ? '#85de76' : '#eef8f1'
-    const speck = snapshot.selectedFloor === 0 ? '#33b578' : '#afc6c3'
+    const outdoor = snapshot.selectedFloor === 0
+    const base = outdoor ? '#7fd06f' : '#e7f1ee'
+    const speck = outdoor ? '#33b578' : '#c3d4d0'
     g.fillStyle(toColor(base), 1)
     g.fillRect(-WORLD_PX_W, -WORLD_PX_H, WORLD_PX_W * 3, WORLD_PX_H * 3)
+
+    // Manchas de terreno/losa para romper el color plano.
+    for (let y = 0; y < WORLD_H; y += 2) {
+      for (let x = 0; x < WORLD_W; x += 2) {
+        const n = (x * 13 + y * 31 + snapshot.selectedFloor * 7) % 11
+        if (n < 3) {
+          g.fillStyle(toColor(shadeHex(base, n === 0 ? -14 : 10)), 0.5)
+          g.fillRect(x * TILE, y * TILE, TILE * 2, TILE * 2)
+        }
+      }
+    }
 
     for (let y = 0; y < WORLD_H; y += 1) {
       for (let x = 0; x < WORLD_W; x += 1) {
@@ -418,12 +759,38 @@ class HospitalGameScene extends Phaser.Scene {
       }
     }
 
-    if (snapshot.selectedFloor === 0) {
+    if (outdoor) {
+      this.drawSiteAccess()
       this.drawPixelTree(10, 8)
       this.drawPixelTree(7, 17)
       this.drawPixelTree(89, 8)
       this.drawFlowerPatch(8, 24)
       this.drawFlowerPatch(92, 46)
+    }
+  }
+
+  /** Vial de acceso y aparcamiento perimetral: da contexto urbano a la planta baja. */
+  private drawSiteAccess() {
+    if (!this.layers) return
+    const g = this.add.graphics()
+    this.layers.staticLayer.add(g)
+    const roadY = WORLD_H - 5
+
+    g.fillStyle(toColor('#4d5b66'), 1)
+    g.fillRect(0, tileY(roadY), WORLD_PX_W, TILE * 3)
+    g.fillStyle(toColor('#3c4750'), 1)
+    g.fillRect(0, tileY(roadY), WORLD_PX_W, 3)
+    g.fillStyle(0xffffff, 0.75)
+    for (let x = 1; x < WORLD_W; x += 4) {
+      g.fillRect(tileX(x), tileY(roadY + 1.5) - 1, TILE * 2, 3)
+    }
+
+    // Plazas de aparcamiento sobre la banda de acceso.
+    g.fillStyle(toColor('#5d7186'), 1)
+    g.fillRect(tileX(4), tileY(roadY - 4), TILE * 24, TILE * 4)
+    g.lineStyle(1.5, 0xffffff, 0.6)
+    for (let i = 0; i <= 12; i += 1) {
+      g.lineBetween(tileX(4 + i * 2), tileY(roadY - 4), tileX(4 + i * 2), tileY(roadY))
     }
   }
 
@@ -447,7 +814,7 @@ class HospitalGameScene extends Phaser.Scene {
     const wallColor = disconnectedPassage ? '#ed7369' : ROOM_WALL_COLORS[room.kind] ?? '#375171'
     const pressure = Math.min(1, (result.roomPressure[room.id] ?? 0) / Math.max(1, room.capacity * 1.6))
 
-    drawTileRect(g, room.x, room.y, room.w, room.h, roomColor, wallColor)
+    drawRoomShell(g, room, roomColor, wallColor)
     drawRoomPattern(g, room)
     if (room.kind !== 'circulation') drawDoors(g, room, allRooms)
 
@@ -513,22 +880,39 @@ class HospitalGameScene extends Phaser.Scene {
     const layout = roomLabelLayout(room)
     if (!layout) return
 
-    const bg = this.add.rectangle(tileX(room.x + 0.45), tileY(room.y + 0.45), layout.width, layout.height, 0xffffff, 0.94)
+    const container = this.add.container(tileX(room.x + 0.45), tileY(room.y + 0.45))
+    const bg = this.add.rectangle(0, 0, layout.width, layout.height, 0xffffff, 0.94)
       .setOrigin(0, 0)
       .setStrokeStyle(1, 0xaab6ae, 0.9)
     const label = this.add.text(
-      tileX(room.x + 0.75),
-      tileY(room.y + 0.62),
+      6,
+      4,
       `${truncateText(room.name, layout.titleChars)}\nDem ${pressure} | Cap ${room.capacity}`,
       {
-      color: '#1d2f42',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: `${layout.fontSize}px`,
-      fontStyle: 'bold',
-      lineSpacing: 2,
-    },
+        color: '#1d2f42',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${layout.fontSize}px`,
+        fontStyle: 'bold',
+        lineSpacing: 2,
+      },
     ).setResolution(2)
-    this.layers.staticLayer.add([bg, label])
+    container.add([bg, label])
+    this.layers.staticLayer.add(container)
+    this.zoomLabels.push(container)
+  }
+
+  /**
+   * Mantiene etiquetas y contadores a tamano de pantalla constante al hacer zoom:
+   * sin esto, acercarse convierte los rotulos en carteles gigantes.
+   */
+  private applyLabelScale() {
+    const camera = this.cameras.main
+    if (!camera) return
+    const scale = clamp(LABEL_REFERENCE_ZOOM / camera.zoom, 0.34, 1.5)
+    this.zoomLabels.forEach((label) => {
+      if (label.active) label.setScale(scale)
+    })
+    this.occupancyBadges.forEach((badge) => badge.setScale(scale))
   }
 
   private updateAgents(snapshot: SimulationSnapshot) {
@@ -541,6 +925,7 @@ class HospitalGameScene extends Phaser.Scene {
     )
 
     const activeIds = new Set<string>()
+    this.activeAgents = active
     active.forEach(({ agent, pos }) => {
       activeIds.add(agent.id)
       const sprite = this.agentSprites.get(agent.id) ?? this.createAgentSprite(agent)
@@ -556,6 +941,7 @@ class HospitalGameScene extends Phaser.Scene {
         sprite.setDepth(pos.y * TILE)
       }
       sprite.setVisible(true)
+      this.updateAgentFacing(sprite, pos)
       this.updateAgentWalk(sprite, pos.moving, motionMinute, agent.id)
       const roleLabel = sprite.getData('roleLabel') as Phaser.GameObjects.Text | undefined
       if (roleLabel) roleLabel.setVisible(false)
@@ -578,13 +964,18 @@ class HospitalGameScene extends Phaser.Scene {
   private updateAgentWalk(sprite: Phaser.GameObjects.Container, moving: boolean, minute: number, id: string) {
     const leftLeg = sprite.getData('leftLeg') as Phaser.GameObjects.Rectangle | undefined
     const rightLeg = sprite.getData('rightLeg') as Phaser.GameObjects.Rectangle | undefined
-    const shadow = sprite.getData('shadow') as Phaser.GameObjects.Rectangle | undefined
+    const leftArm = sprite.getData('leftArm') as Phaser.GameObjects.Rectangle | undefined
+    const rightArm = sprite.getData('rightArm') as Phaser.GameObjects.Rectangle | undefined
+    const shadow = sprite.getData('shadow') as Phaser.GameObjects.Ellipse | undefined
     const step = moving ? Math.sin(minute * 1.5 + Number(id.replace(/\D/g, '')) * 0.3) : 0
     leftLeg?.setRotation(step * 0.28)
     rightLeg?.setRotation(-step * 0.28)
     leftLeg?.setX(-3 - Math.abs(step) * 0.9)
     rightLeg?.setX(3 + Math.abs(step) * 0.9)
-    shadow?.setScale(moving ? 1.08 : 1, moving ? 0.9 : 1)
+    leftArm?.setRotation(-step * 0.34)
+    rightArm?.setRotation(step * 0.34)
+    shadow?.setScale(moving ? 1.08 : 1, moving ? 0.88 : 1)
+    shadow?.setAlpha(moving ? 0.2 : 0.28)
   }
 
   private updateCareIndicators(active: ActiveAgent[], minute: number) {
@@ -726,21 +1117,47 @@ class HospitalGameScene extends Phaser.Scene {
 
   private createAgentSprite(agent: SimAgent) {
     const container = this.add.container(0, 0)
-    const roleColor = agent.role === 'patient' ? agent.color : staffColor(agent.role)
-    const shadow = this.add.rectangle(0, 8, 12, 4, 0x111827, 0.25)
-    const body = this.add.rectangle(0, 0, 9, 11, toColor(roleColor)).setStrokeStyle(1, 0x17201c)
-    const head = this.add.rectangle(0, -8, 7, 6, 0xd8a878).setStrokeStyle(1, 0x17201c)
-    const hair = this.add.rectangle(0, -12, 8, 3, 0x2b2d42)
+    const uniform = agentUniform(agent.role, agent.id, agent.color)
+    const bodyColor = toColor(uniform.body)
+
+    const shadow = this.add.ellipse(0, 9, 15, 6, 0x0d1a15, 0.26)
+    container.add(shadow)
+
+    if (agent.role === 'patient' && agent.severity && SEVERITY_RING[agent.severity]) {
+      const ring = SEVERITY_RING[agent.severity]
+      const severityRing = this.add.ellipse(0, 9, 23, 11, 0x000000, 0)
+        .setStrokeStyle(2, toColor(ring.color), ring.alpha)
+      container.add(severityRing)
+      container.setData('severityRing', severityRing)
+    }
+
     const leftLeg = this.add.rectangle(-3, 7, 3, 6, 0x293241)
     const rightLeg = this.add.rectangle(3, 7, 3, 6, 0x293241)
-    container.add([shadow, leftLeg, rightLeg, body, head, hair])
+    const leftArm = this.add.rectangle(-6, 0, 2.6, 8, shadeColor(uniform.body, -34))
+    const rightArm = this.add.rectangle(6, 0, 2.6, 8, shadeColor(uniform.body, -34))
+    const body = this.add.rectangle(0, 0, 10, 12, bodyColor).setStrokeStyle(1, 0x17201c, 0.85)
+    const trim = this.add.rectangle(0, 1, 2.6, 11, toColor(uniform.trim), 0.9)
+    const badge = this.add.rectangle(3.2, -3, 3, 2.4, toColor(uniform.badge))
+    const head = this.add.rectangle(0, -8, 7.6, 6.6, toColor(uniform.skin)).setStrokeStyle(1, 0x17201c, 0.6)
+    const hair = this.add.rectangle(0, -11.4, 8.6, 3.4, toColor(uniform.hair))
+    const face = this.add.rectangle(0, -7.4, 4.4, 1.6, 0x17201c, 0.75)
+
+    container.add([leftLeg, rightLeg, leftArm, rightArm, body, trim, badge, head, hair, face])
+    if (uniform.cap) container.add(this.add.rectangle(0, -11.4, 9.2, 3.6, toColor(uniform.cap)))
+
     container.setData('shadow', shadow)
     container.setData('leftLeg', leftLeg)
     container.setData('rightLeg', rightLeg)
+    container.setData('leftArm', leftArm)
+    container.setData('rightArm', rightArm)
+    container.setData('face', face)
+    container.setData('trim', trim)
 
-    if (agent.role !== 'patient') {
-      container.add(this.add.rectangle(0, 0, 3, 10, 0xf8f9fa, 0.9))
-      container.add(this.add.rectangle(0, -1, 8, 2, 0xd62828))
+    if (agent.role === 'porter') {
+      // El celador empuja camilla: se dibuja delante del cuerpo.
+      const trolley = this.add.rectangle(0, 11, 13, 4, 0xffffff).setStrokeStyle(1, 0x375171, 0.9)
+      container.add(trolley)
+      container.setData('trolley', trolley)
     }
 
     const roleLabel = this.add.text(8, -18, shortAgentLabel(agent), {
@@ -757,6 +1174,40 @@ class HospitalGameScene extends Phaser.Scene {
     this.layers?.agentLayer.add(container)
     this.agentSprites.set(agent.id, container)
     return container
+  }
+
+  /**
+   * Orienta el agente segun su desplazamiento real entre frames: mirar de frente,
+   * de espaldas o de perfil hace la escena mucho mas legible que sprites fijos.
+   */
+  private updateAgentFacing(sprite: Phaser.GameObjects.Container, pos: AgentPosition) {
+    const previousX = (sprite.getData('lastX') as number | undefined) ?? pos.x
+    const previousY = (sprite.getData('lastY') as number | undefined) ?? pos.y
+    const dx = pos.x - previousX
+    const dy = pos.y - previousY
+    sprite.setData('lastX', pos.x)
+    sprite.setData('lastY', pos.y)
+
+    let facing = (sprite.getData('facing') as string | undefined) ?? 'down'
+    if (Math.abs(dx) > 0.02 || Math.abs(dy) > 0.02) {
+      facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up'
+      sprite.setData('facing', facing)
+    }
+
+    const face = sprite.getData('face') as Phaser.GameObjects.Rectangle | undefined
+    const trim = sprite.getData('trim') as Phaser.GameObjects.Rectangle | undefined
+    const trolley = sprite.getData('trolley') as Phaser.GameObjects.Rectangle | undefined
+
+    if (face) {
+      face.setVisible(facing !== 'up')
+      face.setX(facing === 'right' ? 1.4 : facing === 'left' ? -1.4 : 0)
+    }
+    if (trim) trim.setVisible(facing !== 'up')
+    if (trolley) {
+      const horizontal = facing === 'left' || facing === 'right'
+      trolley.setSize(horizontal ? 4 : 13, horizontal ? 13 : 4)
+      trolley.setPosition(facing === 'right' ? 10 : facing === 'left' ? -10 : 0, facing === 'up' ? -11 : horizontal ? 1 : 11)
+    }
   }
 
   private addPixelText(text: string, x: number, y: number, color: string, background: string, layer?: Phaser.GameObjects.Container, fontSize = 10) {
@@ -776,13 +1227,17 @@ class HospitalGameScene extends Phaser.Scene {
     if (!this.layers) return
     const g = this.add.graphics()
     this.layers.staticLayer.add(g)
+    // Sombra proyectada al sureste para dar volumen.
+    g.fillStyle(0x0d1a15, 0.18)
+    g.fillEllipse(tileX(x + 1.5), tileY(y + 2.4), 40, 18)
     g.fillStyle(0x8b5a2b, 1)
-    g.fillRect(tileX(x + 1.1), tileY(y + 2.0), 10, 22)
-    g.fillStyle(0x2f8f46, 1)
-    g.fillRect(tileX(x), tileY(y + 0.7), 36, 16)
-    g.fillRect(tileX(x + 0.6), tileY(y), 24, 18)
+    g.fillRect(tileX(x + 1.1), tileY(y + 1.6), 9, 20)
     g.fillStyle(0x256f38, 1)
-    g.fillRect(tileX(x + 0.3), tileY(y + 1.4), 30, 8)
+    g.fillEllipse(tileX(x + 1.1), tileY(y + 0.9), 42, 34)
+    g.fillStyle(0x2f8f46, 1)
+    g.fillEllipse(tileX(x + 0.9), tileY(y + 0.6), 34, 27)
+    g.fillStyle(0x46a95a, 0.85)
+    g.fillEllipse(tileX(x + 0.7), tileY(y + 0.35), 20, 15)
   }
 
   private drawFlowerPatch(x: number, y: number) {
@@ -800,6 +1255,7 @@ class HospitalGameScene extends Phaser.Scene {
 
   private layoutCamera() {
     if (!this.cameras.main) return
+    if (this.cameraOverride) return
     if (this.snapshot?.viewMode === 'isometric') {
       const bounds = isometricSceneBounds(this.snapshot.plan.rooms)
       const padding = 120
@@ -1016,21 +1472,135 @@ function drawTileRect(g: Phaser.GameObjects.Graphics, x: number, y: number, w: n
   g.strokeRect(px + 1, py + 1, pw - 2, ph - 2)
 }
 
+/**
+ * Envolvente construida de una sala: sombra proyectada, suelo, muro con espesor
+ * real y sombreado interior. Sustituye al rectangulo plano anterior para que el
+ * plano se lea como arquitectura y no como un diagrama de bloques.
+ */
+function drawRoomShell(g: Phaser.GameObjects.Graphics, room: PlacedRoom, fill: string, stroke: string) {
+  const px = tileX(room.x)
+  const py = tileY(room.y)
+  const pw = room.w * TILE
+  const ph = room.h * TILE
+  const wall = room.kind === 'circulation' ? 2 : room.kind === 'technical' || room.kind === 'vertical' ? 5 : 4
+
+  // Sombra proyectada del volumen sobre el terreno.
+  g.fillStyle(0x0d1a15, 0.16)
+  g.fillRect(px + 4, py + 5, pw, ph)
+
+  // Suelo interior.
+  g.fillStyle(toColor(fill), 1)
+  g.fillRect(px, py, pw, ph)
+
+  // Muro perimetral con espesor.
+  g.fillStyle(toColor(shadeHex(stroke, 34)), 1)
+  g.fillRect(px, py, pw, wall)
+  g.fillRect(px, py + ph - wall, pw, wall)
+  g.fillRect(px, py, wall, ph)
+  g.fillRect(px + pw - wall, py, wall, ph)
+
+  // Cantos del muro: linea exterior nitida y junta interior mas oscura.
+  g.lineStyle(1.5, toColor(shadeHex(stroke, -26)), 1)
+  g.strokeRect(px + 0.75, py + 0.75, pw - 1.5, ph - 1.5)
+  g.lineStyle(1, toColor(shadeHex(stroke, -40)), 0.55)
+  g.strokeRect(px + wall, py + wall, pw - wall * 2, ph - wall * 2)
+
+  // Sombra interior arrojada por los muros norte y oeste.
+  g.fillStyle(0x0d1a15, 0.1)
+  g.fillRect(px + wall, py + wall, pw - wall * 2, 3)
+  g.fillRect(px + wall, py + wall, 3, ph - wall * 2)
+
+  // Pilares de esquina.
+  g.fillStyle(toColor(shadeHex(stroke, -18)), 1)
+  const post = wall + 1
+  g.fillRect(px, py, post, post)
+  g.fillRect(px + pw - post, py, post, post)
+  g.fillRect(px, py + ph - post, post, post)
+  g.fillRect(px + pw - post, py + ph - post, post, post)
+}
+
+/** Textura de suelo por tipo de sala: baldosa, vinilo, terrazo, tecnico o exterior. */
 function drawRoomPattern(g: Phaser.GameObjects.Graphics, room: PlacedRoom) {
   if (room.kind === 'circulation') {
-    g.lineStyle(1, toColor('#afc6c3'), 0.34)
-    for (let x = Math.ceil(room.x); x < room.x + room.w + room.h; x += 2) {
-      g.lineBetween(tileX(x), tileY(room.y), tileX(x - room.h), tileY(room.y + room.h))
+    drawCorridorSurface(g, room)
+    return
+  }
+
+  const texture = floorTexture(room.kind)
+  const px = tileX(room.x)
+  const py = tileY(room.y)
+  const pw = room.w * TILE
+  const ph = room.h * TILE
+  const step = Math.max(1, texture.tile) * TILE
+
+  if (texture.pattern === 'grass') {
+    g.fillStyle(toColor(texture.grout), 0.5)
+    for (let y = 0; y < ph; y += 7) {
+      for (let x = (y % 14 === 0 ? 0 : 5); x < pw; x += 11) {
+        g.fillRect(px + x, py + y, 3, 2)
+      }
     }
     return
   }
-  const stripeColor = room.kind === 'surgery' || room.kind === 'critical' ? '#7a4c28' : '#4d665d'
-  g.lineStyle(1, toColor(stripeColor), 0.14)
-  for (let x = Math.ceil(room.x); x < room.x + room.w; x += 1) {
-    g.lineBetween(tileX(x), tileY(room.y), tileX(x), tileY(room.y + room.h))
+
+  g.lineStyle(1, toColor(texture.grout), texture.groutAlpha)
+  for (let x = step; x < pw; x += step) {
+    g.lineBetween(px + x, py + 2, px + x, py + ph - 2)
   }
-  for (let y = Math.ceil(room.y); y < room.y + room.h; y += 1) {
-    g.lineBetween(tileX(room.x), tileY(y), tileX(room.x + room.w), tileY(y))
+  for (let y = step; y < ph; y += step) {
+    g.lineBetween(px + 2, py + y, px + pw - 2, py + y)
+  }
+
+  if (texture.accent) {
+    // Brillo especular suave para dar sensacion de suelo pulido.
+    g.fillStyle(toColor(texture.accent), 0.09)
+    for (let y = 0; y < ph; y += step * 2) {
+      g.fillRect(px + 2, py + y, pw - 4, Math.min(step * 0.5, ph - y))
+    }
+  }
+
+  if (texture.pattern === 'technical' || texture.pattern === 'asphalt') {
+    g.fillStyle(toColor(texture.grout), texture.groutAlpha * 0.8)
+    for (let y = step / 2; y < ph; y += step) {
+      for (let x = step / 2; x < pw; x += step) {
+        g.fillRect(px + x - 1, py + y - 1, 2, 2)
+      }
+    }
+  }
+}
+
+/** Pasillo con banda guia central y marcas de sentido de circulacion. */
+function drawCorridorSurface(g: Phaser.GameObjects.Graphics, room: PlacedRoom) {
+  const px = tileX(room.x)
+  const py = tileY(room.y)
+  const pw = room.w * TILE
+  const ph = room.h * TILE
+  const horizontal = room.w >= room.h
+
+  g.lineStyle(1, toColor('#afc6c3'), 0.3)
+  const step = 2 * TILE
+  if (horizontal) {
+    for (let x = step; x < pw; x += step) g.lineBetween(px + x, py + 2, px + x, py + ph - 2)
+  } else {
+    for (let y = step; y < ph; y += step) g.lineBetween(px + 2, py + y, px + pw - 2, py + y)
+  }
+
+  // Rodapie/pasamanos en los lados largos.
+  g.fillStyle(toColor('#cfe0dc'), 0.85)
+  if (horizontal) {
+    g.fillRect(px, py + 1, pw, 2)
+    g.fillRect(px, py + ph - 3, pw, 2)
+  } else {
+    g.fillRect(px + 1, py, 2, ph)
+    g.fillRect(px + pw - 3, py, 2, ph)
+  }
+
+  // Banda guia central discontinua.
+  g.fillStyle(toColor('#01b7c1'), 0.22)
+  if (horizontal) {
+    for (let x = 6; x < pw - 6; x += 22) g.fillRect(px + x, py + ph / 2 - 1.5, 12, 3)
+  } else {
+    for (let y = 6; y < ph - 6; y += 22) g.fillRect(px + pw / 2 - 1.5, py + y, 3, 12)
   }
 }
 
@@ -1044,17 +1614,42 @@ function drawDoors(g: Phaser.GameObjects.Graphics, room: PlacedRoom, allRooms: P
     const length = Math.max(30, Math.min(62, (horizontal ? room.w : room.h) * TILE * 0.32))
     const thickness = 12
     const fill = connected
-      ? (room.simulationNode === 'emergency_stair' ? '#e86464' : ROOM_FLOOR_COLORS.circulation)
+      ? (room.simulationNode === 'emergency_stair' ? '#e86464' : '#f7fbfa')
       : '#fff0ed'
     const stroke = connected ? '#375171' : '#ed7369'
+
+    // Hueco de paso: se borra el muro y se coloca el umbral.
     g.fillStyle(toColor(fill), 1)
-    g.lineStyle(2, toColor(stroke), 1)
+    g.lineStyle(1.5, toColor(stroke), 1)
     if (horizontal) {
       g.fillRect(px - length / 2, py - thickness / 2, length, thickness)
       g.strokeRect(px - length / 2, py - thickness / 2, length, thickness)
     } else {
       g.fillRect(px - thickness / 2, py - length / 2, thickness, length)
       g.strokeRect(px - thickness / 2, py - length / 2, thickness, length)
+    }
+
+    // Hoja de puerta y arco de barrido, como en un plano arquitectonico.
+    const inwardX = door.side === 'left' ? 1 : door.side === 'right' ? -1 : 0
+    const inwardY = door.side === 'top' ? 1 : door.side === 'bottom' ? -1 : 0
+    const leaf = length * 0.82
+    const hingeX = horizontal ? px - leaf / 2 : px
+    const hingeY = horizontal ? py : py - leaf / 2
+
+    g.lineStyle(1, toColor(stroke), 0.42)
+    g.beginPath()
+    if (horizontal) {
+      g.arc(hingeX, hingeY, leaf, inwardY > 0 ? 0 : Phaser.Math.DegToRad(-90), inwardY > 0 ? Phaser.Math.DegToRad(90) : 0, false)
+    } else {
+      g.arc(hingeX, hingeY, leaf, inwardX > 0 ? Phaser.Math.DegToRad(-90) : Phaser.Math.DegToRad(90), inwardX > 0 ? 0 : Phaser.Math.DegToRad(180), false)
+    }
+    g.strokePath()
+
+    g.lineStyle(2.5, toColor(stroke), 0.9)
+    if (horizontal) {
+      g.lineBetween(hingeX, hingeY, hingeX, hingeY + leaf * (inwardY > 0 ? 1 : -1))
+    } else {
+      g.lineBetween(hingeX, hingeY, hingeX + leaf * (inwardX > 0 ? 1 : -1), hingeY)
     }
   })
 }
@@ -1280,11 +1875,98 @@ function equipmentCount(room: PlacedRoom) {
   return Math.min(18, Math.max(4, room.equipment.length * 3))
 }
 
-function staffColor(role: AgentRole) {
-  if (role === 'doctor') return '#f8f9fa'
-  if (role === 'nurse') return '#4f83cc'
-  if (role === 'porter') return '#7c6bb0'
-  return '#6c757d'
+function staffRoleLabel(role: AgentRole) {
+  if (role === 'doctor') return 'Médico/a'
+  if (role === 'nurse') return 'Enfermería'
+  if (role === 'porter') return 'Celador/a'
+  if (role === 'technician') return 'Técnico/a'
+  return 'Paciente'
+}
+
+const SEVERITY_LABELS: Record<string, string> = {
+  low: 'leve',
+  medium: 'moderada',
+  high: 'alta',
+  critical: 'crítica',
+}
+
+/** Datos de tooltip para un agente concreto del replay. */
+function agentProbe(item: ActiveAgent): Omit<StageProbe, 'x' | 'y'> {
+  const { agent, pos } = item
+  const lines = [
+    `Estancia: ${pos.room.name}`,
+    `Estado: ${pos.moving ? 'en traslado' : 'en atención'}`,
+  ]
+  if (pos.phase) lines.push(`Fase: ${pos.phase}`)
+  if (agent.role === 'patient') {
+    if (agent.caseName) lines.push(`Caso: ${agent.caseName}`)
+    if (agent.severity) lines.push(`Gravedad: ${SEVERITY_LABELS[agent.severity] ?? agent.severity}`)
+  } else if (agent.staffLabel) {
+    lines.push(`Equipo: ${agent.staffLabel}`)
+  }
+  return {
+    title: agent.role === 'patient' ? (agent.caseCode ?? 'Paciente') : staffRoleLabel(agent.role),
+    subtitle: agent.role === 'patient' ? 'Paciente' : 'Personal',
+    lines,
+    accent: agent.role === 'patient' ? agent.color : ROOM_WALL_COLORS.staff,
+  }
+}
+
+/** Datos de tooltip para una estancia, con presión y ocupación en vivo. */
+function roomProbe(room: PlacedRoom, snapshot: SimulationSnapshot, occupancy: RoomOccupancy): Omit<StageProbe, 'x' | 'y'> {
+  const pressure = snapshot.result.roomPressure[room.id] ?? 0
+  const ratio = room.capacity > 0 ? pressure / room.capacity : 0
+  const state = ratio > 0.85 ? 'saturada' : ratio > 0.45 ? 'ajustada' : 'holgada'
+  const lines = [
+    `Tipo: ${KIND_LABELS[room.kind]}`,
+    `Planta ${floorName(room.floor)} · ${Math.round(room.areaSqm)} m²`,
+    `Demanda ${pressure} / capacidad ${room.capacity} (${state})`,
+    `Dentro ahora: ${occupancy.total} (P ${occupancy.patients} · S ${occupancy.staff})`,
+  ]
+  if ((room.doors ?? []).length === 0 && room.kind !== 'circulation') lines.push('Sin puertas definidas')
+  return {
+    title: room.name,
+    subtitle: room.simulationNode ? `Nodo ${room.simulationNode}` : undefined,
+    lines,
+    accent: ROOM_WALL_COLORS[room.kind] ?? '#375171',
+  }
+}
+
+function occupancyForRoom(active: ActiveAgent[], roomId: string): RoomOccupancy {
+  return active.reduce<RoomOccupancy>((accumulator, item) => {
+    if (item.pos.room.id !== roomId) return accumulator
+    accumulator.total += 1
+    if (item.agent.role === 'patient') accumulator.patients += 1
+    else accumulator.staff += 1
+    return accumulator
+  }, { total: 0, patients: 0, staff: 0 })
+}
+
+/** Cara superior del prisma isometrico, usada para detectar el bloque bajo el puntero. */
+function isoTopFace(room: PlacedRoom): Array<{ x: number; y: number }> {
+  const height = isoBlockHeight(room)
+  return [
+    isoPoint(room.x, room.y, room.floor, height),
+    isoPoint(room.x + room.w, room.y, room.floor, height),
+    isoPoint(room.x + room.w, room.y + room.h, room.floor, height),
+    isoPoint(room.x, room.y + room.h, room.floor, height),
+  ]
+}
+
+function pointInPolygon(point: { x: number; y: number }, polygon: Array<{ x: number; y: number }>): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[i]
+    const b = polygon[j]
+    const intersects = a.y > point.y !== b.y > point.y
+      && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y || 0.0001) + a.x
+    if (intersects) inside = !inside
+  }
+  return inside
+}
+
+function shadeColor(hex: string, amount: number) {
+  return toColor(shadeHex(hex, amount))
 }
 
 function shortAgentLabel(agent: SimAgent) {
@@ -1304,6 +1986,8 @@ function tileY(value: number) {
 }
 
 function toColor(hex: string) {
+  // La capa de dibujo nunca debe romper la escena por un color mal formado.
+  if (typeof hex !== 'string' || !hex.startsWith('#')) return 0xffffff
   return Phaser.Display.Color.HexStringToColor(hex).color
 }
 

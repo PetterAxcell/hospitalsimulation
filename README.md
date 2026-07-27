@@ -22,6 +22,16 @@ npm run lint
 npm run build
 ```
 
+Para verificar la vista de Simulación en un navegador real (Chrome headless), con el dev server levantado:
+
+```bash
+cd frontend
+npm run dev          # en otra terminal
+npm run verify:sim
+```
+
+El script `scripts/verify-simulation.mjs` abre la pestaña Simulación, comprueba render, reloj día/noche, tooltip, zoom, pan, leyenda, atajos y vista isométrica, falla si hay excepciones JS y deja capturas en `/tmp/simlab-shots`.
+
 Para desplegar el frontend en Cloudflare Pages:
 
 ```bash
@@ -53,6 +63,12 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Canvas de Vision para colocar, mover y redimensionar servicios, pasillos, ascensores, escaleras, montacargas y piezas de seguridad.
 - Navegacion del planificador: el plano encaja por ancho y permite arrastrar sobre zonas vacias para desplazarse verticalmente por plantas grandes.
 - Simulación 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presión por estancia y capas de RPG, flujos y reglas.
+- Render arquitectónico de la simulación: muros con espesor y pilares, sombra proyectada por bloque, suelos con textura por tipo de estancia (baldosa, vinilo, terrazo, técnico), puertas con umbral y arco de barrido, pasillos con pasamanos y banda guía de wayfinding, y vial de acceso con aparcamiento en planta baja.
+- Ciclo día/noche ligado al reloj del replay: filtro ambiental por hora, luz interior encendida de noche en urgencias, críticos, quirófanos, laboratorio y núcleos verticales, y alumbrado de guardia en circulaciones.
+- Agentes más legibles: uniformes por rol (bata, pijama azul, celador con camilla, técnico), orientación según el movimiento real, anillo de gravedad en pacientes, sombra y ciclo de marcha con brazos.
+- Cámara interactiva en la simulación: zoom con rueda o botones, desplazamiento arrastrando, encajar vista con doble clic o `F`, y rótulos que mantienen tamaño de pantalla al hacer zoom.
+- HUD de escena: reloj con hora, fase del día, turno y planta activa; tooltip al pasar el ratón sobre estancias (tipo, m², demanda, capacidad, ocupación en vivo) y sobre agentes (rol, caso, gravedad, fase); leyenda de agentes, presión y atajos.
+- Atajos de teclado en la simulación: `Espacio` play/pausa, `←`/`→` desplazar el tiempo, `1`-`4` velocidad, `V` alternar 2D/3D, `F` encajar vista, `L` leyenda. El lienzo es enfocable con teclado y respeta los controles nativos de sliders, selects y botones.
 - Top de propuestas por autor: ranking local de arquitecturas, puntuado con KPIs de simulacion, reglas abiertas y desviacion de m2. Es la primera vista de la app para priorizar comparacion antes que edicion; ahora usa tarjetas compactas y modales de detalle para evitar paginas demasiado explicativas.
 - Análisis compacto: la vista muestra cuellos de botella, presión por estancia, casos bloqueados y estado en una pantalla sin paneles laterales; la lectura operativa vive en modal para no llenar la página con texto fijo.
 - Modales por sección: Top, Análisis y Servicios tienen una acción contextual en la barra superior; Planificador y Simulación usan asides compactos donde cada bloque pequeño abre su propio modal de detalle.
@@ -131,6 +147,7 @@ frontend/
   src/components/ui/ Primitivas compartidas como métricas y modales
   src/features/    Funcionalidades de producto separadas: planning, top, servicios, saturacion y simulacion
   src/utils/       Formato compartido de numeros y plantas
+  scripts/         Verificacion headless de la vista de Simulacion (Chrome CDP)
 hospital_sim/      Prototipo Python/SimPy inicial, mantenido como referencia
 docs/              Arquitectura, backend y requisitos
 tests/             Pruebas de regresion del prototipo Python
