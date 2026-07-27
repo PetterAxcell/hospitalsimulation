@@ -32,6 +32,14 @@ npm run verify:sim
 
 El script `scripts/verify-simulation.mjs` abre la pestaña Simulación, comprueba render, reloj día/noche, tooltip, zoom, pan, leyenda, atajos y vista isométrica, falla si hay excepciones JS y deja capturas en `/tmp/simlab-shots`.
 
+Para verificar escenarios y la importación de mezcla clínica:
+
+```bash
+cd frontend
+npm run verify:scenarios                              # escenarios, ranking y persistencia
+npm run verify:scenarios -- --cases casos-mimic.yaml  # además aplica un YAML de casos
+```
+
 Para desplegar el frontend en Cloudflare Pages:
 
 ```bash
@@ -60,6 +68,9 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 ## Estado actual
 
 - Frontend React con editor multi-planta.
+- Escenarios comparables: el Planificador guarda escenarios que congelan plano, demanda, mezcla clínica y matriz de adyacencia, los relanza en un clic (individual o en bloque), avisa cuando un resultado queda obsoleto, permite cargarlos de vuelta al editor y los conserva en el navegador entre sesiones.
+- Ranking del Top alimentado por escenarios reales: cada tarjeta usa la simulación de su escenario, no una variante sintética, y el score penaliza la tasa de bloqueo en lugar del valor absoluto para que escenarios con distinta demanda sean comparables.
+- Mezcla clínica desde datos reales: `npm run cases:mimic` convierte una extracción de MIMIC-IV en el YAML de casos del simulador, derivando cohortes por capítulo diagnóstico, pesos por frecuencia y probabilidades observadas de analítica, imagen, quirófano, UCI y destino al alta. Ver [docs/MIMIC_CASE_MIX.md](docs/MIMIC_CASE_MIX.md).
 - Canvas de Vision para colocar, mover y redimensionar servicios, pasillos, ascensores, escaleras, montacargas y piezas de seguridad.
 - Navegacion del planificador: el plano encaja por ancho y permite arrastrar sobre zonas vacias para desplazarse verticalmente por plantas grandes.
 - Simulación 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presión por estancia y capas de RPG, flujos y reglas.
@@ -103,6 +114,7 @@ La documentacion tecnica vive en [docs/](docs/):
 - [Backend propuesto](docs/BACKEND.md)
 - [Despliegue](docs/DEPLOYMENT.md)
 - [Modelo funcional Hospital Clinic](docs/HOSPITAL_CLINIC_MODEL.md)
+- [Mezcla clinica desde MIMIC-IV](docs/MIMIC_CASE_MIX.md)
 - [Sincronizacion Pla d'Espais Clinic](docs/CLINIC_SPACE_PROGRAM_SYNC.md)
 - [Paleta visual Clinic Barcelona](docs/BRAND_COLORS.md)
 - [Requisitos arquitectonicos y seguridad](docs/SAFETY_REQUIREMENTS.md)

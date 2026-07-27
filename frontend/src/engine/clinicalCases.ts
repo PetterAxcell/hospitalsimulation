@@ -27,6 +27,19 @@ export interface ClinicalCaseCompileResult {
   cases: PatientCaseDefinition[]
   diagnostics: ClinicalCaseDiagnostic[]
   appliedCases: number
+  meta?: ClinicalCaseMeta
+}
+
+/**
+ * Procedencia opcional de la mezcla clinica. La escribe quien genera el YAML
+ * (por ejemplo el conversor de MIMIC) bajo la clave `meta` y sirve para saber
+ * si los casos son sinteticos o derivados de una base de datos real.
+ */
+export interface ClinicalCaseMeta {
+  source?: string
+  generatedAt?: string
+  patients?: number
+  notes?: string
 }
 
 interface CaseStepSpec {
@@ -725,6 +738,7 @@ export function compileClinicalCases(source: string): ClinicalCaseCompileResult 
       cases,
       diagnostics: [],
       appliedCases: cases.length,
+      meta: metaFromValue(root.meta),
     }
   } catch (error) {
     return {
@@ -778,6 +792,18 @@ export function replaceClinicalCaseInYaml(source: string, caseSource: string, ta
 
 function caseStep(node: SimulationNode, phase: string): PatientCaseStep {
   return { node, phase }
+}
+
+function metaFromValue(value: unknown): ClinicalCaseMeta | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const meta: ClinicalCaseMeta = {
+    source: optionalString(record.source ?? record.dataset),
+    generatedAt: optionalString(record.generatedAt ?? record.generated_at),
+    patients: optionalNumber(record.patients ?? record.sample),
+    notes: optionalString(record.notes),
+  }
+  return meta.source || meta.generatedAt || meta.patients || meta.notes ? meta : undefined
 }
 
 export function weightedPatientCase(rng: () => number, patientCases: PatientCaseDefinition[]): PatientCaseDefinition {

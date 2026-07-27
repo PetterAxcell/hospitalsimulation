@@ -163,10 +163,15 @@ export function scoreArchitecture(
   const failCount = rules.filter((rule) => rule.status === 'fail').length
   const warnCount = rules.filter((rule) => rule.status === 'warn').length
   const areaDrift = Math.abs(totalArea - plan.targetAreaSqm) / Math.max(1, plan.targetAreaSqm)
-  const blockedPenalty = metrics.blocked * 2.4
+  // El bloqueo se puntua en tasa, no en valor absoluto: si no, cualquier
+  // escenario con mas demanda hunde su score y el ranking deja de comparar
+  // arquitecturas para comparar solo volumen de llegadas.
+  const attempted = Math.max(1, metrics.completed + metrics.blocked)
+  const blockedRate = metrics.blocked / attempted
+  const blockedPenalty = blockedRate * 48
   const waitPenalty = Math.max(0, metrics.edP90 - 120) * 0.055
   const travelPenalty = metrics.averageTravel * 0.35
-  const verticalPenalty = metrics.verticalMoves * 0.012
+  const verticalPenalty = (metrics.verticalMoves / attempted) * 1.2
   const rulePenalty = failCount * 8 + warnCount * 2.5
   const areaPenalty = Math.min(12, areaDrift * 40)
   const value = clampScore(100 - blockedPenalty - waitPenalty - travelPenalty - verticalPenalty - rulePenalty - areaPenalty)

@@ -25,5 +25,5 @@ export interface ArchitectureProposal {
   roomCount: number
   hottestRoomName: string
   createdAt: string
-  source: 'demo' | 'submitted'
+  source: 'demo' | 'submitted' | 'scenario'
 }

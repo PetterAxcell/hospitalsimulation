@@ -7,131 +7,37 @@
  *
  * Uso: node scripts/verify-simulation.mjs [url]   (por defecto http://localhost:5173/)
  */
-import { spawn } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { setTimeout as sleep } from 'node:timers/promises'
+import {
+  collectPageErrors,
+  connect,
+  createReport,
+  evaluate,
+  findPageTarget,
+  key,
+  launchChrome,
+  mouse,
+  printReport,
+  screenshot,
+  sleep,
+} from './lib/cdp.mjs'
 
 const URL_BASE = process.argv[2] ?? 'http://localhost:5173/'
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 const PORT = 9333
 const OUT = '/tmp/simlab-shots'
-mkdirSync(OUT, { recursive: true })
 
-const chrome = spawn(CHROME, [
-  '--headless=new',
-  `--remote-debugging-port=${PORT}`,
-  '--user-data-dir=/tmp/simlab-cdp-profile',
-  '--no-first-run',
-  '--no-default-browser-check',
-  '--disable-extensions',
-  '--window-size=1500,940',
-  '--enable-unsafe-swiftshader',
-  '--hide-scrollbars',
-  'about:blank',
-], { stdio: ['ignore', 'ignore', 'pipe'] })
+const chrome = launchChrome({ port: PORT, profile: '/tmp/simlab-cdp-profile' })
 
-let chromeStderr = ''
-chrome.stderr.on('data', (chunk) => { chromeStderr += chunk.toString() })
-
-const report = { steps: [], consoleErrors: [], exceptions: [], screenshots: [] }
+const report = createReport()
 const fail = (message) => { report.steps.push(`FAIL ${message}`) }
 const ok = (message) => { report.steps.push(`OK   ${message}`) }
 
-async function targets() {
-  for (let i = 0; i < 60; i += 1) {
-    try {
-      const response = await fetch(`http://127.0.0.1:${PORT}/json/list`)
-      const list = await response.json()
-      const page = list.find((item) => item.type === 'page')
-      if (page?.webSocketDebuggerUrl) return page
-    } catch {
-      // Chrome aun no escucha.
-    }
-    await sleep(250)
-  }
-  throw new Error('Chrome DevTools no respondio')
-}
-
-function connect(url) {
-  const socket = new WebSocket(url)
-  const pending = new Map()
-  const listeners = []
-  let nextId = 1
-
-  socket.addEventListener('message', (event) => {
-    const message = JSON.parse(event.data)
-    if (message.id && pending.has(message.id)) {
-      const { resolve, reject } = pending.get(message.id)
-      pending.delete(message.id)
-      if (message.error) reject(new Error(JSON.stringify(message.error)))
-      else resolve(message.result)
-      return
-    }
-    listeners.forEach((listener) => listener(message))
-  })
-
-  const ready = new Promise((resolve, reject) => {
-    socket.addEventListener('open', resolve)
-    socket.addEventListener('error', reject)
-  })
-
-  return {
-    ready,
-    on: (listener) => listeners.push(listener),
-    send: (method, params = {}) => new Promise((resolve, reject) => {
-      const id = nextId += 1
-      pending.set(id, { resolve, reject })
-      socket.send(JSON.stringify({ id, method, params }))
-    }),
-    close: () => socket.close(),
-  }
-}
-
-async function shot(cdp, name) {
-  const { data } = await cdp.send('Page.captureScreenshot', { format: 'png' })
-  const file = `${OUT}/${name}.png`
-  writeFileSync(file, Buffer.from(data, 'base64'))
-  report.screenshots.push(file)
-  return file
-}
-
-async function evaluate(cdp, expression) {
-  const result = await cdp.send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text ?? 'evaluate error')
-  return result.result.value
-}
-
-async function mouse(cdp, type, x, y, extra = {}) {
-  await cdp.send('Input.dispatchMouseEvent', { type, x, y, button: extra.button ?? 'none', buttons: extra.buttons ?? 0, clickCount: extra.clickCount ?? 0, ...extra })
-}
-
-async function key(cdp, keyDef) {
-  const payload = {
-    windowsVirtualKeyCode: keyDef.windowsVirtualKeyCode,
-    nativeVirtualKeyCode: keyDef.windowsVirtualKeyCode,
-    unmodifiedText: keyDef.text,
-    location: 0,
-    isKeypad: false,
-    ...keyDef,
-  }
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...payload })
-  await cdp.send('Input.dispatchKeyEvent', { type: 'char', text: payload.text })
-  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...payload })
-}
+const shot = (cdp, name) => screenshot(cdp, OUT, name, report)
 
 try {
-  const target = await targets()
+  const target = await findPageTarget(PORT)
   const cdp = connect(target.webSocketDebuggerUrl)
   await cdp.ready
-
-  cdp.on((message) => {
-    if (message.method === 'Runtime.exceptionThrown') {
-      report.exceptions.push(message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text)
-    }
-    if (message.method === 'Runtime.consoleAPICalled' && ['error', 'assert'].includes(message.params.type)) {
-      report.consoleErrors.push(message.params.args.map((arg) => arg.description ?? arg.value).join(' '))
-    }
-  })
+  collectPageErrors(cdp, report)
 
   await cdp.send('Runtime.enable')
   await cdp.send('Page.enable')
@@ -322,19 +228,10 @@ try {
 } catch (error) {
   fail(`error del verificador: ${error.message}`)
 } finally {
-  chrome.kill('SIGTERM')
+  chrome.process.kill('SIGTERM')
 }
 
-const failures = report.steps.filter((step) => step.startsWith('FAIL'))
-const blocking = [...failures, ...report.exceptions]
-console.log('=== PASOS ===')
-report.steps.forEach((step) => console.log(step))
-console.log('\n=== EXCEPCIONES JS ===')
-console.log(report.exceptions.length ? report.exceptions.join('\n') : 'ninguna')
-console.log('\n=== CONSOLE ERROR ===')
-console.log(report.consoleErrors.length ? report.consoleErrors.join('\n') : 'ninguno')
-console.log('\n=== CAPTURAS ===')
-report.screenshots.forEach((file) => console.log(file))
-if (chromeStderr.includes('ERROR:') && process.env.SIMLAB_VERBOSE) console.log('\n=== CHROME STDERR ===\n' + chromeStderr)
-console.log(`\nRESULTADO: ${blocking.length === 0 ? 'PASS' : 'FAIL'}`)
-process.exit(blocking.length === 0 ? 0 : 1)
+if (process.env.SIMLAB_VERBOSE && chrome.getStderr().includes('ERROR:')) {
+  console.log(`=== CHROME STDERR ===\n${chrome.getStderr()}`)
+}
+process.exit(printReport(report) ? 0 : 1)

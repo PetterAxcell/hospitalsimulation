@@ -96,14 +96,20 @@ export function TopControls({
   owner,
   proposals,
   currentScore,
+  scenarioCount,
+  staleScenarioCount,
   onChangeOwner,
   onSubmit,
+  onRunScenarios,
 }: {
   owner: ProposalOwner
   proposals: ArchitectureProposal[]
   currentScore: ArchitectureScore
+  scenarioCount: number
+  staleScenarioCount: number
   onChangeOwner: (owner: ProposalOwner) => void
   onSubmit: () => void
+  onRunScenarios: () => void
 }) {
   const submittedCount = proposals.filter((proposal) => proposal.source === 'submitted').length
   return (
@@ -116,6 +122,15 @@ export function TopControls({
         </label>
         <Metric label="Score actual" value={formatScore(currentScore.value)} />
         <button type="button" className="primary-action" onClick={onSubmit}>Guardar arquitectura</button>
+      </section>
+
+      <section className="panel-section">
+        <h2>Escenarios</h2>
+        <Metric label="Comparados" value={String(scenarioCount)} />
+        <Metric label="Sin relanzar" value={String(staleScenarioCount)} />
+        <button type="button" className="secondary-action" onClick={onRunScenarios} disabled={scenarioCount === 0}>
+          Relanzar escenarios
+        </button>
       </section>
 
       <section className="panel-section">

@@ -11,6 +11,8 @@ interface SimulationCaseSelectorProps {
   selectedCaseId: PatientCaseFilter
   agentLayer: SimulationAgentLayer
   diagnostics: ClinicalCaseDiagnostic[]
+  /** Procedencia de la mezcla clinica aplicada, si viene de una base de datos. */
+  caseMixSource?: string
   onEditCases: () => void
   onEditCase: (caseId: PatientCaseFilter) => void
   onUploadCases: (file: File | undefined) => void
@@ -24,6 +26,7 @@ export function SimulationCaseSelector({
   selectedCaseId,
   agentLayer,
   diagnostics,
+  caseMixSource,
   onEditCases,
   onEditCase,
   onUploadCases,
@@ -84,6 +87,7 @@ export function SimulationCaseSelector({
 
       <div className="simulation-yaml-panel">
         <span>Plantilla de casos</span>
+        {caseMixSource && <small className="case-mix-source">Fuente: {caseMixSource}</small>}
         <div className="case-yaml-actions" aria-label="Herramientas de casos clínicos">
           <ToolIconButton icon="edit" label="Editar YAML" onClick={onEditCases} />
           <label className="file-action icon-action" aria-label="Subir YAML" title="Subir YAML">

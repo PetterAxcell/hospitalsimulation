@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "pages:dev": "npm run build && wrangler pages dev dist",
     "deploy": "npm run build && wrangler pages deploy dist --project-name simlab",
-    "verify:sim": "node scripts/verify-simulation.mjs"
+    "verify:sim": "node scripts/verify-simulation.mjs",
+    "verify:scenarios": "node scripts/verify-scenarios.mjs",
+    "cases:mimic": "node scripts/mimic-to-cases.mjs"
   },
   "dependencies": {
     "phaser": "^4.1.0",

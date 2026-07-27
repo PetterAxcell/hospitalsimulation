@@ -57,11 +57,33 @@ import {
   scoreArchitecture,
 } from './features/top/scoring'
 import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
+import { ScenarioPanel } from './features/scenarios/ScenarioPanel'
+import {
+  createScenario,
+  duplicateScenario,
+  isRunStale,
+  proposalFromScenario,
+  runScenario,
+  updateScenarioSnapshot,
+} from './features/scenarios/runner'
+import { MAX_SCENARIOS, loadScenarioLibrary, saveScenarioLibrary } from './features/scenarios/storage'
+import type { ScenarioLibrary } from './features/scenarios/types'
 import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomComponent, RoomDoor, RoomKind, SimulationAgentLayer, SimulationResult } from './types'
 import { floorLabel, formatNumber } from './utils/format'
 
 const INITIAL_PLAN = createHospitalClinicCampusPlan()
 const DOOR_MAGNET_DISTANCE = 6
+
+/**
+ * Identificadores unicos para bloques y puertas. Con solo `Date.now()` dos
+ * elementos creados en el mismo milisegundo compartian id y React duplicaba
+ * claves en el plano.
+ */
+let idCounter = 0
+function uniqueId(prefix: string) {
+  idCounter += 1
+  return `${prefix}-${Date.now().toString(36)}${idCounter.toString(36)}`
+}
 type ComponentSourceMode = 'clinic' | 'default'
 const SimulationCanvas = lazy(() =>
   import('./components/SimulationCanvas').then((module) => ({ default: module.SimulationCanvas })),
@@ -94,6 +116,10 @@ function App() {
   const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
   const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
   const [adjacencyRules, setAdjacencyRules] = useState<AdjacencyRule[]>(DEFAULT_ADJACENCY_RULES)
+  const [scenarioLibrary, setScenarioLibrary] = useState<ScenarioLibrary>(() => loadScenarioLibrary())
+  const [activeScenarioId, setActiveScenarioId] = useState<string | undefined>()
+  const [scenarioError, setScenarioError] = useState<string | undefined>()
+  const [caseMixSource, setCaseMixSource] = useState<string | undefined>()
   const [isLeftPanelHidden, setLeftPanelHidden] = useState(false)
   const [isRightPanelHidden, setRightPanelHidden] = useState(false)
   const [sectionModalTab, setSectionModalTab] = useState<WorkspaceTab | null>(null)
@@ -105,12 +131,27 @@ function App() {
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
   const adjacencyResults = useMemo(() => evaluateAdjacencyRules(plan, adjacencyRules), [plan, adjacencyRules])
   const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings, patientCases), [patientCases, plan, simulationSettings])
+  const scenarioProposals = useMemo(
+    () => scenarioLibrary.scenarios
+      .map((scenario) => {
+        const run = scenarioLibrary.runs[scenario.id]
+        return run ? proposalFromScenario(scenario, run) : null
+      })
+      .filter((proposal): proposal is ArchitectureProposal => proposal !== null),
+    [scenarioLibrary],
+  )
+  const staleScenarioCount = useMemo(
+    () => scenarioLibrary.scenarios.filter((scenario) => isRunStale(scenario, scenarioLibrary.runs[scenario.id])).length,
+    [scenarioLibrary],
+  )
   const topProposals = useMemo(
     () => rankArchitectureProposals([
+      ...scenarioProposals,
       ...submittedProposals,
-      ...demoArchitectureProposals(plan, simulationResult, rules, totalArea),
+      // Las variantes sinteticas solo tienen sentido mientras no haya escenarios reales.
+      ...(scenarioProposals.length > 0 ? [] : demoArchitectureProposals(plan, simulationResult, rules, totalArea)),
     ]),
-    [plan, rules, simulationResult, submittedProposals, totalArea],
+    [plan, rules, scenarioProposals, simulationResult, submittedProposals, totalArea],
   )
   const currentScore = useMemo(() => scoreArchitecture(plan, simulationResult, rules, totalArea), [plan, rules, simulationResult, totalArea])
   const panelToggleAvailable = activeTab === 'plan' || activeTab === 'simulation'
@@ -134,7 +175,7 @@ function App() {
   }
 
   function addRoomFromTemplate(templateId: string) {
-    const nextId = `${templateId}-${Date.now()}`
+    const nextId = uniqueId(templateId)
     const template = templateById(templateId)
     const w = template.kind === 'circulation' ? 22 : Math.max(8, Math.min(22, Math.sqrt(template.defaultAreaSqm) / 4))
     const h = template.kind === 'circulation' ? 5 : Math.max(7, Math.min(16, Math.sqrt(template.defaultAreaSqm) / 5))
@@ -171,7 +212,7 @@ function App() {
     const entry = clinicSpaceProgramById(entryId)
     if (!entry) return
     const template = templateById(entry.templateIds[0] ?? 'ward')
-    const nextId = `program-${entry.id}-${Date.now()}`
+    const nextId = uniqueId(`program-${entry.id}`)
     const targetArea = entry.usefulAreaSqm ? Math.round(entry.usefulAreaSqm * entry.grossingFactor) : template.defaultAreaSqm
     const dimensions = dimensionsForTargetArea(targetArea, template.kind)
     const nextRoom: PlacedRoom = {
@@ -230,7 +271,7 @@ function App() {
 
   function duplicateSelected() {
     if (!selectedRoom) return
-    const copyId = `${selectedRoom.templateId}-${Date.now()}`
+    const copyId = uniqueId(selectedRoom.templateId)
     const copy = clampRoom({
       ...selectedRoom,
       id: copyId,
@@ -256,7 +297,7 @@ function App() {
     setPlan((current) => {
       const target = current.rooms.find((room) => room.id === roomId)
       if (!target) return current
-      const snap = snapDoorToCorridor(target, current.rooms, point, `${target.id}-door-${Date.now()}`)
+      const snap = snapDoorToCorridor(target, current.rooms, point, uniqueId(`${target.id}-door`))
       const door = snap.door
       const updatedRoom = clampRoom({ ...target, doors: [...(target.doors ?? []), door] })
       const roomsWithDoor = current.rooms.map((room) => (room.id === roomId ? updatedRoom : room))
@@ -399,6 +440,7 @@ function App() {
       if (result.diagnostics.some((diagnostic) => diagnostic.level === 'error')) return
       setPatientCases(result.cases)
       setClinicalCaseLibrarySource(clinicalCaseSource)
+      setCaseMixSource(result.meta?.source)
       setSelectedCaseId('all')
       setClinicalCaseModalOpen(false)
       return
@@ -447,6 +489,7 @@ function App() {
     setClinicalCaseSource(DEFAULT_CLINICAL_CASES_YAML)
     setClinicalCaseFileName('casos-clinicos.yaml')
     setClinicalCaseResult(null)
+    setCaseMixSource(undefined)
     setEditingClinicalCaseId('all')
     setSelectedCaseId('all')
   }
@@ -462,6 +505,125 @@ function App() {
     })
     setSubmittedProposals((current) => [nextProposal, ...current])
     setActiveTab('top')
+  }
+
+  /**
+   * Los escenarios se guardan en el navegador. La escritura se hace aqui, en los
+   * manejadores, para no encadenar renders desde un efecto.
+   */
+  function commitScenarioLibrary(next: ScenarioLibrary) {
+    setScenarioLibrary(next)
+    const saved = saveScenarioLibrary(next)
+    setScenarioError(saved.ok ? undefined : saved.message)
+  }
+
+  function saveCurrentScenario(name: string) {
+    if (scenarioLibrary.scenarios.length >= MAX_SCENARIOS) {
+      setScenarioError(`Limite de ${MAX_SCENARIOS} escenarios. Borra alguno antes de guardar.`)
+      return
+    }
+    const scenario = createScenario({
+      name,
+      owner: proposalOwner,
+      notes: caseMixSource ? `Mezcla clinica: ${caseMixSource}` : '',
+      plan,
+      settings: simulationSettings,
+      caseSource: clinicalCaseLibrarySource,
+      adjacencyRules,
+      caseMixSource,
+    })
+    const run = runScenario(scenario)
+    commitScenarioLibrary({
+      scenarios: [...scenarioLibrary.scenarios, scenario],
+      runs: { ...scenarioLibrary.runs, [scenario.id]: run },
+    })
+    setActiveScenarioId(scenario.id)
+  }
+
+  function runScenarioById(scenarioId: string) {
+    const scenario = scenarioLibrary.scenarios.find((item) => item.id === scenarioId)
+    if (!scenario) return
+    commitScenarioLibrary({
+      ...scenarioLibrary,
+      runs: { ...scenarioLibrary.runs, [scenario.id]: runScenario(scenario) },
+    })
+  }
+
+  function runAllScenarios() {
+    if (scenarioLibrary.scenarios.length === 0) return
+    const runs = { ...scenarioLibrary.runs }
+    scenarioLibrary.scenarios.forEach((scenario) => {
+      runs[scenario.id] = runScenario(scenario)
+    })
+    commitScenarioLibrary({ ...scenarioLibrary, runs })
+  }
+
+  /** Devuelve el editor al estado exacto guardado en el escenario. */
+  function loadScenario(scenarioId: string) {
+    const scenario = scenarioLibrary.scenarios.find((item) => item.id === scenarioId)
+    if (!scenario) return
+    const compiled = compileClinicalCases(scenario.caseSource)
+    setPlan(structuredClone(scenario.plan))
+    setSimulationSettings({ ...scenario.settings })
+    setAdjacencyRules(structuredClone(scenario.adjacencyRules))
+    setClinicalCaseLibrarySource(scenario.caseSource)
+    setClinicalCaseSource(scenario.caseSource)
+    setPatientCases(compiled.cases)
+    setClinicalCaseResult(null)
+    setCaseMixSource(scenario.caseMixSource ?? compiled.meta?.source)
+    setEditingClinicalCaseId('all')
+    setSelectedCaseId('all')
+    setSelectedRoomId(scenario.plan.rooms[0]?.id)
+    setSelectedFloor(scenario.plan.floors.includes(selectedFloor) ? selectedFloor : (scenario.plan.floors[0] ?? 0))
+    setActiveScenarioId(scenario.id)
+    setScenarioError(undefined)
+  }
+
+  /**
+   * Reescribe el escenario con lo que hay ahora en el editor. Es una accion
+   * explicita: un escenario guardado no se modifica solo al seguir editando,
+   * porque entonces dejaria de ser comparable. Su resultado queda marcado como
+   * obsoleto hasta que se relanza.
+   */
+  function updateScenarioFromEditor(scenarioId: string) {
+    const scenario = scenarioLibrary.scenarios.find((item) => item.id === scenarioId)
+    if (!scenario) return
+    const updated = updateScenarioSnapshot(scenario, {
+      plan,
+      settings: simulationSettings,
+      caseSource: clinicalCaseLibrarySource,
+      adjacencyRules,
+      caseMixSource,
+    })
+    commitScenarioLibrary({
+      ...scenarioLibrary,
+      scenarios: scenarioLibrary.scenarios.map((item) => (item.id === updated.id ? updated : item)),
+    })
+    setActiveScenarioId(updated.id)
+  }
+
+  function duplicateScenarioById(scenarioId: string) {
+    const scenario = scenarioLibrary.scenarios.find((item) => item.id === scenarioId)
+    if (!scenario) return
+    if (scenarioLibrary.scenarios.length >= MAX_SCENARIOS) {
+      setScenarioError(`Limite de ${MAX_SCENARIOS} escenarios. Borra alguno antes de duplicar.`)
+      return
+    }
+    const copy = duplicateScenario(scenario)
+    commitScenarioLibrary({
+      scenarios: [...scenarioLibrary.scenarios, copy],
+      runs: { ...scenarioLibrary.runs, [copy.id]: runScenario(copy) },
+    })
+  }
+
+  function deleteScenario(scenarioId: string) {
+    const runs = { ...scenarioLibrary.runs }
+    delete runs[scenarioId]
+    commitScenarioLibrary({
+      scenarios: scenarioLibrary.scenarios.filter((item) => item.id !== scenarioId),
+      runs,
+    })
+    if (activeScenarioId === scenarioId) setActiveScenarioId(undefined)
   }
 
   function renderFloorPicker() {
@@ -532,6 +694,26 @@ function App() {
     )
   }
 
+  function renderScenarioPanel() {
+    return (
+      <ScenarioPanel
+        scenarios={scenarioLibrary.scenarios}
+        runs={scenarioLibrary.runs}
+        activeScenarioId={activeScenarioId}
+        defaultName={`Escenario ${scenarioLibrary.scenarios.length + 1}`}
+        owner={proposalOwner}
+        error={scenarioError}
+        onSave={saveCurrentScenario}
+        onLoad={loadScenario}
+        onUpdate={updateScenarioFromEditor}
+        onDuplicate={duplicateScenarioById}
+        onDelete={deleteScenario}
+        onRun={runScenarioById}
+        onRunAll={runAllScenarios}
+      />
+    )
+  }
+
   function renderPlannerInspector() {
     return (
       <RoomInspector
@@ -556,6 +738,7 @@ function App() {
         selectedCaseId={selectedCaseId}
         agentLayer={simulationAgentLayer}
         diagnostics={clinicalCaseResult?.diagnostics ?? []}
+        caseMixSource={caseMixSource}
         onEditCases={openClinicalCaseLibrary}
         onEditCase={openClinicalCaseEditor}
         onUploadCases={loadClinicalCaseTemplate}
@@ -583,8 +766,11 @@ function App() {
         owner={proposalOwner}
         proposals={topProposals}
         currentScore={currentScore}
+        scenarioCount={scenarioLibrary.scenarios.length}
+        staleScenarioCount={staleScenarioCount}
         onChangeOwner={setProposalOwner}
         onSubmit={submitCurrentArchitecture}
+        onRunScenarios={runAllScenarios}
       />
     )
   }
@@ -682,6 +868,7 @@ function App() {
             ) : (
               <>
                 {renderPlannerTools()}
+                {renderScenarioPanel()}
                 {renderPlanSummary()}
                 <AccessAlerts plan={plan} selectedFloor={selectedFloor} />
               </>
