@@ -12,7 +12,8 @@
     "deploy": "npm run build && wrangler pages deploy dist --project-name simlab",
     "verify:sim": "node scripts/verify-simulation.mjs",
     "verify:scenarios": "node scripts/verify-scenarios.mjs",
-    "cases:mimic": "node scripts/mimic-to-cases.mjs"
+    "cases:mimic": "node scripts/mimic-to-cases.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "phaser": "^4.1.0",
@@ -33,6 +34,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
-    "wrangler": "^4.94.0"
+    "wrangler": "^4.94.0",
+    "vitest": "^4.1.10"
   }
 }
