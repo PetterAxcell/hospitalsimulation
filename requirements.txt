@@ -1,7 +1,4 @@
 simpy>=4.1
-pandas>=2.2
-plotly>=5.22
-streamlit>=1.36
 fastapi>=0.111
 uvicorn[standard]>=0.30
 httpx>=0.27

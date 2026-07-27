@@ -4,7 +4,7 @@ import { Modal } from '../../components/ui/Modal'
 import { bestProposalByOwner, formatScore } from './scoring'
 import type { ArchitectureProposal, ArchitectureScore, ProposalOwner } from './types'
 
-export function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
+export function TopPanel({ proposals, onRestore }: { proposals: ArchitectureProposal[]; onRestore?: (proposal: ArchitectureProposal) => void }) {
   const [detailProposalId, setDetailProposalId] = useState<string | undefined>()
   const [isScoreModalOpen, setScoreModalOpen] = useState(false)
   const userRows = bestProposalByOwner(proposals).slice(0, 5)
@@ -34,6 +34,11 @@ export function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
         <section className="top-block wide">
           <h3>Arquitecturas</h3>
           <div className="proposal-list">
+            {proposals.length === 0 && (
+              <article className="proposal-card is-compact">
+                <p className="modal-empty">Aún no has guardado ninguna arquitectura. Ajusta el escenario o el plano y pulsa «Guardar en Top» para registrarla y poder montarla desde aquí.</p>
+              </article>
+            )}
             {proposals.map((proposal, index) => (
               <article key={proposal.id} className="proposal-card is-compact">
                 <header>
@@ -51,6 +56,9 @@ export function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
                   <span>ED {proposal.edP90}m</span>
                   <span>{proposal.blocked} bloqueados</span>
                   <span>{proposal.verticalMoves} verticales</span>
+                  {proposal.snapshot && onRestore && (
+                    <button type="button" onClick={() => onRestore(proposal)}>Montar</button>
+                  )}
                   <button type="button" onClick={() => setDetailProposalId(proposal.id)}>Ver detalle</button>
                 </div>
               </article>
@@ -83,7 +91,7 @@ export function TopPanel({ proposals }: { proposals: ArchitectureProposal[] }) {
       </div>
 
       {detailProposal && (
-        <ProposalDetailModal proposal={detailProposal} onClose={() => setDetailProposalId(undefined)} />
+        <ProposalDetailModal proposal={detailProposal} onClose={() => setDetailProposalId(undefined)} onRestore={onRestore} />
       )}
       {isScoreModalOpen && (
         <ScoreFormulaModal proposal={best} onClose={() => setScoreModalOpen(false)} />
@@ -143,7 +151,7 @@ export function TopControls({
   )
 }
 
-function ProposalDetailModal({ proposal, onClose }: { proposal: ArchitectureProposal; onClose: () => void }) {
+function ProposalDetailModal({ proposal, onClose, onRestore }: { proposal: ArchitectureProposal; onClose: () => void; onRestore?: (proposal: ArchitectureProposal) => void }) {
   return (
     <Modal
       titleId="proposal-detail-title"
@@ -151,21 +159,56 @@ function ProposalDetailModal({ proposal, onClose }: { proposal: ArchitectureProp
       subtitle={`${proposal.owner} · score ${formatScore(proposal.score.value)}`}
       onClose={onClose}
     >
-      <div className="top-modal-grid">
-        <Metric label="Completados" value={String(proposal.completed)} />
-        <Metric label="Bloqueados" value={String(proposal.blocked)} />
-        <Metric label="ED P90" value={`${proposal.edP90} min`} />
-        <Metric label="Traslado" value={`${proposal.averageTravel} min`} />
-        <Metric label="Cambios planta" value={String(proposal.verticalMoves)} />
-        <Metric label="Reglas abiertas" value={String(proposal.ruleIssues)} />
-        <Metric label="m2 modelados" value={formatInteger(proposal.modeledArea)} />
-        <Metric label="Estancias" value={String(proposal.roomCount)} />
-      </div>
+      <section className="top-modal-section">
+        <h3>Simulación</h3>
+        <div className="top-modal-grid">
+          <Metric label="Pacientes atendidos" value={String(proposal.completed)} />
+          <Metric label="Bloqueados" value={String(proposal.blocked)} />
+          <Metric label="Espera ED P90" value={`${proposal.edP90} min`} />
+          <Metric label="Traslado medio" value={`${proposal.averageTravel} min`} />
+          <Metric label="Personal en turno" value={String(proposal.staffOnShift)} />
+          <Metric label="Personal en movimiento" value={String(proposal.staffInMotion)} />
+          <Metric label="Recorridos clínicos" value={String(proposal.activeCases)} />
+          <Metric label="Roles de personal" value={String(proposal.staffRoles)} />
+          <Metric label="Cambios de planta" value={String(proposal.verticalMoves)} />
+          <Metric label="Avisos de seguridad" value={String(proposal.safetyWarnings)} />
+          <Metric label="Reglas abiertas" value={String(proposal.ruleIssues)} />
+          <Metric label="Zona más cargada" value={proposal.hottestRoomName} />
+        </div>
+      </section>
+
+      {proposal.scenario && (
+        <section className="top-modal-section">
+          <h3>Escenario simulado</h3>
+          <div className="proposal-chips">
+            <span>{proposal.scenario.arrivalsPerHour} llegadas/h</span>
+            <span>{proposal.scenario.horizonYears} años</span>
+            <span>Ciclo {proposal.scenario.durationHours}h</span>
+            <span>Adyacencia {proposal.scenario.adjacencyComplies}/{proposal.scenario.adjacencyTotal}</span>
+          </div>
+        </section>
+      )}
 
       <section className="top-modal-section">
-        <h3>Zona caliente</h3>
-        <p>{proposal.hottestRoomName}</p>
+        <h3>Arquitectura</h3>
+        <div className="proposal-chips">
+          <span>{formatInteger(proposal.modeledArea)} m² modelados</span>
+          <span>{proposal.roomCount} estancias</span>
+        </div>
       </section>
+
+      {proposal.snapshot && onRestore && (
+        <button
+          type="button"
+          className="primary-action"
+          onClick={() => {
+            onRestore(proposal)
+            onClose()
+          }}
+        >
+          Restaurar escenario y plano
+        </button>
+      )}
     </Modal>
   )
 }
@@ -185,6 +228,7 @@ function ScoreFormulaModal({ proposal, onClose }: { proposal?: ArchitecturePropo
           <Penalty label="Traslado" value={proposal.score.travelPenalty} />
           <Penalty label="Vertical" value={proposal.score.verticalPenalty} />
           <Penalty label="Reglas" value={proposal.score.rulePenalty} />
+          <Penalty label="Adyacencia" value={proposal.score.adjacencyPenalty} />
           <Penalty label="m2" value={proposal.score.areaPenalty} />
         </div>
       ) : (

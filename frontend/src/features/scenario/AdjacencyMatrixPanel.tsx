@@ -3,6 +3,7 @@ import { Metric } from '../../components/ui/Metric'
 import { KIND_LABELS } from '../../data/catalog'
 import {
   KIND_ORDER,
+  adjacencyComplies,
   findRule,
   labelForRule,
   summarizeAdjacency,
@@ -37,9 +38,9 @@ const SHORT_KIND_LABELS: Record<RoomKind, string> = {
 
 const STATUS_LABELS: Record<AdjacencyStatus, string> = {
   ok: 'Cumple',
-  warn: 'En tensión',
-  fail: 'Incumple',
-  missing: 'Falta bloque',
+  warn: 'Cumple',
+  fail: 'No cumple',
+  missing: 'No cumple · falta bloque',
 }
 
 interface AdjacencyMatrixPanelProps {
@@ -52,6 +53,8 @@ interface AdjacencyMatrixPanelProps {
 
 export function AdjacencyMatrixPanel({ rules, results, onCycle, onReset, onClear }: AdjacencyMatrixPanelProps) {
   const summary = useMemo(() => summarizeAdjacency(results), [results])
+  const complies = summary.ok + summary.warn
+  const noComplies = summary.fail + summary.missing
   const resultById = useMemo(() => new Map(results.map((result) => [result.id, result])), [results])
   const activeResults = useMemo(
     () => [...results].sort((a, b) => statusWeight(b.status) - statusWeight(a.status)),
@@ -68,9 +71,8 @@ export function AdjacencyMatrixPanel({ rules, results, onCycle, onReset, onClear
         </div>
         <div className="adjacency-kpis">
           <Metric label="Reglas" value={String(summary.total)} />
-          <Metric label="Cumplen" value={String(summary.ok)} />
-          <Metric label="En tensión" value={String(summary.warn)} />
-          <Metric label="Incumplen" value={String(summary.fail + summary.missing)} />
+          <Metric label="Cumplen" value={String(complies)} />
+          <Metric label="No cumplen" value={String(noComplies)} />
         </div>
       </section>
 
@@ -79,8 +81,7 @@ export function AdjacencyMatrixPanel({ rules, results, onCycle, onReset, onClear
           <span className="adjacency-legend-item"><i className="adj-swatch near" /> Cerca</span>
           <span className="adjacency-legend-item"><i className="adj-swatch far" /> Lejos</span>
           <span className="adjacency-legend-item"><i className="adj-swatch ok" /> Cumple</span>
-          <span className="adjacency-legend-item"><i className="adj-swatch warn" /> Tensión</span>
-          <span className="adjacency-legend-item"><i className="adj-swatch fail" /> Incumple</span>
+          <span className="adjacency-legend-item"><i className="adj-swatch fail" /> No cumple</span>
         </div>
         <div className="adjacency-toolbar-actions">
           <button type="button" className="secondary-action" onClick={onReset}>Reglas por defecto</button>
@@ -112,7 +113,7 @@ export function AdjacencyMatrixPanel({ rules, results, onCycle, onReset, onClear
                     const rule = findRule(rules, rowKind, colKind)
                     const result = rule ? resultById.get(rule.id) : undefined
                     const desire = rule?.desire
-                    const status = result?.status
+                    const cellState = result ? (adjacencyComplies(result.status) ? 'meets' : 'breaks') : ''
                     const symbol = desire === 'near' ? '●' : desire === 'far' ? '✕' : ''
                     const cellTitle = rule
                       ? `${labelForRule(rule)}${result ? ` · ${STATUS_LABELS[result.status]}` : ''}`
@@ -121,7 +122,7 @@ export function AdjacencyMatrixPanel({ rules, results, onCycle, onReset, onClear
                       <td key={colKind} className="adjacency-cell">
                         <button
                           type="button"
-                          className={`adjacency-dot ${desire ?? 'empty'} ${status ?? ''}`}
+                          className={`adjacency-dot ${desire ?? 'empty'} ${cellState}`}
                           onClick={() => onCycle(rowKind, colKind)}
                           title={cellTitle}
                           aria-label={cellTitle}
@@ -145,12 +146,15 @@ export function AdjacencyMatrixPanel({ rules, results, onCycle, onReset, onClear
         </div>
         <div className="rule-list compact">
           {activeResults.length > 0 ? (
-            activeResults.map((result) => (
-              <article key={result.id} className={`rule-item ${resultTone(result.status)}`}>
-                <strong>{result.label} · {STATUS_LABELS[result.status]}</strong>
-                <span>{result.evidence}</span>
-              </article>
-            ))
+            activeResults.map((result) => {
+              const ok = adjacencyComplies(result.status)
+              return (
+                <article key={result.id} className={`rule-item ${ok ? 'ok' : 'fail'}`}>
+                  <strong>{result.label} · {ok ? 'Cumple' : 'No cumple'}</strong>
+                  <span>{result.evidence}</span>
+                </article>
+              )
+            })
           ) : (
             <article className="rule-item ok">
               <strong>Sin reglas definidas</strong>
@@ -167,10 +171,4 @@ function statusWeight(status: AdjacencyStatus): number {
   if (status === 'fail' || status === 'missing') return 3
   if (status === 'warn') return 2
   return 1
-}
-
-function resultTone(status: AdjacencyStatus): 'ok' | 'warn' | 'fail' {
-  if (status === 'ok') return 'ok'
-  if (status === 'warn') return 'warn'
-  return 'fail'
 }

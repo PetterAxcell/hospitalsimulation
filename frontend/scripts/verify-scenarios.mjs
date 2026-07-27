@@ -53,24 +53,20 @@ try {
   await cdp.send('Page.reload')
   await sleep(3000)
 
-  await openTab(cdp, 'Planificador')
-  await sleep(1200)
-  const panelPresent = await evaluate(cdp, "Boolean(document.querySelector('.scenario-panel'))")
-  if (!panelPresent) fail('el panel de escenarios no aparece en el planificador')
-  else ok('panel de escenarios visible en el planificador')
+  await openTab(cdp, 'Escenario')
+  await sleep(1500)
+  const panelPresent = await evaluate(cdp, "Boolean(document.querySelector('.scenario-dashboard .scenario-panel'))")
+  if (!panelPresent) fail('el panel de escenarios guardados no aparece en la pestana Escenario')
+  else ok('biblioteca de escenarios visible en la pestana Escenario')
 
   await saveScenario(cdp, 'Base urgencias')
   const afterFirst = await scenarioCount(cdp)
   if (afterFirst !== 1) fail(`tras guardar hay ${afterFirst} escenarios, se esperaba 1`)
   else ok('primer escenario guardado')
 
-  // Se cambia la demanda para que el segundo escenario no sea identico.
-  await openTab(cdp, 'Simulación')
-  await sleep(1800)
-  await clickByText(cdp, '.right-panel button', 'Editar')
-  await sleep(700)
+  // Se cambia la demanda desde la propia pestana Escenario.
   const arrivalsChanged = await evaluate(cdp, `(() => {
-    const input = document.querySelector('.app-modal input[type=range]')
+    const input = document.querySelector('.scenario-params-grid input[type=range], .scenario-params-grid input[type=number]')
     if (!input) return false
     const max = Number(input.max || 60)
     const next = Math.min(max, Number(input.value || 9) + Math.max(2, Math.round(max * 0.25)))
@@ -80,13 +76,10 @@ try {
     input.dispatchEvent(new Event('change', { bubbles: true }))
     return next
   })()`)
-  if (!arrivalsChanged) fail('no se pudo cambiar ningun parametro de simulacion')
-  else ok(`parametro de demanda modificado a ${arrivalsChanged}`)
-  await clickByText(cdp, '.app-modal button', 'Cerrar')
-  await sleep(500)
+  if (!arrivalsChanged) fail('no se pudo cambiar la demanda en la pestana Escenario')
+  else ok(`demanda modificada a ${arrivalsChanged} llegadas/h`)
+  await sleep(1500)
 
-  await openTab(cdp, 'Planificador')
-  await sleep(1200)
   await saveScenario(cdp, 'Mas demanda')
   const afterSecond = await scenarioCount(cdp)
   if (afterSecond !== 2) fail(`tras guardar hay ${afterSecond} escenarios, se esperaba 2`)
@@ -128,6 +121,8 @@ try {
   const scoresBeforeEdit = await scenarioScores(cdp)
   await clickByText(cdp, '.script-modal-header button', 'Cerrar')
   await sleep(400)
+  await openTab(cdp, 'Planificador')
+  await sleep(1500)
   const roomsAdded = await evaluate(cdp, `(() => {
     const button = [...document.querySelectorAll('.left-panel button')].find((item) => item.textContent.trim().startsWith('Añadir a planta'))
     if (!button) return false
@@ -136,6 +131,8 @@ try {
     return true
   })()`)
   if (!roomsAdded) fail('no se pudo anadir un bloque al plano')
+  await sleep(1500)
+  await openTab(cdp, 'Escenario')
   await sleep(1500)
   await clickByText(cdp, '.scenario-panel button', 'Abrir escenarios')
   await sleep(800)

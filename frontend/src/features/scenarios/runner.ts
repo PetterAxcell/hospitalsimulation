@@ -1,5 +1,5 @@
-import { evaluateAdjacencyRules, type AdjacencyRule, type AdjacencyRuleResult } from '../../engine/adjacencyMatrix'
-import { evaluateArchitectureRules, type ArchitectureRuleResult } from '../../engine/architectureRules'
+import { adjacencyComplies, evaluateAdjacencyRules, type AdjacencyRule } from '../../engine/adjacencyMatrix'
+import { evaluateArchitectureRules } from '../../engine/architectureRules'
 import { compileClinicalCases } from '../../engine/clinicalCases'
 import { runHospitalSimulation, type SimulationSettings } from '../../engine/simulation'
 import type { HospitalPlan } from '../../types'
@@ -124,7 +124,10 @@ export function runScenario(scenario: Scenario): ScenarioRun {
   const result = runHospitalSimulation(scenario.plan, scenario.settings, compiled.cases)
   const architectureRules = evaluateArchitectureRules(scenario.plan)
   const adjacencyResults = evaluateAdjacencyRules(scenario.plan, scenario.adjacencyRules)
-  const combinedRules = [...architectureRules, ...adjacencyRulesAsArchitectureRules(adjacencyResults)]
+  const adjacency = {
+    total: adjacencyResults.length,
+    noComplies: adjacencyResults.filter((rule) => !adjacencyComplies(rule.status)).length,
+  }
   const modeledArea = scenario.plan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
 
   return {
@@ -132,35 +135,25 @@ export function runScenario(scenario: Scenario): ScenarioRun {
     signature: scenarioSignature(scenario),
     ranAt: new Date().toISOString(),
     durationMs: Math.round(performance.now() - startedAt),
-    score: scoreArchitecture(scenario.plan, result, combinedRules, modeledArea),
+    score: scoreArchitecture(scenario.plan, result, architectureRules, modeledArea, adjacency),
     completed: result.kpis.completed,
     blocked: result.kpis.blockedPatients,
     edP90: result.kpis.edP90Minutes,
     averageTravel: result.kpis.averageTravelMinutes,
     verticalMoves: result.kpis.verticalMoves,
+    staffOnShift: result.kpis.staffOnShift,
+    staffInMotion: result.kpis.staffInMotion,
+    safetyWarnings: result.kpis.safetyWarnings,
+    activeCases: result.caseStats.filter((stat) => stat.attempted > 0).length,
+    staffRoles: result.staffStats.filter((stat) => stat.count > 0).length,
     ruleIssues: architectureRules.filter((rule) => rule.status !== 'ok').length,
-    adjacencyIssues: adjacencyResults.filter((rule) => rule.status === 'warn' || rule.status === 'fail').length,
+    adjacencyIssues: adjacency.noComplies,
+    adjacencyTotal: adjacency.total,
     casesApplied: compiled.appliedCases > 0 ? compiled.appliedCases : compiled.cases.length,
     modeledArea,
     roomCount: scenario.plan.rooms.length,
     hottestRoomName: result.kpis.hottestRoomName,
   }
-}
-
-/**
- * La matriz de adyacencia entra en el score como reglas mas: un plano que
- * incumple proximidades declaradas no puede puntuar igual que uno que las cumple.
- */
-function adjacencyRulesAsArchitectureRules(results: AdjacencyRuleResult[]): ArchitectureRuleResult[] {
-  return results
-    .filter((rule) => rule.status !== 'missing')
-    .map((rule) => ({
-      id: `adjacency-${rule.id}`,
-      label: rule.label,
-      status: rule.status === 'fail' ? 'fail' : rule.status === 'warn' ? 'warn' : 'ok',
-      evidence: rule.evidence,
-      category: 'flujos' as const,
-    }))
 }
 
 /** Adapta un escenario ejecutado al formato del ranking del Top. */
@@ -177,10 +170,28 @@ export function proposalFromScenario(scenario: Scenario, run: ScenarioRun): Arch
     edP90: run.edP90,
     averageTravel: run.averageTravel,
     verticalMoves: run.verticalMoves,
+    staffOnShift: run.staffOnShift,
+    staffInMotion: run.staffInMotion,
+    activeCases: run.activeCases,
+    staffRoles: run.staffRoles,
+    safetyWarnings: run.safetyWarnings,
     ruleIssues: run.ruleIssues + run.adjacencyIssues,
     modeledArea: run.modeledArea,
     roomCount: run.roomCount,
     hottestRoomName: run.hottestRoomName,
+    scenario: {
+      arrivalsPerHour: scenario.settings.arrivalsPerHour,
+      horizonYears: scenario.settings.horizonYears,
+      durationHours: scenario.settings.durationHours,
+      adjacencyTotal: run.adjacencyTotal,
+      adjacencyComplies: Math.max(0, run.adjacencyTotal - run.adjacencyIssues),
+    },
+    // El snapshot permite restaurar desde el Top igual que una arquitectura sembrada.
+    snapshot: {
+      plan: scenario.plan,
+      settings: scenario.settings,
+      adjacencyRules: scenario.adjacencyRules,
+    },
   }
 }
 

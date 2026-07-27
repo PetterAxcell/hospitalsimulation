@@ -1,8 +1,13 @@
 import type { ArchitectureRuleResult } from '../../engine/architectureRules'
 import type { HospitalPlan, SimulationResult } from '../../types'
-import type { ArchitectureProposal, ArchitectureScore, ProposalOwner } from './types'
+import type { ArchitectureProposal, ArchitectureScore, ProposalOwner, ProposalScenario, ProposalSnapshot } from './types'
 
 type ArchitectureMetrics = ReturnType<typeof metricsFromSimulation>
+
+interface AdjacencyScoreInput {
+  total: number
+  noComplies: number
+}
 
 export function demoArchitectureProposals(
   plan: HospitalPlan,
@@ -67,6 +72,11 @@ export function architectureProposalFromCurrentPlan({
   rules,
   totalArea,
   index,
+  scenario,
+  snapshot,
+  adjacency,
+  title,
+  id,
 }: {
   owner: ProposalOwner
   plan: HospitalPlan
@@ -74,19 +84,26 @@ export function architectureProposalFromCurrentPlan({
   rules: ArchitectureRuleResult[]
   totalArea: number
   index: number
+  scenario?: ProposalScenario
+  snapshot?: ProposalSnapshot
+  adjacency?: AdjacencyScoreInput
+  title?: string
+  id?: string
 }): ArchitectureProposal {
   const now = new Date()
-  return architectureProposalFromMetrics({
-    id: `submitted-${now.getTime()}`,
+  const base = architectureProposalFromMetrics({
+    id: id ?? `submitted-${now.getTime()}`,
     owner,
-    title: `Arquitectura ${index}`,
+    title: title ?? `Arquitectura ${index}`,
     createdAt: new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(now),
     source: 'submitted',
     plan,
     rules,
     totalArea,
     metrics: metricsFromSimulation(result),
+    adjacency,
   })
+  return { ...base, scenario, snapshot }
 }
 
 function architectureProposalFromMetrics({
@@ -99,6 +116,7 @@ function architectureProposalFromMetrics({
   rules,
   totalArea,
   metrics,
+  adjacency,
 }: {
   id: string
   owner: ProposalOwner
@@ -109,6 +127,7 @@ function architectureProposalFromMetrics({
   rules: ArchitectureRuleResult[]
   totalArea: number
   metrics: ArchitectureMetrics
+  adjacency?: AdjacencyScoreInput
 }): ArchitectureProposal {
   return {
     id,
@@ -116,12 +135,17 @@ function architectureProposalFromMetrics({
     title,
     createdAt,
     source,
-    score: scoreArchitecture(plan, metrics, rules, totalArea),
+    score: scoreArchitecture(plan, metrics, rules, totalArea, adjacency),
     completed: metrics.completed,
     blocked: metrics.blocked,
     edP90: metrics.edP90,
     averageTravel: metrics.averageTravel,
     verticalMoves: metrics.verticalMoves,
+    staffOnShift: metrics.staffOnShift,
+    staffInMotion: metrics.staffInMotion,
+    activeCases: metrics.activeCases,
+    staffRoles: metrics.staffRoles,
+    safetyWarnings: metrics.safetyWarnings,
     ruleIssues: rules.filter((rule) => rule.status !== 'ok').length,
     modeledArea: totalArea,
     roomCount: plan.rooms.length,
@@ -137,6 +161,11 @@ function metricsFromSimulation(result: SimulationResult | null) {
     averageTravel: result?.kpis.averageTravelMinutes ?? 0,
     verticalMoves: result?.kpis.verticalMoves ?? 0,
     hottestRoomName: result?.kpis.hottestRoomName ?? '-',
+    staffOnShift: result?.kpis.staffOnShift ?? 0,
+    staffInMotion: result?.kpis.staffInMotion ?? 0,
+    safetyWarnings: result?.kpis.safetyWarnings ?? 0,
+    activeCases: result?.caseStats.filter((stat) => stat.attempted > 0).length ?? 0,
+    staffRoles: result?.staffStats.length ?? 0,
   }
 }
 
@@ -158,23 +187,20 @@ export function scoreArchitecture(
   resultOrMetrics: SimulationResult | ArchitectureMetrics | null,
   rules: ArchitectureRuleResult[],
   totalArea: number,
+  adjacency?: AdjacencyScoreInput,
 ): ArchitectureScore {
   const metrics = isSimulationResult(resultOrMetrics) ? metricsFromSimulation(resultOrMetrics) : (resultOrMetrics ?? metricsFromSimulation(null))
   const failCount = rules.filter((rule) => rule.status === 'fail').length
   const warnCount = rules.filter((rule) => rule.status === 'warn').length
   const areaDrift = Math.abs(totalArea - plan.targetAreaSqm) / Math.max(1, plan.targetAreaSqm)
-  // El bloqueo se puntua en tasa, no en valor absoluto: si no, cualquier
-  // escenario con mas demanda hunde su score y el ranking deja de comparar
-  // arquitecturas para comparar solo volumen de llegadas.
-  const attempted = Math.max(1, metrics.completed + metrics.blocked)
-  const blockedRate = metrics.blocked / attempted
-  const blockedPenalty = blockedRate * 48
-  const waitPenalty = Math.max(0, metrics.edP90 - 120) * 0.055
-  const travelPenalty = metrics.averageTravel * 0.35
-  const verticalPenalty = (metrics.verticalMoves / attempted) * 1.2
-  const rulePenalty = failCount * 8 + warnCount * 2.5
+  const blockedPenalty = metrics.blocked * 2.4
+  const waitPenalty = Math.min(16, Math.max(0, metrics.edP90 - 120) * 0.025)
+  const travelPenalty = Math.min(16, metrics.averageTravel * 0.22)
+  const verticalPenalty = Math.min(8, metrics.verticalMoves * 0.008)
+  const rulePenalty = Math.min(24, failCount * 3 + warnCount * 1)
   const areaPenalty = Math.min(12, areaDrift * 40)
-  const value = clampScore(100 - blockedPenalty - waitPenalty - travelPenalty - verticalPenalty - rulePenalty - areaPenalty)
+  const adjacencyPenalty = Math.min(18, (adjacency?.noComplies ?? 0) * 4)
+  const value = clampScore(100 - blockedPenalty - waitPenalty - travelPenalty - verticalPenalty - rulePenalty - areaPenalty - adjacencyPenalty)
 
   return {
     value,
@@ -184,6 +210,7 @@ export function scoreArchitecture(
     verticalPenalty: roundScore(verticalPenalty),
     rulePenalty: roundScore(rulePenalty),
     areaPenalty: roundScore(areaPenalty),
+    adjacencyPenalty: roundScore(adjacencyPenalty),
   }
 }
 

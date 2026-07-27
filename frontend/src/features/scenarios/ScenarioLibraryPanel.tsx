@@ -5,7 +5,7 @@ import { formatScore } from '../top/scoring'
 import { formatTimestamp, isRunStale, rankScenarios } from './runner'
 import type { Scenario, ScenarioRun } from './types'
 
-interface ScenarioPanelProps {
+interface ScenarioLibraryPanelProps {
   scenarios: Scenario[]
   runs: Record<string, ScenarioRun>
   activeScenarioId?: string
@@ -22,7 +22,7 @@ interface ScenarioPanelProps {
 }
 
 /** Bloque compacto del planificador para crear y comparar escenarios. */
-export function ScenarioPanel({
+export function ScenarioLibraryPanel({
   scenarios,
   runs,
   activeScenarioId,
@@ -36,7 +36,7 @@ export function ScenarioPanel({
   onDelete,
   onRun,
   onRunAll,
-}: ScenarioPanelProps) {
+}: ScenarioLibraryPanelProps) {
   const [name, setName] = useState('')
   const [isListOpen, setListOpen] = useState(false)
   const ranked = rankScenarios(scenarios, runs)

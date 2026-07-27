@@ -38,8 +38,14 @@ export interface ScenarioRun {
   edP90: number
   averageTravel: number
   verticalMoves: number
+  staffOnShift: number
+  staffInMotion: number
+  safetyWarnings: number
+  activeCases: number
+  staffRoles: number
   ruleIssues: number
   adjacencyIssues: number
+  adjacencyTotal: number
   casesApplied: number
   modeledArea: number
   roomCount: number

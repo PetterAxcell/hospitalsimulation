@@ -19,6 +19,7 @@ Para validar:
 ```bash
 cd frontend
 npm run lint
+npm run test
 npm run build
 ```
 
@@ -68,11 +69,12 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 ## Estado actual
 
 - Frontend React con editor multi-planta.
-- Escenarios comparables: el Planificador guarda escenarios que congelan plano, demanda, mezcla clínica y matriz de adyacencia, los relanza en un clic (individual o en bloque), avisa cuando un resultado queda obsoleto, permite cargarlos de vuelta al editor y los conserva en el navegador entre sesiones.
+- Pestaña Escenario: configura demanda, horizonte y matriz de adyacencia, y guarda escenarios que congelan plano, demanda, mezcla clínica y adyacencias. Se relanzan en un clic (individual o en bloque), avisan cuando el resultado queda obsoleto, se actualizan de forma explícita con el estado del editor, se cargan de vuelta y se conservan en el navegador entre sesiones.
 - Ranking del Top alimentado por escenarios reales: cada tarjeta usa la simulación de su escenario, no una variante sintética, y el score penaliza la tasa de bloqueo en lugar del valor absoluto para que escenarios con distinta demanda sean comparables.
 - Mezcla clínica desde datos reales: `npm run cases:mimic` convierte una extracción de MIMIC-IV en el YAML de casos del simulador, derivando cohortes por capítulo diagnóstico, pesos por frecuencia y probabilidades observadas de analítica, imagen, quirófano, UCI y destino al alta. Ver [docs/MIMIC_CASE_MIX.md](docs/MIMIC_CASE_MIX.md).
 - Canvas de Vision para colocar, mover y redimensionar servicios, pasillos, ascensores, escaleras, montacargas y piezas de seguridad.
 - Navegacion del planificador: el plano encaja por ancho y permite arrastrar sobre zonas vacias para desplazarse verticalmente por plantas grandes.
+- Reparto de pacientes entre salas del mismo servicio ponderado por capacidad: duplicar un triaje o añadir boxes baja la presión de la sala original en lugar de concentrar la carga.
 - Simulación 2D con Phaser 3, estilo top-down RPG/pixel-art, con agentes, presión por estancia y capas de RPG, flujos y reglas.
 - Render arquitectónico de la simulación: muros con espesor y pilares, sombra proyectada por bloque, suelos con textura por tipo de estancia (baldosa, vinilo, terrazo, técnico), puertas con umbral y arco de barrido, pasillos con pasamanos y banda guía de wayfinding, y vial de acceso con aparcamiento en planta baja.
 - Ciclo día/noche ligado al reloj del replay: filtro ambiental por hora, luz interior encendida de noche en urgencias, críticos, quirófanos, laboratorio y núcleos verticales, y alumbrado de guardia en circulaciones.
@@ -82,13 +84,13 @@ La API queda disponible en `http://127.0.0.1:8000` con endpoints iniciales para 
 - Atajos de teclado en la simulación: `Espacio` play/pausa, `←`/`→` desplazar el tiempo, `1`-`4` velocidad, `V` alternar 2D/3D, `F` encajar vista, `L` leyenda. El lienzo es enfocable con teclado y respeta los controles nativos de sliders, selects y botones.
 - Top de propuestas por autor: ranking local de arquitecturas, puntuado con KPIs de simulacion, reglas abiertas y desviacion de m2. Es la primera vista de la app para priorizar comparacion antes que edicion; ahora usa tarjetas compactas y modales de detalle para evitar paginas demasiado explicativas.
 - Análisis compacto: la vista muestra cuellos de botella, presión por estancia, casos bloqueados y estado en una pantalla sin paneles laterales; la lectura operativa vive en modal para no llenar la página con texto fijo.
-- Modales por sección: Top, Análisis y Servicios tienen una acción contextual en la barra superior; Planificador y Simulación usan asides compactos donde cada bloque pequeño abre su propio modal de detalle.
+- Modales por sección: Top y Análisis tienen una acción contextual en la barra superior; Planificador y Simulación usan asides compactos donde cada bloque pequeño abre su propio modal de detalle.
 - Paneles laterales contextuales: Planificador y Simulación permiten ocultar/mostrar panel izquierdo y derecho desde la barra superior para trabajar a pantalla más limpia; en móvil estos paneles se ocultan y la edición pasa por el acceso contextual de herramientas.
 - Simulación compacta: el panel lateral muestra parámetros y cuatro KPIs; el detalle de personal, traslados, plantas y reglas abiertas queda en modal. El layout usa paneles laterales más estrechos, controles compactos y encuadre 2D tipo videojuego que cubre todo el canvas sin bandas oscuras alrededor del mapa.
 - Barra de replay responsive: los controles de tiempo, velocidad, capa de agentes y caso clínico se adaptan en varias líneas para evitar solapes en anchos pequeños.
 - Catálogo de hospital terciario: urgencias, diagnóstico, quirófanos, PACU, UCI, wards, maternidad, neonatal, oncología, farmacia, laboratorio, logística, investigación y command center.
 - Preset Hospital Clinic: primera visión del Nou Campus Clinic-UB con asistencia, docencia, investigación, infraestructuras, campus, sótanos técnicos/logísticos, urgencias, quirófanos, UCI, institutos clínicos, consultas, hospital de día y reservas de crecimiento.
-- Sincronizacion Pla d'Espais Clinic: la pestaña Servicios compara el preset actual con una primera capa estructurada desde `260608-SESSIO3-ESPAIS-Presentacio.pdf`, y el Planificador permite añadir entradas del PDF como bloques construibles con componentes internos editables.
+- Disenos desde el Pla d'Espais: dos arquitecturas montables (torre asistencial compacta e institutos distribuidos) construidas con bloques del PDF `260608-SESSIO3-ESPAIS-Presentacio.pdf`, sembradas en el Top y restaurables al editor; el Planificador permite añadir entradas del PDF como bloques construibles con componentes internos editables.
 - Planificador conectado al PDF: el selector `Elemento` permite anadir entradas del Pla d'Espais como bloques editables en planta, con m2 brutos aproximados y capacidad esperada; el selector `Componentes` arranca en `Nou Clinic` y permite cambiar a componentes por defecto.
 - Contenido del bloque: el inspector muestra una accion visible `Editar contenido` para ver, anadir, editar y quitar subcomponentes funcionales como habitaciones, boxes, controles de enfermeria, zonas limpio/sucio, AGV, almacenes, CPD o salas blancas.
 - Identidad visual Clinic: paleta azul/verde/rojo/amarillo/cian aplicada a shell, controles, planificador, simulacion y estados de saturacion, manteniendo blanco como base; la cabecera usa logotipo Clinic destacado y nombre del campus en blanco.

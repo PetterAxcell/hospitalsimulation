@@ -8,3 +8,6 @@ __pycache__/
 *.pyc
 *.py[cod]
 .DS_Store
+
+# Presentación local, no se publica en el repo remoto
+presentacion/

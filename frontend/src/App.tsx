@@ -5,16 +5,16 @@ import { HospitalCanvas } from './components/HospitalCanvas'
 import { WorkspaceTabs, type WorkspaceTab } from './components/WorkspaceTabs'
 import { Metric } from './components/ui/Metric'
 import { Modal } from './components/ui/Modal'
-import { KIND_LABELS, ROOM_TEMPLATES, templateById } from './data/catalog'
+import { templateById } from './data/catalog'
 import { CLINIC_SPACE_PROGRAM, clinicSpaceProgramById, componentsForSpaceProgramEntry } from './data/clinicSpaceProgram'
-import { createHospitalClinicCampusPlan } from './data/presets'
+import { createClinicPdfDesignInstitutes, createClinicPdfDesignVertical } from './data/presets'
 import { evaluateArchitectureRules, type ArchitectureRuleResult } from './engine/architectureRules'
 import {
   DEFAULT_ADJACENCY_RULES,
+  adjacencyComplies,
   cycleRule,
   evaluateAdjacencyRules,
   type AdjacencyRule,
-  type AdjacencyRuleResult,
 } from './engine/adjacencyMatrix'
 import {
   defaultDoorForRoom,
@@ -45,19 +45,17 @@ import { DEFAULT_SIMULATION_SETTINGS, runHospitalSimulation, type SimulationSett
 import { TopControls, TopPanel } from './features/top/TopDashboard'
 import { RoomInspector } from './features/planning/RoomInspector'
 import { SaturationPanel } from './features/saturation/SaturationPanel'
-import { ClinicSpaceProgramPanel } from './features/services/ClinicSpaceProgramPanel'
-import { AdjacencyMatrixPanel } from './features/services/AdjacencyMatrixPanel'
 import { SimulationCaseSelector } from './features/simulation/SimulationCaseSelector'
 import { SimulationControlsPanel } from './features/simulation/SimulationControlsPanel'
+import { ScenarioPanel } from './features/scenario/ScenarioPanel'
 import {
   architectureProposalFromCurrentPlan,
-  demoArchitectureProposals,
   formatScore,
   rankArchitectureProposals,
   scoreArchitecture,
 } from './features/top/scoring'
 import type { ArchitectureProposal, ProposalOwner } from './features/top/types'
-import { ScenarioPanel } from './features/scenarios/ScenarioPanel'
+import { ScenarioLibraryPanel } from './features/scenarios/ScenarioLibraryPanel'
 import {
   createScenario,
   duplicateScenario,
@@ -68,10 +66,10 @@ import {
 } from './features/scenarios/runner'
 import { MAX_SCENARIOS, loadScenarioLibrary, saveScenarioLibrary } from './features/scenarios/storage'
 import type { ScenarioLibrary } from './features/scenarios/types'
-import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomComponent, RoomDoor, RoomKind, SimulationAgentLayer, SimulationResult } from './types'
+import type { DoorSide, HospitalPlan, PatientCaseFilter, PlacedRoom, RoomComponent, RoomDoor, SimulationAgentLayer, SimulationResult } from './types'
 import { floorLabel, formatNumber } from './utils/format'
 
-const INITIAL_PLAN = createHospitalClinicCampusPlan()
+const INITIAL_PLAN = createClinicPdfDesignVertical()
 const DOOR_MAGNET_DISTANCE = 6
 
 /**
@@ -89,13 +87,50 @@ const SimulationCanvas = lazy(() =>
   import('./components/SimulationCanvas').then((module) => ({ default: module.SimulationCanvas })),
 )
 
+// Construye una propuesta montable a partir de un diseno PDF, con su simulacion y score.
+function buildDesignProposal(designPlan: HospitalPlan, title: string, id: string): ArchitectureProposal {
+  const designRules = evaluateArchitectureRules(designPlan)
+  const designAdjacency = evaluateAdjacencyRules(designPlan, DEFAULT_ADJACENCY_RULES)
+  const designResult = runHospitalSimulation(designPlan, DEFAULT_SIMULATION_SETTINGS)
+  const designArea = designPlan.rooms.reduce((sum, room) => sum + room.areaSqm, 0)
+  const noComplies = designAdjacency.filter((res) => !adjacencyComplies(res.status)).length
+  return architectureProposalFromCurrentPlan({
+    owner: 'Diseño PDF',
+    plan: designPlan,
+    result: designResult,
+    rules: designRules,
+    totalArea: designArea,
+    index: 1,
+    title,
+    id,
+    adjacency: { total: designAdjacency.length, noComplies },
+    scenario: {
+      arrivalsPerHour: DEFAULT_SIMULATION_SETTINGS.arrivalsPerHour,
+      horizonYears: DEFAULT_SIMULATION_SETTINGS.horizonYears,
+      durationHours: DEFAULT_SIMULATION_SETTINGS.durationHours,
+      adjacencyTotal: designAdjacency.length,
+      adjacencyComplies: designAdjacency.length - noComplies,
+    },
+    snapshot: {
+      plan: structuredClone(designPlan),
+      settings: { ...DEFAULT_SIMULATION_SETTINGS },
+      adjacencyRules: DEFAULT_ADJACENCY_RULES.map((rule) => ({ ...rule })),
+    },
+  })
+}
+
+const SEEDED_DESIGN_PROPOSALS: ArchitectureProposal[] = [
+  buildDesignProposal(createClinicPdfDesignVertical(), 'Nou Clínic PDF · torre asistencial', 'design-pdf-vertical'),
+  buildDesignProposal(createClinicPdfDesignInstitutes(), 'Nou Clínic PDF · institutos distribuidos', 'design-pdf-institutes'),
+]
+
 function App() {
   const [plan, setPlan] = useState<HospitalPlan>(INITIAL_PLAN)
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('top')
   const [selectedFloor, setSelectedFloor] = useState(0)
   const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>(plan.rooms[0]?.id)
   const [doorToolRoomId, setDoorToolRoomId] = useState<string | undefined>()
-  const [elementToAdd, setElementToAdd] = useState('template:edBoxes')
+  const [elementToAdd, setElementToAdd] = useState('program:a1-hospitalitzacio-module')
   const [componentSourceMode, setComponentSourceMode] = useState<ComponentSourceMode>('clinic')
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettings>(DEFAULT_SIMULATION_SETTINGS)
   const [patientCases, setPatientCases] = useState<PatientCaseDefinition[]>(DEFAULT_PATIENT_CASES)
@@ -114,7 +149,8 @@ function App() {
   const [isClinicalCaseModalOpen, setClinicalCaseModalOpen] = useState(false)
   const [isClinicalCaseHelpOpen, setClinicalCaseHelpOpen] = useState(false)
   const [proposalOwner, setProposalOwner] = useState<ProposalOwner>('Equipo de diseno')
-  const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>([])
+  const [proposalTitle, setProposalTitle] = useState('')
+  const [submittedProposals, setSubmittedProposals] = useState<ArchitectureProposal[]>(SEEDED_DESIGN_PROPOSALS)
   const [adjacencyRules, setAdjacencyRules] = useState<AdjacencyRule[]>(DEFAULT_ADJACENCY_RULES)
   const [scenarioLibrary, setScenarioLibrary] = useState<ScenarioLibrary>(() => loadScenarioLibrary())
   const [activeScenarioId, setActiveScenarioId] = useState<string | undefined>()
@@ -131,6 +167,13 @@ function App() {
   const rules = useMemo(() => evaluateArchitectureRules(plan), [plan])
   const adjacencyResults = useMemo(() => evaluateAdjacencyRules(plan, adjacencyRules), [plan, adjacencyRules])
   const simulationResult = useMemo(() => runHospitalSimulation(plan, simulationSettings, patientCases), [patientCases, plan, simulationSettings])
+  const adjacencyScoreInput = useMemo(
+    () => ({
+      total: adjacencyResults.length,
+      noComplies: adjacencyResults.filter((res) => !adjacencyComplies(res.status)).length,
+    }),
+    [adjacencyResults],
+  )
   const scenarioProposals = useMemo(
     () => scenarioLibrary.scenarios
       .map((scenario) => {
@@ -145,15 +188,13 @@ function App() {
     [scenarioLibrary],
   )
   const topProposals = useMemo(
-    () => rankArchitectureProposals([
-      ...scenarioProposals,
-      ...submittedProposals,
-      // Las variantes sinteticas solo tienen sentido mientras no haya escenarios reales.
-      ...(scenarioProposals.length > 0 ? [] : demoArchitectureProposals(plan, simulationResult, rules, totalArea)),
-    ]),
-    [plan, rules, scenarioProposals, simulationResult, submittedProposals, totalArea],
+    () => rankArchitectureProposals([...scenarioProposals, ...submittedProposals]),
+    [scenarioProposals, submittedProposals],
   )
-  const currentScore = useMemo(() => scoreArchitecture(plan, simulationResult, rules, totalArea), [plan, rules, simulationResult, totalArea])
+  const currentScore = useMemo(
+    () => scoreArchitecture(plan, simulationResult, rules, totalArea, adjacencyScoreInput),
+    [adjacencyScoreInput, plan, rules, simulationResult, totalArea],
+  )
   const panelToggleAvailable = activeTab === 'plan' || activeTab === 'simulation'
   const simulationWorkspace = activeTab === 'simulation'
   const showLeftPanel = panelToggleAvailable && !isLeftPanelHidden
@@ -495,6 +536,11 @@ function App() {
   }
 
   function submitCurrentArchitecture() {
+    const fallbackName = proposalTitle.trim() || `Arquitectura ${submittedProposals.length + 1}`
+    const chosen = window.prompt('Nombre de la arquitectura', fallbackName)
+    if (chosen === null) return
+    const title = chosen.trim() || fallbackName
+    setProposalTitle(title)
     const nextProposal = architectureProposalFromCurrentPlan({
       owner: proposalOwner.trim() || 'Autor sin nombre',
       plan,
@@ -502,6 +548,23 @@ function App() {
       rules,
       totalArea,
       index: submittedProposals.length + 1,
+      title,
+      adjacency: {
+        total: adjacencyResults.length,
+        noComplies: adjacencyResults.filter((res) => !adjacencyComplies(res.status)).length,
+      },
+      scenario: {
+        arrivalsPerHour: simulationSettings.arrivalsPerHour,
+        horizonYears: simulationSettings.horizonYears,
+        durationHours: simulationSettings.durationHours,
+        adjacencyTotal: adjacencyResults.length,
+        adjacencyComplies: adjacencyResults.filter((res) => adjacencyComplies(res.status)).length,
+      },
+      snapshot: {
+        plan: structuredClone(plan),
+        settings: { ...simulationSettings },
+        adjacencyRules: adjacencyRules.map((rule) => ({ ...rule })),
+      },
     })
     setSubmittedProposals((current) => [nextProposal, ...current])
     setActiveTab('top')
@@ -626,6 +689,28 @@ function App() {
     if (activeScenarioId === scenarioId) setActiveScenarioId(undefined)
   }
 
+  /**
+   * Restaurar desde el Top. Si la propuesta viene de un escenario guardado se
+   * carga el escenario completo, incluida la mezcla clinica; si es una
+   * arquitectura sembrada se usa su snapshot de plano, demanda y adyacencias.
+   */
+  function restoreProposal(proposal: ArchitectureProposal) {
+    const scenarioId = proposal.id.startsWith('scenario-') ? proposal.id.slice('scenario-'.length) : undefined
+    if (scenarioId && scenarioLibrary.scenarios.some((item) => item.id === scenarioId)) {
+      loadScenario(scenarioId)
+      setActiveTab('plan')
+      return
+    }
+    if (!proposal.snapshot) return
+    setPlan(structuredClone(proposal.snapshot.plan))
+    setSimulationSettings({ ...proposal.snapshot.settings })
+    setAdjacencyRules(proposal.snapshot.adjacencyRules.map((rule) => ({ ...rule })))
+    setSelectedRoomId(proposal.snapshot.plan.rooms[0]?.id)
+    setSelectedFloor(0)
+    setActiveScenarioId(undefined)
+    setActiveTab('plan')
+  }
+
   function renderFloorPicker() {
     return (
       <section className="panel-section">
@@ -653,20 +738,11 @@ function App() {
         <label>
           Elemento
           <select value={elementToAdd} onChange={(event) => setElementToAdd(event.target.value)}>
-            <optgroup label="Catálogo base">
-              {ROOM_TEMPLATES.map((template) => (
-                <option key={template.id} value={`template:${template.id}`}>
-                  {template.shortName} · {KIND_LABELS[template.kind]}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Pla d'Espais Nou Clínic">
-              {CLINIC_SPACE_PROGRAM.map((entry) => (
-                <option key={entry.id} value={`program:${entry.id}`}>
-                  PDF p.{entry.sourcePages.join('/')} · {entry.label}
-                </option>
-              ))}
-            </optgroup>
+            {CLINIC_SPACE_PROGRAM.map((entry) => (
+              <option key={entry.id} value={`program:${entry.id}`}>
+                {entry.label}
+              </option>
+            ))}
           </select>
         </label>
         <label>
@@ -690,27 +766,9 @@ function App() {
         <Metric label="m2 planta" value={formatNumber(floorArea)} />
         <Metric label="Bloques" value={String(activeFloorRooms.length)} />
         <Metric label="Solapes" value={String(overlapScore(plan.rooms, selectedFloor))} />
+        <Metric label="Score actual" value={formatScore(currentScore.value)} />
+        <button type="button" className="primary-action" onClick={submitCurrentArchitecture}>Guardar en Top</button>
       </section>
-    )
-  }
-
-  function renderScenarioPanel() {
-    return (
-      <ScenarioPanel
-        scenarios={scenarioLibrary.scenarios}
-        runs={scenarioLibrary.runs}
-        activeScenarioId={activeScenarioId}
-        defaultName={`Escenario ${scenarioLibrary.scenarios.length + 1}`}
-        owner={proposalOwner}
-        error={scenarioError}
-        onSave={saveCurrentScenario}
-        onLoad={loadScenario}
-        onUpdate={updateScenarioFromEditor}
-        onDuplicate={duplicateScenarioById}
-        onDelete={deleteScenario}
-        onRun={runScenarioById}
-        onRunAll={runAllScenarios}
-      />
     )
   }
 
@@ -789,6 +847,7 @@ function App() {
               <Metric label="Bloqueos" value={`-${formatScore(currentScore.blockedPenalty)}`} />
               <Metric label="Espera ED" value={`-${formatScore(currentScore.waitPenalty)}`} />
               <Metric label="Reglas" value={`-${formatScore(currentScore.rulePenalty)}`} />
+              <Metric label="Adyacencia" value={`-${formatScore(currentScore.adjacencyPenalty)}`} />
             </div>
           </section>
         </div>
@@ -829,7 +888,7 @@ function App() {
       return <AnalysisModalContent result={simulationResult} rules={rules} />
     }
 
-    return <ServicesModalContent plan={plan} />
+    return null
   }
 
   return (
@@ -868,7 +927,6 @@ function App() {
             ) : (
               <>
                 {renderPlannerTools()}
-                {renderScenarioPanel()}
                 {renderPlanSummary()}
                 <AccessAlerts plan={plan} selectedFloor={selectedFloor} />
               </>
@@ -906,19 +964,46 @@ function App() {
             </Suspense>
           )}
 
-          {activeTab === 'top' && <TopPanel proposals={topProposals} />}
-          {activeTab === 'services' && (
-            <ServicesDashboard
-              plan={plan}
+          {activeTab === 'top' && <TopPanel proposals={topProposals} onRestore={restoreProposal} />}
+          {activeTab === 'scenario' && (
+            <ScenarioPanel
+              settings={simulationSettings}
+              result={simulationResult}
               adjacencyRules={adjacencyRules}
               adjacencyResults={adjacencyResults}
+              onChangeSettings={setSimulationSettings}
               onCycleAdjacency={(a, b) => setAdjacencyRules((current) => cycleRule(current, a, b))}
               onResetAdjacency={() => setAdjacencyRules(DEFAULT_ADJACENCY_RULES)}
               onClearAdjacency={() => setAdjacencyRules([])}
+              onSaveToTop={submitCurrentArchitecture}
+              library={(
+                <ScenarioLibraryPanel
+                  scenarios={scenarioLibrary.scenarios}
+                  runs={scenarioLibrary.runs}
+                  activeScenarioId={activeScenarioId}
+                  defaultName={`Escenario ${scenarioLibrary.scenarios.length + 1}`}
+                  owner={proposalOwner}
+                  error={scenarioError}
+                  onSave={saveCurrentScenario}
+                  onLoad={loadScenario}
+                  onUpdate={updateScenarioFromEditor}
+                  onDuplicate={duplicateScenarioById}
+                  onDelete={deleteScenario}
+                  onRun={runScenarioById}
+                  onRunAll={runAllScenarios}
+                />
+              )}
             />
           )}
           {activeTab === 'analysis' && (
-            <SaturationPanel plan={plan} result={simulationResult} selectedCaseId="all" adjacencyResults={adjacencyResults} />
+            <SaturationPanel
+              plan={plan}
+              result={simulationResult}
+              selectedCaseId="all"
+              adjacencyResults={adjacencyResults}
+              score={currentScore.value}
+              onSaveToTop={submitCurrentArchitecture}
+            />
           )}
         </section>
 
@@ -1002,7 +1087,7 @@ function WorkspaceSectionActions({
   onToggleLeft: () => void
   onToggleRight: () => void
 }) {
-  const showSectionModalTrigger = !panelToggleAvailable
+  const showSectionModalTrigger = !panelToggleAvailable && activeTab !== 'scenario'
   return (
     <div className="section-action-controls">
       {showSectionModalTrigger && (
@@ -1121,68 +1206,6 @@ function AnalysisModalContent({
           )}
         </div>
       </section>
-    </div>
-  )
-}
-
-function ServicesModalContent({ plan }: { plan: HospitalPlan }) {
-  const rows = serviceRowsForPlan(plan)
-  const totalArea = rows.reduce((sum, row) => sum + row.area, 0)
-  const totalCapacity = rows.reduce((sum, row) => sum + row.capacity, 0)
-
-  return (
-    <div className="section-modal-grid">
-      <section className="section-modal-card">
-        <h3>Programa funcional</h3>
-        <div className="section-metric-grid">
-          <Metric label="Familias" value={String(rows.length)} />
-          <Metric label="Bloques" value={String(plan.rooms.length)} />
-          <Metric label="m2" value={formatNumber(totalArea)} />
-          <Metric label="Capacidad" value={String(totalCapacity)} />
-        </div>
-      </section>
-
-      <section className="section-modal-card">
-        <h3>Mayores bolsas de superficie modelada</h3>
-        <div className="rule-list compact">
-          {rows.slice(0, 6).map((row) => (
-            <article key={row.label} className="rule-item ok">
-              <strong>{row.label}</strong>
-              <span>{row.count} bloques · {formatNumber(row.area)} m2 · capacidad {row.capacity}</span>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function ServicesDashboard({
-  plan,
-  adjacencyRules,
-  adjacencyResults,
-  onCycleAdjacency,
-  onResetAdjacency,
-  onClearAdjacency,
-}: {
-  plan: HospitalPlan
-  adjacencyRules: AdjacencyRule[]
-  adjacencyResults: AdjacencyRuleResult[]
-  onCycleAdjacency: (a: RoomKind, b: RoomKind) => void
-  onResetAdjacency: () => void
-  onClearAdjacency: () => void
-}) {
-  return (
-    <div className="services-dashboard">
-      <ClinicSpaceProgramPanel plan={plan} />
-      <AdjacencyMatrixPanel
-        rules={adjacencyRules}
-        results={adjacencyResults}
-        onCycle={onCycleAdjacency}
-        onReset={onResetAdjacency}
-        onClear={onClearAdjacency}
-      />
-      <ServiceMatrix plan={plan} />
     </div>
   )
 }
@@ -1660,56 +1683,6 @@ function ClinicalCasesHelpModal({ onClose }: { onClose: () => void }) {
       </section>
     </div>
   )
-}
-
-function ServiceMatrix({ plan }: { plan: HospitalPlan }) {
-  const rows = serviceRowsForPlan(plan)
-  return (
-    <div className="table-panel">
-      <table>
-        <thead>
-          <tr>
-            <th>Servicio</th>
-            <th>Bloques</th>
-            <th>m2</th>
-            <th>Capacidad</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.label}>
-              <td>{row.label}</td>
-              <td>{row.count}</td>
-              <td>{formatNumber(row.area)}</td>
-              <td>{row.capacity}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-interface ServiceRow {
-  label: string
-  count: number
-  area: number
-  capacity: number
-}
-
-function serviceRowsForPlan(plan: HospitalPlan): ServiceRow[] {
-  return Object.entries(
-    plan.rooms.reduce<Record<string, Omit<ServiceRow, 'label'>>>((acc, room) => {
-      const label = KIND_LABELS[room.kind]
-      acc[label] ??= { count: 0, area: 0, capacity: 0 }
-      acc[label].count += 1
-      acc[label].area += room.areaSqm
-      acc[label].capacity += room.capacity
-      return acc
-    }, {}),
-  )
-    .map(([label, value]) => ({ label, ...value }))
-    .sort((a, b) => b.area - a.area)
 }
 
 function componentsForTemplate(roomId: string, templateId: string, source: ComponentSourceMode): RoomComponent[] {
